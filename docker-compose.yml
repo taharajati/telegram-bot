@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -25,14 +23,10 @@ services:
       context: ./telegram_order_bot
       dockerfile: Dockerfile
     container_name: foroshgram_bot
+    env_file:
+      - ./telegram_order_bot/.env
     environment:
-      BOT_TOKEN: ${BOT_TOKEN}
-      ADMIN_IDS: ${ADMIN_IDS}
       DATABASE_URL: postgresql+asyncpg://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
-      ZARINPAL_MERCHANT_ID: ${ZARINPAL_MERCHANT_ID}
-      ZARINPAL_SANDBOX: ${ZARINPAL_SANDBOX:-true}
-      ZARINPAL_CALLBACK_URL: ${ZARINPAL_CALLBACK_URL}
-      STORE_NAME: ${PROXY_URL:+PROXY_URL=${PROXY_URL}}
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,12 +37,10 @@ services:
       context: ./telegram_order_website
       dockerfile: Dockerfile
     container_name: foroshgram_website
+    env_file:
+      - ./telegram_order_website/.env.local
     environment:
       DATABASE_URL: postgresql://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
-      JWT_SECRET: ${JWT_SECRET:-foroshgram_jwt_secret_change_in_production}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
     depends_on:
