@@ -96,10 +96,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Try admin first
-    if (isAdmin && password === process.env.ADMIN_PASSWORD) {
-      clearAttempts(rateKey);
-      await setSession({ userId: uid, role: 'admin', loginMethod: 'telegram_id' });
-      return NextResponse.json({ success: true, role: 'admin' });
+    if (isAdmin) {
+      if (password === process.env.ADMIN_PASSWORD) {
+        clearAttempts(rateKey);
+        await setSession({ userId: uid, role: 'admin', loginMethod: 'telegram_id' });
+        return NextResponse.json({ success: true, role: 'admin' });
+      }
+      // Admin password wrong — don't fall through to seller
+      recordFailedAttempt(rateKey);
+      return NextResponse.json({ success: false, error: 'رمز عبور اشتباه است.' });
     }
 
     // Try seller
