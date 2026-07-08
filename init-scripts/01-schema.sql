@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE INDEX IF NOT EXISTS idx_products_shop_id ON products(shop_id);
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+-- Composite index for category queries within a shop
+CREATE INDEX IF NOT EXISTS idx_products_shop_category ON products(shop_id, category_id);
 
 -- ─── Users (کاربران / مشتریان) ───
 CREATE TABLE IF NOT EXISTS users (
@@ -119,6 +121,9 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_shop_id ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS idx_orders_tracking_code ON orders(tracking_code);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+-- Composite indexes for multi-tenant query performance
+CREATE INDEX IF NOT EXISTS idx_orders_shop_status ON orders(shop_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_shop_created ON orders(shop_id, created_at DESC);
 
 -- ─── Order Items (اقلام سفارش) ───
 CREATE TABLE IF NOT EXISTS order_items (
