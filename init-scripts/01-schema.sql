@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS shop_owners (
     shop_id INTEGER REFERENCES shops(id) ON DELETE CASCADE,
     first_name VARCHAR(100),
     username VARCHAR(100),
+    password_hash VARCHAR(128),
+    password_salt VARCHAR(32),
     registered_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_shop_owners_user_id ON shop_owners(user_id);

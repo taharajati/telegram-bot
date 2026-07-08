@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     container_name: foroshgram_website
     env_file:
-      - ./telegram_order_website/.env.local
+      - ./telegram_order_website/.env.production
     environment:
       DATABASE_URL: postgresql://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
     ports:
