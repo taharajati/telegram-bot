@@ -42,6 +42,8 @@
 - **درگاه شخصی فروشنده**: هر فروشنده merchant_id اختصاصی زرین‌پال دارد — پول مستقیم به حساب فروشنده می‌رود
 - **کارت‌به‌کارت با آپلود رسید**: مشتری رسید واریز را آپلود می‌کند، فروشنده تأیید/رد می‌کند
 - **دکمه‌های داینامیک پرداخت**: فقط روش‌هایی که فروشنده فعال کرده نمایش داده می‌شود
+- **لینک مستقیم محصول**: هر محصول یک لینک اختصاصی `t.me/bot?start=product_X` دارد — فروشنده در کانال می‌گذارد، خریدار با کلیک مستقیم وارد بات می‌شود
+- **صفحه عمومی محصول در وبسایت**: `/product/[id]` با Open Graph و دکمه خرید
 - **منوی سه سطحی (BotCommandScope)**: دستورات متفاوت برای مشتری/فروشنده/ادمین
 - **شروع هوشمند**: `/start` بدون پارامتر → بازگشت به آخرین فروشگاه یا دعوت به ساخت فروشگاه
 - **مدیریت موجودی اتمیک**: جلوگیری از overselling با رزرو اتمیک SQL
@@ -102,6 +104,7 @@
 | name | String(150) | نام فروشگاه |
 | description | String(500)? | توضیحات |
 | phone | String(30)? | شماره تماس |
+| channel_link | String(200)? | لینک کانال تلگرام فروشنده |
 | rejection_reason | String(500)? | دلیل رد (اگر رد شده) |
 | username | String(100)? Unique | یوزرنیم اختصاصی |
 | is_active | Boolean | فعال/غیرفعال |
@@ -209,8 +212,9 @@
 | status | Enum(OrderStatus) | وضعیت فعلی |
 | payment_method | String(20)? | آنلاین / کارت‌به‌کارت / درب منزل |
 | payment_ref | String(100)? | کد پیگیری زرین‌پال |
-| payment_status | String(20)? | pending / paid / rejected |
-| payment_receipt_file_id | String(255)? | file_id رسید کارت‌به‌کارت |
+| payment_status | String(20)? | pending / paid / rejected / waiting_retry |
+| payment_receipt_file_id | String(255)? | file_id رسید کارت‌به‌کارت (عکس) |
+| payment_receipt_text | String(500)? | شماره تراکنش کارت‌به‌کارت (متن — جایگزین عکس) |
 | payment_receipt_at | DateTime? | زمان آپلود رسید |
 | receiver_name | String(150)? | نام گیرنده |
 | shipping_address | String(500) | آدرس ارسال |
@@ -302,6 +306,18 @@ PENDING_PAYMENT ──→ PAID ──→ CONFIRMED ──→ SHIPPED ──→ D
 4. اگر کاربر فروشنده/ادمین است و لینک فروشگاه خودش است → مستقیم پنل مدیریت را نمایش می‌دهد
 5. اگر کاربر جدید است → ثبت در دیتابیس + منوی فروشگاه
 6. اگر کاربر قبلاً ثبت شده → به‌روزرسانی اطلاعات + منوی فروشگاه
+
+#### سناریوی لینک مستقیم محصول (`?start=product_X`)
+1. کاربر روی `https://t.me/Foroshgrambot?start=product_123` کلیک می‌کند (لینکی که فروشنده در کانال گذاشته)
+2. ربات `product_id` را از پارامتر start استخراج می‌کند (`resolve_product_id_from_start`)
+3. محصول از دیتابیس واکشی می‌شود:
+   - اگر محصول وجود نداشت یا غیرفعال بود → `❌ این محصول دیگر در دسترس نیست.`
+4. کاربر ثبت می‌شود و `current_shop_id` به فروشگاه محصول تنظیم می‌شود
+5. نام محصول، توضیحات، قیمت و وضعیت موجودی نمایش داده می‌شود
+6. دکمه `➕ افزودن به سبد خرید` (فقط اگر موجود باشد)
+7. دکمه `🔙 بازگشت به فروشگاه`
+8. اگر خود فروشنده/ادمین لینک محصول خودش را زده باشد → مستقیم به پنل مدیریت هدایت می‌شود
+9. **فرمت لینک وبسایت**: `https://telegramorder.ir/product/123` — صفحه عمومی محصول با Open Graph
 
 #### سناریوی بدون پارامتر (شروع هوشمند)
 1. کاربر `/start` را بدون لینک می‌فرستد
@@ -582,13 +598,13 @@ PENDING_PAYMENT ──→ PAID ──→ CONFIRMED ──→ SHIPPED ──→ D
 
 **تغییر عکس**: آپلود عکس جدید / `حذف` برای حذف عکس / `انصراف`
 
-**حذف محصول**: تأیید دوم → حذف + پاکسازی CartItem و OrderItem مرتبط
+**حذف محصول**: تأیید دوم → `UPDATE order_items SET product_id=NULL` (حفظ تاریخچه) + `DELETE FROM cart_items` + `DELETE FROM products`
 
 ### ۶.۴. مدیریت دسته‌بندی‌ها (فروشنده/ادمین)
 
 1. نمایش لیست دسته‌بندی‌ها با دکمه حذف
 2. افزودن دسته‌بندی جدید (دریافت نام)
-3. حذف دسته‌بندی: تأیید + اخطار تعداد محصولات داخلش → حذف دسته + محصولات + CartItem + OrderItem مرتبط
+3. حذف دسته‌بندی: تأیید + اخطار تعداد محصولات داخلش → `UPDATE order_items SET product_id=NULL` برای همه محصولات + `DELETE FROM cart_items` + `DELETE FROM products WHERE category_id=X` + `DELETE FROM categories`
 
 ### ۶.۵. مدیریت سفارش‌ها (فروشنده/ادمین)
 
@@ -839,14 +855,49 @@ WHERE id = :pid
 
 ### ۹.۷. کارت به کارت (ثبت + تأیید/رد فروشنده)
 
+#### فلوی کامل (عکس یا متن)
+
 1. مشتری روش `کارت به کارت` را انتخاب می‌کند
-2. شماره کارت و نام صاحب کارت فروشنده نمایش داده می‌شود
-3. مشتری تصویر رسید واریز را آپلود می‌کند
-4. سفارش با وضعیت `PENDING_PAYMENT` و `payment_receipt_file_id` ایجاد می‌شود
-5. فروشنده پیام حاوی رسید را با دکمه‌های `✅ تایید` / `❌ رد` دریافت می‌کند
-6. **تایید**: `finalize_card_payment` → PAID + نهایی‌سازی موجودی + پیام به مشتری
-7. **رد**: `reject_card_payment` → دلیل خواسته می‌شود → CANCELLED + آزادسازی موجودی
-8. عدم اقدام فروشنده تا ۱۲۰ دقیقه → آزادسازی خودکار توسط کرون‌جاب
+2. ربات شماره کارت و نام صاحب کارت فروشنده + جمع کالاها + هزینه ارسال + مبلغ قابل پرداخت را نمایش می‌دهد
+3. ربات می‌گوید: «بعد از واریز، می‌تونی **عکس رسید** یا **شماره تراکنش** رو بفرستی 👇»
+4. مشتری یکی از دو نوع رسید را ارسال می‌کند:
+   - **📸 عکس رسید**: `update.message.photo[-1].file_id` → در `payment_receipt_file_id` ذخیره می‌شود
+   - **🧾 متن (شماره تراکنش)**: `update.message.text` → پس از اعتبارسنجی (۴-۱۰۰ کاراکتر، نرمال‌سازی اعداد فارسی) در `payment_receipt_text` ذخیره می‌شود
+5. سفارش با وضعیت `PENDING_PAYMENT` و `payment_method='card_to_card'` ایجاد می‌شود
+6. رزرو اتمیک موجودی (`reserve_stock_atomic`)
+   - اگر ناموفق → لغو سفارش + پیام خطا
+7. فروشنده پیام حاوی رسید را دریافت می‌کند:
+   - اگر **عکس** باشد: `send_photo` با caption
+   - اگر **متن** باشد: `send_message` با شماره تراکنش
+   - هر دو حالت دکمه‌های `✅ تایید` / `❌ رد` دارند
+8. **تایید** (`seller_approve_card_payment`):
+   - `payment_svc.finalize_card_payment(order_id)` → نهایی‌سازی موجودی (`stock - qty`, `reserved_stock - qty`)
+   - وضعیت → `PAID`
+   - پیام تأیید به مشتری
+   - Idempotent: اگر قبلاً PAID شده → `False`
+9. **رد** (`seller_reject_card_payment`):
+   - `payment_svc.reject_card_payment(order_id)` → `payment_status='rejected'`
+   - سفارش **لغو نمی‌شود** — مشتری ۳ گزینه دارد (دکمه inline):
+     - 🔁 **آپلود رسید جدید** → `handle_card_receipt_retry` → منتظر عکس/متن جدید → `retry_card_receipt(order_id, file_id=..., receipt_text=...)` → ذخیره رسید جدید در سفارش موجود + نوتیف مجدد به فروشنده
+     - 🚚 **تغییر به پرداخت درب منزل** → `handle_convert_to_cod` → `payment_svc.convert_to_cod(order_id)` → تغییر `payment_method='cod'`, `status=PENDING`, موجودی رزرو محفوظ می‌ماند
+     - ❌ **لغو کامل سفارش** → `payment_svc.cancel_order_with_refund(by='customer')` → آزادسازی `reserved_stock` + وضعیت `CANCELLED`
+10. عدم اقدام فروشنده تا ۱۲۰ دقیقه → آزادسازی خودکار توسط کرون‌جاب (`cleanup_abandoned_payments`)
+
+#### نکات فنی مهم در `payment.py`:
+- **`retry_card_receipt(order_id, file_id=None, receipt_text=None)`**: قبلاً فقط `file_id` داشت، الآن هم `file_id` و هم `receipt_text` را می‌پذیرد. اگر `file_id` داده شود → `payment_receipt_text` پاک می‌شود و برعکس. اگر هیچکدام داده نشود → `False` برمی‌گرداند.
+- **`_notify_seller_receipt(context, order_id, shop_id, tracking, total, file_id=None, receipt_text=None)`**: بر اساس نوع رسید، `send_photo` یا `send_message` می‌کند. شماره تراکنش در پیام با `<code>` نمایش داده می‌شود.
+- **فیلتر هندلر در `main.py`**: `ASK_CARD_RECEIPT` از `filters.PHOTO` به `(filters.PHOTO | filters.TEXT) & ~filters.COMMAND` تغییر یافته
+- **دیتابیس**: ستون `payment_receipt_text VARCHAR(500)` با `ALTER TABLE orders ADD COLUMN IF NOT EXISTS` در سرور ایجاد شده
+
+#### اعتبارسنجی متن (شماره تراکنش):
+```python
+receipt_text = receipt_text.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
+if len(receipt_text) < 4 or len(receipt_text) > 100:
+    # خطا: شماره تراکنش معتبر نیست
+```
+- اعداد فارسی (۰-۹) به انگلیسی تبدیل می‌شوند
+- حداقل ۴ کاراکتر، حداکثر ۱۰۰ کاراکتر
+- در صورت نامعتبر بودن، کاربر در همان state (`ASK_CARD_RECEIPT`) می‌ماند و دوباره تلاش می‌کند
 
 ### ۹.۸. سناریوهای خطای پرداخت
 
@@ -885,12 +936,22 @@ WHERE id = :pid
 ### سناریوی B: مشتری با پرداخت کارت به کارت
 
 1-6. مشابه سناریوی A تا مرحله انتخاب `💳 کارت به کارت`
-7. نمایش شماره کارت و نام صاحب کارت فروشنده
-8. مشتری تصویر رسید واریز را آپلود می‌کند
-9. رزرو اتمیک موجودی ✅ + سفارش با `payment_receipt_file_id`
-10. نوتیفیکیشن به فروشنده با رسید + دکمه‌های `✅ تایید` / `❌ رد`
-11. فروشنده تأیید می‌کند → `PAID` → `CONFIRMED` → `SHIPPED` → `DELIVERED`
-12. اگر فروشنده رد کند → `CANCELLED` + آزادسازی موجودی + دلیل به مشتری
+7. ربات نمایش می‌دهد: شماره کارت 🏦 + نام صاحب کارت + جمع کالاها + هزینه ارسال + مبلغ قابل پرداخت
+8. ربات می‌گوید: «می‌تونی **عکس رسید** یا **شماره تراکنش** رو بفرستی 👇»
+9. مشتری یکی را ارسال می‌کند:
+   - **📸 عکس** → `payment_receipt_file_id`
+   - **🧾 متن (شماره تراکنش)** → `payment_receipt_text` (اعتبارسنجی: ۴-۱۰۰ رقم، اعداد فارسی → انگلیسی)
+10. رزرو اتمیک موجودی ✅ + سفارش با `payment_method='card_to_card'`
+11. ربات به فروشنده نوتیف می‌دهد:
+    - اگر عکس: `send_photo` با رسید + دکمه‌های `✅ تایید` / `❌ رد`
+    - اگر متن: `send_message` با شماره تراکنش + دکمه‌های `✅ تایید` / `❌ رد`
+12. فروشنده تأیید می‌کند → `finalize_card_payment` → `PAID` → `CONFIRMED` → `SHIPPED` → `DELIVERED`
+13. اگر فروشنده رد کند:
+    - `reject_card_payment` → `payment_status='rejected'` (سفارش **لغو نمی‌شود**)
+    - مشتری ۳ گزینه دارد:
+      - 🔁 **آپلود رسید جدید** (عکس یا متن) → `retry_card_receipt` → نوتیف مجدد فروشنده
+      - 🚚 **تغییر به پرداخت درب منزل** → `convert_to_cod` (موجودی رزرو محفوظ می‌ماند)
+      - ❌ **لغو کامل سفارش** → `cancel_order_with_refund` (آزادسازی موجودی)
 
 ### سناریوی C: مشتری با پرداخت درب منزل
 
@@ -904,8 +965,8 @@ WHERE id = :pid
 ### سناریوی D: فروشنده جدید ثبت‌نام می‌کند
 
 1. کاربر `🏪 می‌خوام فروشگاه بسازم` را می‌زند
-2. نام → توضیحات → شماره → رمز عبور → ارسال
-3. ادمین پیام اعلان دریافت می‌کند
+2. نام فروشگاه → توضیحات → شماره تماس → **لینک کانال تلگرام** → رمز عبور → تأیید و ارسال
+3. ادمین پیام اعلان دریافت می‌کند (شامل لینک کانال فروشنده)
 4. ادمین `✅ تایید و فعال‌سازی` را می‌زند
 5. فروشنده پیام خوش‌آمدگویی دریافت می‌کند:
    - لینک فروشگاه
@@ -1057,10 +1118,13 @@ ADMIN_IDS=8497713691
 | `/api/seller/shop-info` | GET | — | `{ shop }` | 403 |
 | `/api/seller/toggle-product` | POST | `{ productId }` | `{ success }` | 403 |
 
-### ۱۴.۲. Callback Pattern‌های ربات
+### ۱۴.۲. صفحات عمومی (Public Routes)
 
-| الگوی Callback | هندلر | توضیح |
-|---------------|--------|--------|
+| مسیر | متد | توضیح | پاسخ |
+|------|------|--------|------|
+| `/product/[id]` | GET | صفحه عمومی محصول با Open Graph — دکمه خرید مستقیم به بات | SSR HTML / 404 |
+
+### ۱۴.۳. Callback Pattern‌های ربات
 | `nav:main` | main_menu_callback | بازگشت به منوی اصلی |
 | `cat:list` | show_categories | نمایش دسته‌بندی‌ها |
 | `cat:open:{id}:{page}` | show_products | محصولات یک دسته |
@@ -1089,6 +1153,7 @@ ADMIN_IDS=8497713691
 | `admin:products:list:{page}` | list_products | لیست محصولات |
 | `admin:products:add` | start_add_product | افزودن محصول |
 | `admin:products:edit:{id}` | open_product_edit | ویرایش محصول |
+| `admin:products:link:{id}` | product_link | نمایش لینک مستقیم محصول (t.me + وبسایت) |
 | `admin:products:toggle:{id}` | toggle_product | تغییر وضعیت محصول |
 | `admin:products:delete:{id}` | delete_product_confirm | تأیید حذف محصول |
 | `admin:products:delete_final:{id}` | delete_product_final | حذف نهایی محصول |
@@ -1164,6 +1229,7 @@ delete_seller_menu(bot, chat_id)  # حذف دستورات فروشنده
 ### ✅ پیاده‌سازی شده
 - [x] لاگین نقش‌محور با رمز (ادمین + فروشنده) در سایت
 - [x] ثبت‌نام فروشنده با رمز عبور در ربات (ویزارد ۴ مرحله‌ای)
+- [x] **ثبت‌نام فروشنده با فیلد «لینک کانال تلگرام» (ویزارد ۵ مرحله‌ای)**
 - [x] دستور `/my_panel` در ربات (پنل فروشنده + تغییر رمز)
 - [x] Middleware محافظت مسیرهای `/admin/*` و `/seller/*`
 - [x] Header session-aware (لاگین/لاگاوت)
@@ -1197,6 +1263,21 @@ delete_seller_menu(bot, chat_id)  # حذف دستورات فروشنده
 - [x] ربات جدید `@Foroshgrambot` با توکن جدید
 - [x] **نوتیفیکیشن ایزوله per-shop**: هر فروشنده فقط سفارش فروشگاه خود را دریافت می‌کند (`notify_shop_owner`)
 - [x] **bcrypt در ثبت‌نام فروشنده + تغییر رمز**: هر دو مسیر از bcrypt استفاده می‌کنند (SHA-256 حذف شده)
+- [x] **بازطراحی رنگی پنل وبسایت**: پالت تلگرام‌آبی (`#0088cc`) — همه صفحات کانسوم می‌کنند
+- [x] **لینک مستقیم محصول**: هر محصول لینک اختصاصی `t.me/bot?start=product_123` دارد — فروشنده در کانال می‌ذاره، خریدار می‌زنه می‌ره تو بات
+- [x] **صفحه عمومی محصول در وبسایت**: `/product/[id]` — SSR با Open Graph + دکمه خرید مستقیم به ربات
+- [x] **فایل اینماد**: `public/33482531.txt` در ریشه وبسایت قابل دسترس
+- [x] **۴ صفحه حقوقی/اعتماد**: قوانین، حریم خصوصی، بازگشت کالا، درباره ما — با لینک در فوتر
+- [x] **بازیابی رمز عبور (`/reset_password`)**: دستور جدید در ربات — رمز موقت ۸ رقمی می‌سازد و جایگزین رمز قبلی می‌کند
+- [x] **صفحات خطای سفارشی**: `not-found.tsx` (۴۰۴) و `error.tsx` (۵۰۰) با برند و لینک به ربات
+- [x] **SEO پایه**: `robots.ts`, `sitemap.ts`, `favicon.svg` — مسیرهای ادمین/سِلاِر/API disallow شده
+- [x] **رفع باگ تایید پرداخت کارت‌به‌کارت**: نقش `seller` در validator + `payment_method == "card_to_card"` در transition
+- [x] **سرویس متمرکز سفارش (`order_service.py`)**: `create_order_from_cart` + `transition_order` — منطق واحد برای COD/Card
+- [x] **شکستن `handle_card_receipt`**: فقط رسید می‌گیرد، سفارش قبلاً در `confirm_card_payment` ساخته می‌شود
+- [x] **تجربه یکسان COD/Card**: هر دو ابتدا خلاصه سفارش، بعد تأیید → `create_order_from_cart` در تراکنش واحد
+- [x] **ماژولار کردن `build_application`**: ثبت هندلرها به توابع جداگانه تقسیم شد
+- [x] **UX سبد خرید**: دکمه‌های سریع «مشاهده سبد»، «ادامه خرید»، «حذف» بعد از اضافه کردن
+- [x] **SEO پایه**: `robots.ts`, `sitemap.ts`, `favicon.svg` — مسیرهای ادمین/سِلاِر/API disallow شده
 
 ### 🔄 در حال انجام
 - [ ] زمان‌بندی کرون برای `scripts/db-backup.sh` (اسکریپت آماده، فقط اجرا نمی‌شود)
@@ -1273,7 +1354,8 @@ Telegramorderbot/
 │   │       └── broadcast.py     # پیام همگانی
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── payment.py           # زرین‌پال + مدیریت موجودی
+│   │   ├── payment.py           # مدیریت موجودی + رزرو + نهایی‌سازی
+│   │   └── order_service.py     # سرویس متمرکز سفارش (create_order_from_cart + transition_order)
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   ├── helpers.py           # توابع کمکی
@@ -1292,8 +1374,10 @@ Telegramorderbot/
         ├── middleware.ts
         ├── app/
         │   ├── layout.tsx
-        │   ├── page.tsx                   # لندینگ
-        │   ├── login/page.tsx             # لاگین
+        │   ├── page.tsx                       # لندینگ
+        │   ├── login/page.tsx                 # لاگین
+        │   ├── product/[id]/page.tsx          # صفحه عمومی محصول (لینک مستقیم)
+        │   ├── 33482531.txt                   # فایل تایید اینماد
         │   ├── admin/
         │   │   ├── layout.tsx
         │   │   ├── AdminLayoutClient.tsx

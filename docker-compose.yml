@@ -28,6 +28,8 @@ services:
       - ./telegram_order_bot/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
+    volumes:
+      - ./telegram_order_bot:/app
     depends_on:
       postgres:
         condition: service_healthy
