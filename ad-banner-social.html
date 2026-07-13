@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فروشگرام — بنر تبلیغاتی</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ── Social sized canvas ── */
+  .canvas {
+    width: 1200px;
+    height: 630px;
+    position: relative;
+    overflow: hidden;
+    background: #0f1419;
+    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
+    direction: rtl;
+  }
+
+  /* ── Ambient gradient orbs ── */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .orb-1 {
+    width: 500px; height: 500px;
+    background: rgba(0, 136, 204, 0.15);
+    top: -180px; left: -100px;
+  }
+  .orb-2 {
+    width: 400px; height: 400px;
+    background: rgba(0, 136, 204, 0.08);
+    bottom: -120px; right: -80px;
+  }
+  .orb-3 {
+    width: 250px; height: 250px;
+    background: rgba(91, 33, 182, 0.06);
+    top: 50%; right: 20%;
+    transform: translateY(-50%);
+  }
+
+  /* ── Grid pattern overlay ── */
+  .grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* ── Content ── */
+  .content {
+    position: relative;
+    z-index: 10;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 70px;
+  }
+
+  /* ── Telegram badge ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 136, 204, 0.12);
+    border: 1px solid rgba(0, 136, 204, 0.2);
+    border-radius: 100px;
+    padding: 8px 18px 8px 14px;
+    margin-bottom: 32px;
+    width: fit-content;
+  }
+  .badge-icon {
+    width: 22px; height: 22px;
+    background: #0088cc;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .badge-icon svg { width: 13px; height: 13px; fill: white; }
+  .badge-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Heading ── */
+  .heading {
+    max-width: 700px;
+    margin-bottom: 20px;
+  }
+  .heading h1 {
+    font-size: 58px;
+    font-weight: 900;
+    line-height: 1.12;
+    color: white;
+    letter-spacing: -0.02em;
+  }
+  .heading .highlight {
+    background: linear-gradient(135deg, #0088cc 0%, #66bfff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+  }
+  .heading .underline {
+    position: relative;
+    display: inline-block;
+  }
+  .heading .underline::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: 4px;
+    width: 100%; height: 6px;
+    background: rgba(0, 136, 204, 0.3);
+    border-radius: 3px;
+  }
+
+  /* ── Subtitle ── */
+  .subtitle {
+    max-width: 530px;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 40px;
+  }
+
+  /* ── Feature pills ── */
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 42px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 100px;
+    padding: 8px 18px 8px 14px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.6);
+    transition: all 0.2s;
+  }
+  .pill:hover { background: rgba(0, 136, 204, 0.1); border-color: rgba(0, 136, 204, 0.25); color: white; }
+  .pill-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pill-dot.blue { background: #0088cc; }
+  .pill-dot.green { background: #43a047; }
+  .pill-dot.purple { background: #8b5cf6; }
+  .pill-dot.amber { background: #fb8c00; }
+
+  /* ── CTA ── */
+  .cta-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .cta-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #0088cc;
+    color: white;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 14px 30px;
+    border-radius: 100px;
+    text-decoration: none;
+    box-shadow: 0 4px 24px rgba(0, 136, 204, 0.3);
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+    font-family: 'Vazirmatn', sans-serif;
+  }
+  .cta-button:hover { background: #006da3; box-shadow: 0 6px 32px rgba(0, 136, 204, 0.4); transform: translateY(-1px); }
+  .cta-arrow { transition: transform 0.2s; }
+  .cta-button:hover .cta-arrow { transform: translateX(-4px); }
+
+  .cta-secondary {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .cta-secondary:hover { color: rgba(255,255,255,0.7); }
+
+  /* ── Decorative mockup ── */
+  .mockup-area {
+    position: absolute;
+    left: 60px;
+    top: 50%;
+    transform: translateY(-48%);
+    z-index: 5;
+    pointer-events: none;
+  }
+  .phone-frame {
+    width: 220px;
+    height: 450px;
+    border-radius: 32px;
+    border: 2px solid rgba(255,255,255,0.06);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 100%);
+    backdrop-filter: blur(20px);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+  }
+  .phone-notch {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px; height: 20px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 0 0 12px 12px;
+  }
+  .phone-content {
+    padding: 40px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .phone-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(0, 136, 204, 0.08);
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .phone-header-circle {
+    width: 24px; height: 24px;
+    background: #0088cc;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .phone-header-text {
+    height: 8px; width: 70px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+  }
+  .phone-header-text.short { width: 40px; }
+  .phone-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+  }
+  .phone-row.active {
+    background: rgba(0, 136, 204, 0.08);
+    border: 1px solid rgba(0, 136, 204, 0.15);
+  }
+  .phone-icon-box {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    flex-shrink: 0;
+  }
+  .phone-icon-box.blue { background: rgba(0, 136, 204, 0.15); }
+  .phone-line {
+    height: 7px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    flex: 1;
+  }
+  .phone-line.wide { width: 60px; flex: none; }
+  .phone-line.med { width: 45px; flex: none; }
+  .phone-line.narrow { width: 30px; flex: none; }
+  .phone-line.thin { height: 5px; }
+  .phone-label {
+    font-size: 8px;
+    color: rgba(255,255,255,0.2);
+    margin-top: 10px;
+    text-align: center;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Floating elements ── */
+  .float-1 {
+    position: absolute;
+    left: 310px;
+    top: 80px;
+    z-index: 6;
+    animation: float-up 5s ease-in-out infinite;
+  }
+  .float-2 {
+    position: absolute;
+    left: 290px;
+    bottom: 90px;
+    z-index: 6;
+    animation: float-up 6s ease-in-out infinite;
+    animation-delay: -2s;
+  }
+  .mini-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+  }
+  .mini-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .mini-dot.green-dot { background: #43a047; }
+  .mini-dot.blue-dot { background: #0088cc; }
+
+  @keyframes float-up {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* ── Bottom gradient fade ── */
+  .bottom-fade {
+    position: absolute;
+    bottom: 0;
+    left: 0; right: 0;
+    height: 120px;
+    background: linear-gradient(to top, rgba(15,20,25,1) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* ── Responsive note ── */
+  .screen-note {
+    display: none;
+    text-align: center;
+    font-family: 'Vazirmatn', sans-serif;
+    direction: rtl;
+    padding: 40px 20px;
+  }
+  @media (max-width: 800px) {
+    .canvas { display: none; }
+    .screen-note { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+  <!-- Orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Grid -->
+  <div class="grid-overlay"></div>
+
+  <!-- Decorative mockup (right side) -->
+  <div class="mockup-area" style="left: auto; right: 60px;">
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div class="phone-header">
+          <div class="phone-header-circle"></div>
+          <div class="phone-header-text"></div>
+          <div style="flex:1"></div>
+          <div class="phone-header-text short"></div>
+        </div>
+        <div class="phone-row active">
+          <div class="phone-icon-box blue"></div>
+          <div class="phone-line med"></div>
+          <div class="phone-line narrow"></div>
+        </div>
+        <div class="phone-row">
+          <div class="phone-icon-box"></div>
+          <div class="phone-line wide"></div>
+          <div class="phone-line narrow"></div>
+        </div>
+        <div class="phone-row">
+          <div class="phone-icon-box"></div>
+          <div class="phone-line med"></div>
+          <div class="phone-line narrow"></div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex; gap:4px; padding: 8px 0;">
+          <div style="flex:1; height:32px; background:rgba(0,136,204,0.12); border-radius:8px;"></div>
+          <div style="flex:2; height:32px; background:rgba(0,136,204,0.25); border-radius:8px;"></div>
+        </div>
+        <div style="display:flex; gap:4px;">
+          <div style="flex:1; height:24px; background:rgba(255,255,255,0.04); border-radius:6px;"></div>
+          <div style="flex:1; height:24px; background:rgba(255,255,255,0.04); border-radius:6px;"></div>
+        </div>
+        <div class="phone-label">فروشگاه اختصاصی تلگرامی شما</div>
+      </div>
+    </div>
+
+    <!-- Floating mini-cards -->
+    <div class="float-1">
+      <div class="mini-card">
+        <div class="mini-dot green-dot"></div>
+        <span>سفارش جدید دریافت شد ✅</span>
+      </div>
+    </div>
+    <div class="float-2">
+      <div class="mini-card">
+        <div class="mini-dot blue-dot"></div>
+        <span>پرداخت کارت‌به‌کارت تأیید شد</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content (left side) -->
+  <div class="content" style="padding: 60px 640px 60px 70px;">
+    <div class="badge">
+      <div class="badge-icon">
+        <svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+      </div>
+      <span class="badge-text">پلتفرم اتوماسیون فروش در تلگرام</span>
+    </div>
+
+    <div class="heading">
+      <h1>
+        فروشگاه تلگرامیت رو<br>
+        <span class="highlight">در ۳ دقیقه</span> راه بنداز
+      </h1>
+    </div>
+
+    <p class="subtitle">
+      ربات اختصاصی، پرداخت مستقیم به کارت فروشنده، مدیریت محصولات و پیگیری سفارش — همه‌چیز خودکار.
+    </p>
+
+    <div class="features">
+      <div class="pill"><span class="pill-dot blue"></span> ربات اختصاصی تلگرام</div>
+      <div class="pill"><span class="pill-dot green"></span> پرداخت آنلاین + کارت‌به‌کارت</div>
+      <div class="pill"><span class="pill-dot purple"></span> لینک مستقیم محصول</div>
+      <div class="pill"><span class="pill-dot amber"></span> مدیریت موجودی اتمیک</div>
+      <div class="pill"><span class="pill-dot blue"></span> پنل فروشنده</div>
+    </div>
+
+    <div class="cta-row">
+      <a href="#" class="cta-button">
+        شروع کن
+        <svg class="cta-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m14 7 5 5-5 5"/></svg>
+      </a>
+      <a href="#" class="cta-secondary">ورود فروشنده‌ها</a>
+    </div>
+  </div>
+
+  <div class="bottom-fade"></div>
+</div>
+
+<div class="screen-note">
+  <p style="font-size: 20px; font-weight: 700; color: #0f1419;">فروشگرام</p>
+  <p style="margin-top: 8px; color: #5e6c78;">این بنر در ابعاد 1200×630 طراحی شده — لطفاً در مرورگر کامل مشاهده کنید.</p>
+</div>
+
+</body>
+</html>

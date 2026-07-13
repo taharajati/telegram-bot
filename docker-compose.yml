@@ -28,8 +28,16 @@ services:
       - ./telegram_order_bot/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
+      # Monitoring
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9090}
     volumes:
       - ./telegram_order_bot:/app
+    ports:
+      - "9090:9090"  # Prometheus metrics
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,11 +47,14 @@ services:
     build:
       context: ./telegram_order_website
       dockerfile: Dockerfile
+      args:
+        JWT_SECRET: ${JWT_SECRET:-foroshgram_default_secret_change_me}
     container_name: foroshgram_website
     env_file:
       - ./telegram_order_website/.env.production
     environment:
-      DATABASE_URL: postgresql://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
+      DATABASE_URL: postgresql://foroshgram:***@postgres:5432/foroshgram
+      JWT_SECRET: ${JWT_SECRET:-foroshgram_default_secret_change_me}
     ports:
       - "3000:3000"
     depends_on:
@@ -51,5 +62,43 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ─── Monitoring Stack ────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: foroshgram_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"  # UI on host 9091
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: foroshgram_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:3001"
+    volumes:
+      - ./monitoring/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
