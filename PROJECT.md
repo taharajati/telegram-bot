@@ -1,6 +1,6 @@
 # پروژه فروشگرام (Foroshgram) — Telegram Order Bot
 
-> **نسخه:** 2.2 | **تاریخ:** ۱۴۰۵-۰۴-۲۳ (2026-07-14)  
+> **نسخه:** 2.3 | **تاریخ:** ۱۴۰۵-۰۴-۲۳ (2026-07-14)  
 > **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)  
 > **پلتفرم سفارش آنلاین چندمستأجری تلگرام**
 
@@ -309,7 +309,7 @@ def available_stock(self) -> int:
 | discount_code | String(50)? | کد تخفیف اعمال شده |
 | discount_amount | Integer default=0 | مبلغ تخفیف (تومان) |
 | status_history | Text (JSON) | تاریخچه قدیمی (دیگر استفاده نمی‌شود، برای backward compatibility) |
-| cancellation_reason | String(20)? | دلیل لغو |
+|| cancellation_reason | String(100)? | دلیل لغو |
 | created_at | DateTime | |
 | updated_at | DateTime | |
 
@@ -327,6 +327,9 @@ def available_stock(self) -> int:
 | product_name | String(150) | نام محصول (ذخیره شده در لحظه سفارش) |
 | quantity | Integer | تعداد |
 | unit_price | Float | قیمت واحد در لحظه سفارش |
+
+**روابط:**
+- `product: Product` — رابطه به محصول (برای بررسی موجودی و جزئیات در زمان تایید پرداخت)
 
 ### ۳.۱۱. تاریخچه سفارش (OrderHistory)
 
@@ -557,6 +560,10 @@ order:start → (اگر fast-checkout) ASK_NAME
 - `order:change_payment` — تغییر روش پرداخت
 - `order:cancel` — انصراف (ConversationHandler.END)
 
+**Fallbackهای مکالمه (هرجایی قابل استفاده):**
+- `order:pay_cancel:{id}` — انصراف در مرحله پرداخت + پاک کردن state
+- `order:start` — شروع مجدد checkout (اگر مکالمه گیر کرده باشد)
+
 ### ۵.۶. پرداخت کارت‌به‌کارت
 
 1. مشتری در خلاصه سفارش `✅ ثبت نهایی` می‌زند
@@ -566,9 +573,8 @@ order:start → (اگر fast-checkout) ASK_NAME
 5. سفارش `PENDING_PAYMENT` + `attach_card_receipt()` → رسید ذخیره می‌شود
 6. فروشنده پیام حاوی رسید + دکمه‌های `✅ تایید` / `❌ رد`
 7. **تأیید**: `transition_order(PAID)` → نهایی‌سازی موجودی → نوتیفیکیشن به مشتری
-8. **رد**: مشتری ۳ گزینه:
+8. **رد**: مشتری ۲ گزینه:
    - `pay:receipt_retry:{id}` — آپلود مجدد رسید
-   - `pay:convert_cod:{id}` — تغییر به درب منزل (لغو سفارش فعلی + ساخت سفارش جدید با payment_method=cod)
    - `pay:cancel:{id}` — لغو کامل (`cancel_order_and_release_stock`)
 9. **عدم اقدام فروشنده تا ۱۲۰ دقیقه** → کرون‌جاب آزادسازی خودکار (`cleanup_abandoned_payments`)
 
@@ -1033,9 +1039,9 @@ transition_order(PAID)
 | `pay:cancel:{id}` | `cancel_order_payment` | لغو سفارش |
 | `pay:receipt_retry:{id}` | `handle_card_receipt_retry` | آپلود مجدد رسید |
 | `pay:convert_cod:{id}` | `handle_convert_to_cod` | تغییر به درب منزل |
-| `wishlist:view` | `view_wishlist` | نمایش علاقه‌مندی‌ها |
-| `wishlist:add:{pid}` | `add_to_wishlist` | افزودن به علاقه‌مندی‌ها |
-| `wishlist:remove:{pid}` | `remove_from_wishlist` | حذف از علاقه‌مندی‌ها |
+|| `wishlist:add:{pid}:{cat}:{page}` | `toggle_wishlist` | افزودن/حذف از علاقه‌مندی‌ها |
+|| `wishlist:remove:{pid}:{cat}:{page}` | `toggle_wishlist` | حذف از علاقه‌مندی‌ها |
+|| `wishlist:view` | `view_wishlist` | نمایش علاقه‌مندی‌ها |
 | `search:start` | `start_search` | شروع جستجو |
 | `search:result:{pid}` | `search_result_callback` | نتیجه جستجو |
 | `restock:subscribe:{pid}` | `subscribe_restock` | سابسکرایب موجود شدن |
@@ -1274,6 +1280,15 @@ ADMIN_IDS=8497713691
 - [x] **رفع `ORDER_STATUS.CANCELLED`**: با دو L (cancelled) — انگلیسی بریتانیایی
 - [x] **رفع `.value` روی OrderStatus**: کلاس str ساده است نه Enum
 - [x] **رفع `edit_message_text` روی عکس**: `render_view` fallback به `send_message`
+- [x] **رفع انصراف در مرحله پرداخت → بن‌بست**: `order:pay_cancel` و `order:start` به `fallbacks` مکالمه اضافه شد
+- [x] **رفع ارور بعد از رد رسید و آپلود مجدد**: `retry_card_receipt` سفارش `CANCELLED`/`rejected` رو revive می‌کنه + رزرو مجدد موجودی
+- [x] **رفع ⭐ افزودن به علاقه‌مندی**: `toggle_wishlist` unpack با `*_` برای callback 5 بخشی فیکس شد
+- [x] **رفع ❤️ مشاهده علاقه‌مندی‌ها**: `selectinload(WishlistItem.product)` + حلقه داخل session (رفع lazy-load بعد از بسته شدن session)
+- [x] **رفع ✅ تایید پرداخت (KeyError)**: `OrderItem.product` relationship به مدل اضافه شد
+- [x] **رفع 🎉 تبریک اولین فروش → بن‌بست**: دکمه «🗂 پنل فروشنده» به دو مکان ارسال اضافه شد
+- [x] **رفع `cancellation_reason` ترانکیت**: ستون `VARCHAR(100)` (بود ۲۰ — `release_reserved_stock` ۲۲ کاراکتر)
+- [x] **رفع `release_reserved_stock`**: حذف پارامتر `session`
+- [x] **رفع همه پیام‌های بن‌بست‌ساز**: `_NAV_KB` با ۳ دکمه (ادامه خرید، سبد خرید، شروع) به همه پیام‌های پایانی 
 
 ### 🔄 در حال انجام
 
