@@ -1182,7 +1182,42 @@ services:
 - `fix-deployment.py` — رفع مشکلات استقرار
 - `fix-nginx.py` — رفع مشکلات Nginx
 
-### ۱۳.۴. Nginx
+### ۱۳.۴. Backup & Restore (جديد)
+
+| فایل | توضیح |
+|------|-------|
+| `scripts/backup.sh` | بک‌آپ روزانه/هفتگی/ماهانه PostgreSQL با retention + sync به S3 (rclone) |
+| `scripts/restore.sh` | بازیابی بک‌آپ با drop/create + اعمال init-scripts |
+| `scripts/setup-rclone.sh` | راه‌اندازی rclone برای S3/MinIO/DO Spaces/B2/Wasabi |
+| `scripts/Dockerfile.backup` | ایمیج بک‌آپ (Alpine + pg_dump + rclone + cron) |
+
+**زمان‌بندی:**
+- روزانه: ساعت ۰۳:۰۰ (حفظ ۷ روز)
+- هفتگی: یکشنبه‌ها (حفظ ۴ هفته)
+- ماهانه: اول هر ماه (حفظ ۱۲ ماه)
+
+**استقرار در Docker Compose:**
+```yaml
+backup:
+  build:
+    context: .
+    dockerfile: scripts/Dockerfile.backup
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./scripts:/scripts:ro
+    - ./backups:/backups
+    - ./init-scripts:/init-scripts:ro
+    - ./rclone.conf:/config/rclone.conf:ro
+  restart: unless-stopped
+```
+
+**تنظیم rclone (یک‌بار روی VPS):**
+```bash
+chmod +x scripts/setup-rclone.sh
+./scripts/setup-rclone.sh
+```
+
+### ۱۳.۵. Nginx
 
 - `nginx.conf` — کانفیگ کامل با SSL
 - `nginx-no-ssl.conf` — کانفیگ بدون SSL (توسعه)

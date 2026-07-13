@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS shop_owners (
     username VARCHAR(100),
     password_hash VARCHAR(128),
     password_salt VARCHAR(32),
+    must_change_password BOOLEAN DEFAULT FALSE,
     registered_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_shop_owners_user_id ON shop_owners(user_id);
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS admins (
     id SERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL UNIQUE,
     password_hash VARCHAR(128) NOT NULL,
+    must_change_password BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_admins_user_id ON admins(user_id);
