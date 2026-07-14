@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS shops (
     status VARCHAR(20) DEFAULT 'draft',
     created_at TIMESTAMP DEFAULT NOW(),
     zarinpal_merchant_id VARCHAR(36),
-    card_number VARCHAR(16),
-    card_holder_name VARCHAR(100),
-    sheba_number VARCHAR(26)
+    card_number TEXT,       -- AES-256-GCM ciphertext (base64, ~60 chars for 16-digit)
+    card_holder_name TEXT,  -- AES-256-GCM ciphertext (base64, ~172 chars for 100-char name)
+    sheba_number TEXT       -- AES-256-GCM ciphertext (base64, ~72 chars for 26-char IBAN)
 );
 
 -- ─── Shop Owners (صاحبان فروشگاه) ───

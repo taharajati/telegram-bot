@@ -598,7 +598,7 @@ order:start → (اگر fast-checkout) ASK_NAME
 8. **رد**: مشتری ۲ گزینه:
    - `pay:receipt_retry:{id}` — آپلود مجدد رسید
    - `pay:cancel:{id}` — لغو کامل (`cancel_order_and_release_stock`)
-9. **عدم اقدام فروشنده تا ۱۲۰ دقیقه** → کرون‌جاب آزادسازی خودکار (`cleanup_abandoned_payments`)
+9. **عدم اقدام فروشنده تا ۱۵ دقیقه** (بدون رسید) یا **۴۸ ساعت** (بعد از رسید) → کرون‌جاب آزادسازی خودکار (`cleanup_abandoned_payments`)
 
 ### ۵.۷. تاریخچه و پیگیری سفارش
 
@@ -939,14 +939,18 @@ async def transition_order(order_id, target_status, actor="admin", bot=None) -> 
 
 ## ۱۰. کرون‌جاب‌ها
 
-### ۱۰.۱. پاکسازی سفارش‌های پرداخت‌نشده (APScheduler)
+### ۱۰.۱. پاک‌سازی خودکار سفارش‌های پرداخت‌نشده (APScheduler)
+
+- `cleanup_abandoned_payments()`:
+  - **بدون رسید**: ۱۵ دقیقه پس از ایجاد → CANCELLED
+  - **بعد از رسید**: ۴۸ ساعت (فروشنده فرصت کافی دارد)
+  - **COD (PENDING)**: ۳۰ روز
+- اجرا: هر ۳۰ دقیقه (`payment._post_init`)
 
 ```python
 async def cleanup_task():
-    await payment_svc.cleanup_abandoned_payments(minutes=30)
+    await payment_svc.cleanup_abandoned_payments()
 ```
-
-- اجرا: هر ۳۰ دقیقه (در `_post_init`)
 - سفارش‌های `PENDING_PAYMENT` با `created_at < now - 30min` را لغو می‌کند
 - موجودی رزرو شده آزاد می‌شود
 - از `TIMESTAMP WITHOUT TIME ZONE` → `.replace(tzinfo=None)` برای مقایسه
