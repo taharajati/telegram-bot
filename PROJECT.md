@@ -68,6 +68,13 @@
 - **گالری چندعکسی**: آلبوم تلگرام (send_media_group) برای محصولات با چند عکس
 - **پشتیبانی (Support)**: ConversationHandler مجزا
 - **افزودن محصول با فوروارد**: فروشنده پیام کانال را فوروارد می‌کند
+- **پیام خریدار-فروشنده (Conversations)**: مشتری از داخل جزئیات سفارش پیام بده، فروشنده اینباکس مجزا دارد
+- **تایید/رد مستقیم از نوتیفیکیشن**: ادمین بدون رفتن به پنل از دکمه‌های inline می‌تواند فروشنده را تایید/رد کند
+- **رمزنگاری اطلاعات بانکی**: AES-256-GCM با PBKDF2 در هر دو سمت (ربات + سایت)
+- **CSRF protection**: HMAC-SHA256 double-submit cookie
+- **Rate limiter توزیع‌شده**: Redis-backed با fallback in-memory
+- **De-duplication رسید پرداخت**: SHA-256 hash + UNIQUE constraint
+- **اجبار تغییر رمز بعد از reset**: must_change_password flag
 - **کمپرس پاسخ‌های طولانی**: کاهش سایز پیام‌های تکراری
 
 ---
@@ -107,12 +114,14 @@
 
 - **ربات**: Python 3.12 + python-telegram-bot v22.x (async) — APScheduler
 - **ORM**: SQLAlchemy 2.0 Async + asyncpg
-- **سایت**: Next.js 14 (App Router, Turbopack-ready) + pg (Node.js native)
+- **سایت**: Next.js 14 (App Router, Turbopack-ready) + pg (Node.js native driver)
 - **دیتابیس**: PostgreSQL 16 (تولید) / SQLite (توسعه محلی)
-- **JWT**: jose (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, ۷ روز)
+- **JWT**: jose (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, SameSite=Lax)
 - **هش رمز**: bcrypt (ad-hoc wrapper، کتابخانه `bcrypt` روی Alpine)
+- **رمزنگاری**: AES-256-GCM با `cryptography.hazmat` (Python) / `crypto` native (Node.js)
 - **Proxy Bot**: HTTP proxy support برای مناطق تحریمی
-- **مانیتورینگ**: Prometheus + Grafana (با `metrics_collector` ماژولار)
+- **مانیتورینگ**: Prometheus + Grafana (با `monitoring.py` ماژولار)
+- **Rate Limiter**: Redis (`redis-py` / `redis` npm) + in-memory fallback
 
 ### ماژول‌های اصلی ربات
 
@@ -132,12 +141,15 @@
 | **Support** | پشتیبانی (ConversationHandler) | `handlers/support.py` |
 | **Help** | راهنمای نقش‌محور | `handlers/help.py` |
 | **Common** | توابع مشترک بین handlers | `handlers/common.py` |
+| **Conversations** | پیام خریدار-فروشنده (اینباکس) | `handlers/conversations.py` |
+| **Admin Approval** | تایید/رد فروشنده از دکمه inline | `handlers/admin_approval.py` |
 | **Admin Panel** | پنل ادمین | `handlers/admin/panel.py` |
 | **Admin Products** | مدیریت محصولات | `handlers/admin/products.py` |
 | **Admin Categories** | مدیریت دسته‌بندی | `handlers/admin/categories.py` |
 | **Admin Orders** | مدیریت سفارش‌ها | `handlers/admin/orders.py` |
 | **Admin Shops** | مدیریت فروشگاه‌ها | `handlers/admin/shops.py` |
 | **Admin Broadcast** | پیام همگانی | `handlers/admin/broadcast.py` |
+| **Crypto (Bot)** | AES-256-GCM رمزنگاری اطلاعات بانکی | `utils/crypto.py` |
 | **Payment Service** | رزرو/آزادسازی/نهایی‌سازی موجودی | `services/payment.py` |
 | **Order Service** | سرویس متمرکز سفارش | `services/order_service.py` |
 | **EventBus** | معماری event-driven | `services/events.py` |
@@ -580,6 +592,7 @@ order:start → (اگر fast-checkout) ASK_NAME
 3. ربات شماره کارت فروشنده + نام صاحب کارت + مبلغ را نمایش می‌دهد
 4. مشتری عکس رسید (فایل عکس) یا شماره تراکنش (متن) می‌فرستد → `ASK_CARD_RECEIPT`
 5. سفارش `PENDING_PAYMENT` + `attach_card_receipt()` → رسید ذخیره می‌شود
+   - `payment_receipt_hash = SHA-256(receipt_text or file_id)` — جلوگیری از رسید تکراری
 6. فروشنده پیام حاوی رسید + دکمه‌های `✅ تایید` / `❌ رد`
 7. **تأیید**: `transition_order(PAID)` → نهایی‌سازی موجودی → نوتیفیکیشن به مشتری
 8. **رد**: مشتری ۲ گزینه:
@@ -743,6 +756,7 @@ order:start → (اگر fast-checkout) ASK_NAME
 - دریافت رمز جدید (حداقل ۶ کاراکتر)
 - هش bcrypt + ذخیره در `shop_owners.password_hash`
 - Salt جدید هر بار تولید می‌شود
+- `must_change_password = True` بعد از `/reset_password` — لاگین بعدی الزاماً به `/change-password` ریدایرکت می‌شود
 
 ### ۷.۴. کد تخفیف
 
@@ -761,9 +775,10 @@ order:start → (اگر fast-checkout) ASK_NAME
 
 ### ۷.۶. تنظیمات پرداخت (`seller:payment_settings`)
 
-- `🔢 تنظیم شماره کارت` → دریافت ۱۶ رقمی
-- `👤 تنظیم نام صاحب کارت`
+- `🔢 تنظیم شماره کارت` → دریافت ۱۶ رقمی → AES-256-GCM رمزنگاری می‌شود
+- `👤 تنظیم نام صاحب کارت` → AES-256-GCM رمزنگاری می‌شود
 - `🆔 تنظیم merchant_id زین‌پال` (غیرفعال)
+- رمزگشایی فقط در لحظه نمایش به مشتری در مرحله پرداخت (both bot & website)
 
 ### ۷.۷. داشبورد فروشنده
 
@@ -949,8 +964,8 @@ scheduler.add_job(check_abandoned_carts, "interval", minutes=30)
 
 ### ۱۰.۳. برنامه آینده
 
-- [ ] ارسال یادآوری به فروشنده برای سفارش‌های در انتظار
-- [ ] پشتیبان‌گیری خودکار دیتابیس
+- [x] ارسال یادآوری به فروشنده برای سفارش‌های در انتظار
+- [x] پشتیبان‌گیری خودکار دیتابیس — کانتینر foroshgram_backup با crond (روزانه ۳ صبح + هفتگی)
 - [ ] گزارش روزانه فروش به ادمین
 
 ---
@@ -1018,8 +1033,21 @@ transition_order(PAID)
 | `/api/seller/orders/[id]/status` | PATCH | `{ status }` | `{ success }` | فروشنده |
 | `/api/seller/shop-info` | GET | — | `{ shop }` | فروشنده |
 | `/api/seller/toggle-product` | POST | `{ productId }` | `{ success }` | فروشنده |
+| `/api/product-image/[id]` | GET | — | image file | خیر |
 
-### ۱۲.۲. Callback Pattern‌های ربات — مشتری
+### ۱۲.۲. سیستم پیام خریدار-فروشنده (Conversations)
+
+| فایل | توضیح |
+|------|-------|
+| `handlers/conversations.py` | ConversationHandler مجزا — مشتری از `order:conversation:{id}` شروع می‌کند |
+| فروشنده اینباکس در پنل `seller:inbox` دارد | |
+| `Conversation` | جدول: `id`, `buyer_id`, `shop_id`, `order_id?`, `status` (open/closed) |
+| `Message` | جدول: `id`, `conversation_id`, `sender_role` (buyer/seller), `content`, `has_attachment`, `attachment_file_id`, `read_at` |
+| `/cancel` | لغو مکالمه فعلی |
+
+جریان: خریدار from `order:detail` → `conv:open:{id}` → ارسال متن/عکس → فروشنده in `seller:conversations` می‌بیند → پاسخ می‌دهد.
+
+### ۱۲.۳. Callback Pattern‌های ربات — مشتری
 
 | Pattern | Handler | توضیح |
 |---------|---------|-------|
@@ -1059,8 +1087,10 @@ transition_order(PAID)
 | `shop:open:{id}` | `open_shop_from_recent` | باز کردن فروشگاه |
 | `support:open` | `support` | پشتیبانی |
 | `noop` | `noop_callback` | دکمه صرفاً نمایشی |
+| `order:conversation:{id}` | `open_conversation_buyer` | شروع مکالمه با فروشنده |
+| `conv:back` | `back_to_order_detail` | بازگشت به جزئیات سفارش |
 
-### ۱۲.۳. Callback Pattern‌های ربات — فروشنده
+### ۱۲.۴. Callback Pattern‌های ربات — فروشنده
 
 | Pattern | Handler | توضیح |
 |---------|---------|-------|
@@ -1075,8 +1105,11 @@ transition_order(PAID)
 | `discount:list` | `_show_discount_menu` | لیست کد تخفیف |
 | `discount:create` | `apply_discount_start` | ساخت کد جدید |
 | `discount:toggle:{id}` | `toggle_discount` | فعال/غیرفعال |
+| `seller:inbox` | `seller_conversations_list` | لیست مکالمات خریداران |
+| `seller:conv:open:{conv_id}` | `open_conversation_seller` | باز کردن مکالمه |
+| `seller:conv:back` | `back_to_inbox` | بازگشت به اینباکس |
 
-### ۱۲.۴. Callback Pattern‌های ربات — ادمین
+### ۱۲.۵. Callback Pattern‌های ربات — ادمین
 
 | Pattern | Handler | توضیح |
 |---------|---------|-------|
@@ -1109,7 +1142,7 @@ transition_order(PAID)
 | `admin:seller:approve:{shop_id}` | `handle_admin_approve` | تایید فروشنده |
 | `admin:seller:reject:{shop_id}` | `handle_admin_reject` | رد فروشنده |
 
-### ۱۲.۵. Command‌های ربات
+### ۱۲.۶. Command‌های ربات
 
 **همه کاربران (پیش‌فرض):**
 
@@ -1142,7 +1175,7 @@ transition_order(PAID)
 | `/pending_shops` | فروشگاه‌های در انتظار تایید |
 | `/stats` | آمار کلی |
 
-### ۱۲.۶. سطح‌بندی BotCommandScope
+### ۱۲.۷. سطح‌بندی BotCommandScope
 
 ```python
 set_default_menu(bot)          # BotCommandScopeDefault — همه
@@ -1488,6 +1521,7 @@ Telegramorderbot/
 │   │   ├── menu.py                   # دسته‌بندی + محصولات + گالری
 │   │   ├── cart.py                   # سبد خرید
 │   │   ├── order.py                  # ثبت سفارش + تاریخچه + پرداخت + تخفیف
+│   │   ├── conversations.py          # پیام خریدار-فروشنده (اینباکس)
 │   │   ├── bot_commands.py           # BotCommandScope سه سطحی
 │   │   ├── seller_registration.py    # ویزارد ۸ مرحله‌ای
 │   │   ├── seller_panel.py           # پنل فروشنده + تنظیمات
@@ -1498,7 +1532,7 @@ Telegramorderbot/
 │   │   ├── support.py                # پشتیبانی (ConversationHandler)
 │   │   ├── help.py                   # /help نقش‌محور
 │   │   ├── common.py                 # توابع مشترک
-│   │   ├── admin_approval.py         # تایید/رد فروشنده
+│   │   ├── admin_approval.py         # تایید/رد فروشنده از نوتیفیکیشن درون‌خطی
 │   │   └── admin/
 │   │       ├── panel.py              # پنل ادمین
 │   │       ├── products.py           # مدیریت محصولات
@@ -1517,12 +1551,13 @@ Telegramorderbot/
 │   │   └── abandoned_cart.py         # یادآوری سبد رها شده
 │   ├── utils/
 │   │   ├── helpers.py                # format_price, to_jalali, is_super_admin
-│   │   ├── tg_helpers.py             # render_view, get_current_shop_id
+│   │   ├── tg_helpers.py             # render_view, get_current_shop_id, escape_html
+│   │   ├── crypto.py                 # AES-256-GCM رمزنگاری اطلاعات بانکی
 │   │   ├── order_validator.py        # can_transition + ALLOWED_TRANSITIONS
 │   │   ├── payment_config.py         # تنظیمات پرداخت per-shop
 │   │   └── tenant.py                 # چندمستأجری
-│   └── tests/
-│       └── test_flow.py              # تست‌های جریان کامل
+│   ├── tests/
+│   │   └── test_flow.py              # تست‌های جریان کامل (۷ سناریو)
 └── telegram_order_website/
     ├── Dockerfile
     ├── next.config.ts
@@ -1556,14 +1591,33 @@ Telegramorderbot/
         │       ├── admin/create-claim-code|toggle-shop|toggle-user-block/route.ts
         │       ├── admin/orders/[id]/status/route.ts
         │       ├── seller/shop-info|toggle-product/route.ts
-        │       └── seller/orders/[id]/status/route.ts
+        │       ├── seller/orders/[id]/status/route.ts
+        │       └── product-image/[id]/route.ts       # عکس محصول
         ├── components/
         │   ├── layout/ (Header, Footer, ProtectedLayout)
         │   └── shared/ (Card, ...)
         ├── lib/
-        │   ├── auth.ts               # JWT + سشن
-        │   ├── db.ts                 # pg queries
+        │   ├── auth.ts               # JWT + سشن + requireSeller/requireAdmin
+        │   ├── crypto.ts             # AES-256-GCM (Node.js native)
+        │   ├── csrf.ts               # HMAC-SHA256 double-submit
+        │   ├── db.ts                 # pg Pool + query helpers
+        │   ├── rate-limiter.ts       # Redis-backed + in-memory fallback
         │   └── utils.ts
         └── types/
             └── index.ts
+├── scripts/
+│   ├── backup.sh                 # بک‌آپ خودکار PostgreSQL
+│   ├── restore.sh                # بازیابی بک‌آپ
+│   ├── setup-rclone.sh           # راه‌اندازی rclone
+│   ├── Dockerfile.backup         # ایمیج کانتینر بک‌آپ
+│   ├── db-backup.sh              # نسخه قدیمی بک‌آپ
+│   ├── migrate_passwords.py      # SHA-256 → bcrypt مهاجرت
+│   └── seed_admin.py             # افزودن ادمین اولیه
+├── deploy-to-vps.sh / deploy-via-ssh.py
+├── fix-deployment.py / fix-nginx.py
+├── deploy_bot_sftp.py            # (مختل) دیپلوی SFTP
+├── deploy_bot_v2.py / deploy_bot_v3.py
+├── deploy_chan.py / deploy_paramiko.py
+├── upload_*.py                   # آپلود chunk شده فایل‌ها
+└── .env                          # متغیرهای محیطی (رد شده در git)
 ```
