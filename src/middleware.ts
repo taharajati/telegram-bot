@@ -12,7 +12,14 @@ export const config = {
 
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get(COOKIE)?.value;
-  if (!token) return NextResponse.redirect(new URL('/login', req.url));
+  if (!token) {
+    const loginUrl = new URL('/login', req.url);
+    // Force HTTPS when behind Cloudflare proxy
+    if (req.headers.get('x-forwarded-proto') === 'https') {
+      loginUrl.protocol = 'https:';
+    }
+    return NextResponse.redirect(loginUrl);
+  }
 
   try {
     const { payload } = await jwtVerify(token, SECRET);
@@ -20,13 +27,19 @@ export async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
 
     if (path.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL('/login', req.url));
+      const loginUrl = new URL('/login', req.url);
+      if (req.headers.get('x-forwarded-proto') === 'https') loginUrl.protocol = 'https:';
+      return NextResponse.redirect(loginUrl);
     }
     if (path.startsWith('/seller') && role !== 'seller' && role !== 'admin') {
-      return NextResponse.redirect(new URL('/login', req.url));
+      const loginUrl = new URL('/login', req.url);
+      if (req.headers.get('x-forwarded-proto') === 'https') loginUrl.protocol = 'https:';
+      return NextResponse.redirect(loginUrl);
     }
     return NextResponse.next();
   } catch {
-    return NextResponse.redirect(new URL('/login', req.url));
+    const loginUrl = new URL('/login', req.url);
+    if (req.headers.get('x-forwarded-proto') === 'https') loginUrl.protocol = 'https:';
+    return NextResponse.redirect(loginUrl);
   }
 }
