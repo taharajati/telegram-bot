@@ -196,11 +196,11 @@ Handler → event_bus.emit(Event.ORDER_PAID, ...)
 | created_at | DateTime | تاریخ ثبت |
 | shipping_cost | Integer default=0 | هزینه ارسال (تومان) |
 | zarinpal_merchant_id | String(36)? | merchant_id زین‌پال (غیرفعال) |
-| card_number | String(16)? | شماره کارت برای کارت‌به‌کارت (AES-256-GCM encrypted) |
-| card_holder_name | String(100)? | نام صاحب کارت (AES-256-GCM encrypted) |
-| sheba_number | String(26)? | شماره شبا (AES-256-GCM encrypted) |
+| card_number | Text? | شماره کارت برای کارت‌به‌کارت (AES-256-GCM ciphertext ~60 chars) |
+| card_holder_name | Text? | نام صاحب کارت (AES-256-GCM ciphertext ~172 chars) |
+| sheba_number | Text? | شماره شبا (AES-256-GCM ciphertext ~72 chars) |
+| zarinpal_merchant_id | String(36)? | شناسه درگاه زین‌پال |
 | banner_image | String(255)? | file_id عکس کاور فروشگاه |
-
 ### ۳.۲. صاحب فروشگاه (ShopOwner)
 
 | فیلد | نوع | توضیح |
@@ -243,6 +243,7 @@ Handler → event_bus.emit(Event.ORDER_PAID, ...)
 | has_video | Boolean default=False | آیا ویدیو دارد؟ |
 | created_at | DateTime | |
 | updated_at | DateTime | |
+| CONSTRAINT chk_stock | CHECK | `reserved_stock >= 0 AND reserved_stock <= stock` |
 
 **محاسبه موجودی قابل فروش:**
 ```python
@@ -309,7 +310,7 @@ def available_stock(self) -> int:
 | shop_id | Integer FK → shops.id | فروشگاه |
 | tracking_code | String(20) Unique | کد رهگیری (فرمت: `YYMMDD + 6 digit`) |
 | user_id | BigInteger FK → users.id | مشتری |
-| total_price | Float | جمع کل به تومان (بعد از تخفیف، قبل از ارسال) |
+| total_price | Integer | جمع کل به تومان (بعد از تخفیف، قبل از ارسال) |
 | status | String(20) | `pending_payment`, `pending`, `paid`, `confirmed`, `shipped`, `delivered`, `cancelled`, `refunded` |
 | payment_method | String(20)? | `card_to_card` (فقط این روش فعال) |
 | payment_ref | String(100)? | شماره مرجع پرداخت (برای آینده) |
@@ -439,13 +440,14 @@ def available_stock(self) -> int:
 
 | فیلد | نوع | توضیح |
 |------|------|--------|
-| id | Integer PK | |
-| buyer_id | BigInteger index | شناسه خریدار |
-| shop_id | Integer FK → shops.id | فروشگاه |
-| order_id | Integer FK → orders.id (nullable) | سفارش مرتبط |
-| status | String(20) | `open` / `closed` |
-| created_at | DateTime | |
-| updated_at | DateTime | |
+|| id | Integer PK | |
+|| user_id | BigInteger index | شناسه تلگرام |
+|| shop_id | Integer FK → shops.id | فروشگاه مرتبط |
+|| password_hash | String(128) | هش bcrypt |
+|| password_salt | String(32) | Salt برای bcrypt |
+|| must_change_password | Boolean default true | پس از `/reset_password` و لاگین اولیه اجباری |
+|| two_factor_secret | String(32)? | (آینده) |
+|| created_at | DateTime | |
 
 ### ۳.۱۷. پیام (Message)
 
@@ -592,7 +594,7 @@ order:start → (اگر fast-checkout) ASK_NAME
 3. ربات شماره کارت فروشنده + نام صاحب کارت + مبلغ را نمایش می‌دهد
 4. مشتری عکس رسید (فایل عکس) یا شماره تراکنش (متن) می‌فرستد → `ASK_CARD_RECEIPT`
 5. سفارش `PENDING_PAYMENT` + `attach_card_receipt()` → رسید ذخیره می‌شود
-   - `payment_receipt_hash = SHA-256(receipt_text or file_id)` — جلوگیری از رسید تکراری
+   - `payment_receipt_hash = SHA-256(receipt_text or file_id)` — UNIQUE constraint جلوگیری از رسید تکراری
 6. فروشنده پیام حاوی رسید + دکمه‌های `✅ تایید` / `❌ رد`
 7. **تأیید**: `transition_order(PAID)` → نهایی‌سازی موجودی → نوتیفیکیشن به مشتری
 8. **رد**: مشتری ۲ گزینه:
@@ -942,16 +944,18 @@ async def transition_order(order_id, target_status, actor="admin", bot=None) -> 
 ### ۱۰.۱. پاک‌سازی خودکار سفارش‌های پرداخت‌نشده (APScheduler)
 
 - `cleanup_abandoned_payments()`:
-  - **بدون رسید**: ۱۵ دقیقه پس از ایجاد → CANCELLED
+  - **بدون رسید**: ۱۵ دقیقه پس از ایجاد → CANCELLED و آزادسازی `reserved_stock`
   - **بعد از رسید**: ۴۸ ساعت (فروشنده فرصت کافی دارد)
-  - **COD (PENDING)**: ۳۰ روز
-- اجرا: هر ۳۰ دقیقه (`payment._post_init`)
+  - **COD (PENDING)**: ۳۰ روز → CANCELLED
+- اجرا: هر ۵ دقیقه (`payment._post_init`)
 
 ```python
 async def cleanup_task():
     await payment_svc.cleanup_abandoned_payments()
 ```
-- سفارش‌های `PENDING_PAYMENT` با `created_at < now - 30min` را لغو می‌کند
+- سفارش‌های بدون رسید `created_at < now - 15min` → CANCELLED
+- سفارش‌های با رسید (بیش از ۴۸ ساعت) → CANCELLED
+- COD سفارش‌های `PENDING` قدیمی‌تر از ۳۰ روز → CANCELLED
 - موجودی رزرو شده آزاد می‌شود
 - از `TIMESTAMP WITHOUT TIME ZONE` → `.replace(tzinfo=None)` برای مقایسه
 
