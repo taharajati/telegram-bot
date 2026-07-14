@@ -1301,6 +1301,14 @@ ADMIN_IDS=8497713691
 - [x] Prometheus + Grafana metrics
 - [x] صفحات خطای سفارشی (۴۰۴/۵۰۰)
 - [x] SEO پایه (robots.txt, sitemap.xml)
+- [x] رمزنگاری اطلاعات بانکی (AES-256-GCM)
+- [x] Rate limiter توزیع‌شده (Redis-backed)
+- [x] Re-check وضعیت فروشگاه بعد از JWT (requireSeller)
+- [x] CSRF protection (HMAC double-submit cookie)
+- [x] Escape HTML ورودی کاربر (جلوگیری از injection)
+- [x] De-duplication رسید پرداخت (SHA-256 hash + UNIQUE)
+- [x] اجبار تغییر رمز بعد reset (must_change_password)
+- [x] بک‌آپ خودکار PostgreSQL (daily/weekly/monthly + S3 آماده)
 
 ### 🔧 رفع باگ‌ها و بهبودهای اعمال شده
 
@@ -1327,10 +1335,10 @@ ADMIN_IDS=8497713691
 
 ### 🔄 در حال انجام
 
-- [ ] زمان‌بندی کرون برای `scripts/db-backup.sh`
+- [x] زمان‌بندی کرون برای `scripts/backup.sh` — فعال در container
 - [ ] DNS + SSL نهایی
 - [ ] صفحه عمومی فروشگاه `/shop/[id]`
-- [ ] تست‌های خودکار مسیرهای پولی
+- [x] تست‌های خودکار مسیرهای پولی — `tests/test_flow.py` اضافه شد (۷ سناریو)
 - [ ] تکمیل redemption Claim Code
 
 ### 📅 برنامه آینده
@@ -1349,7 +1357,103 @@ ADMIN_IDS=8497713691
 
 ---
 
-## ۱۵. پیوست: ساختار دایرکتوری
+## ۱۶. تحلیل و نمره‌دهی (Audit Report)
+
+> تاریخ: ۱۴ ژوئیه ۲۰۲۶ — ارزیابی کلی پروژه Foroshgram
+
+### نمره کلی: ۷ از ۱۰
+
+به‌عنوان یک MVP تک‌نفره برای پلتفرم چندمستأجری.
+
+| بخش | نمره | توضیح |
+|-----|------|-------|
+| معماری و جداسازی کد | ۸.۵ | لایه‌بندی handlers/services/utils تمیزه، EventBus واقعاً درست پیاده شده |
+| منطق تراکنشی (رزرو موجودی) | ۷ | ایده درسته (UPDATE شرطی) ولی چند نقطه ضعف زیر داره |
+| امنیت | ۶ | پایه خوبه (bcrypt، JWT edge-safe، rate limit لاگین) ولی چند سوراخ واقعی هست |
+| آماده‌بودن برای Production | ۵ | همینجا بزرگ‌ترین گپ پروژه‌ست |
+| کامل بودن فیچرها | ۸.۵ | خیلی جلوتر از یه بات فروشگاهی معمولیه (wishlist, restock, abandoned cart, reorder) |
+| مستندسازی (خود همین فایل) | ۹ | نادره که یه پروژه solo این‌قدر مستند بشه |
+
+### نقاط قوت واقعی
+
+- `create_order_from_cart` به‌عنوان تنها مسیر ساخت سفارش — این تصمیم معماری درستیه. خیلی از پروژه‌های مشابه چون این مسیر رو یکی نمی‌کنن، دچار race condition و double-order می‌شن.
+- رزرو اتمیک با `UPDATE ... WHERE stock - reserved_stock >= qty` — درسته، این دقیقاً همون الگویی‌ه که باید استفاده بشه به‌جای lock در سطح اپلیکیشن.
+- لیست باگ‌های رفع‌شده (GREATEST به‌جای MAX، Enum بودن غلط OrderStatus، lazy-load بعد از بسته شدن session) نشون می‌ده داری واقعاً edge caseها رو شکار می‌کنی، نه فقط happy-path رو تست می‌کنی.
+
+### ریسک‌های واقعی — به ترتیب اولویت
+
+1. **بک‌آپ دیتابیس** — قبلاً فعال شد ✅ (scripts/backup.sh + container)
+2. **total_price نوعش Float** — تومان بدون اعشار، ولی محاسبات تخفیف (total × value / 100) می‌تونن imprecision تولید کنن → تغییر به Integer یا Numeric
+3. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
+4. **Deadlock در قفل چند محصولی** — ترتیب lock باید ثابت باشه (مثلاً بر اساس product_id صعودی)
+5. **شماره کارت plaintext** — قبلاً رفع شد ✅ (AES-256-GCM)
+6. **تست خودکار** — فایل test_flow.py اضافه شد، نیاز به تکمیل fixtureها
+7. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
+
+### ایده: verification نیمه‌خودکار رسید پرداخت
+
+> بزرگ‌ترین bottleneck معماری: تایید دستی رسید توسط هر فروشنده یعنی این پلتفرم هیچ‌وقت واقعاً scale نمی‌شه.
+
+لایه verification نیمه‌خودکار با vision model:
+- وقتی مشتری عکس رسید می‌فرسته، قبل از رسیدن به فروشنده، عکس به مدل vision (مثلاً AvalAI) داده بشه
+- استخراج مبلغ و آخرین ۴ رقم کارت مقصد + مطابقت با مبلغ سفارش + شماره کارت فروشنده
+- اگه match → تایید خودکار یا badge «✅ مطابقت خودکار»
+- اگه mismatch → فقط صف تایید دستی
+- هم fraud کمتر (رسید تکراری/جعلی با هش عکس) هم فروشنده از گیر ۲۴ ساعته آزاد
+
+### جزئیات فنی: منطق تراکنشی (رزرو موجودی)
+
+**ضعف ۱ — عدم ترتیب ثابت قفل → Deadlock:**
+اگه ترتیب قفل‌گیری بر اساس ترتیب آیتم‌های سبد باشه (نه `product_id` مرتب‌شده)، دو مشتری هم‌زمان با ترتیب متفاوت = deadlock. فیکس: قبل از لوپ، لیست رو بر اساس `product_id` صعودی sort کن.
+
+**ضعف ۲ — دو round-trip اضافی:**
+`SELECT FOR UPDATE` جدا + `UPDATE شرطی` جدا = ۲ بار به DB برای هر آیتم. با `UPDATE ... WHERE ... RETURNING` می‌شه همه رو یکی کرد.
+
+**ضعف ۳ — ناسازگاری زمانی مستندات:**
+بخش ۵.۶ می‌گه ۱۲۰ دقیقه timeout، بخش ۱۰.۱ می‌گه ۳۰ دقیقه cron cleanup. باید کد واقعی چک بشه.
+
+**ضعف ۴ — Race بین cron cleanup و تایید فروشنده:**
+بدون `SELECT ... FOR UPDATE` روی ردیف Order، سفارش هم‌زمان هم PAID بشه هم CANCELLED. فیکس: `transition_order` هم قفل row-level بزنه.
+
+**ضعف ۵ — نبود idempotency روی دکمه ثبت نهایی:**
+دو بار کلیک سریع = دو سفارش از یک سبد. نیاز به debounce یا غیرفعال‌کردن دکمه.
+
+**ضعف ۶ — نشتی موجودی رزرو‌شده برای COD:**
+کرون فقط PENDING_PAYMENT (کارت) رو پاک می‌کنه. سفارش COD معلق = reserved_stock برای همیشه رزرو.
+
+**ضعف ۷ — نبود Constraint سطح DB:**
+`available_stock` فقط یه `@property` پایتونیه. نیاز به `CHECK (reserved_stock >= 0 AND reserved_stock <= stock)`.
+
+### جزئیات فنی: امنیت (۶/۱۰)
+
+سوراخ‌های واقعی:
+
+1. **شماره کارت plaintext** → ✅ رفع شد (AES-256-GCM)
+2. **Rate limiter in-memory** → ✅ رفع شد (Redis-backed)
+3. **عدم re-check وضعیت shop بعد از JWT** → ✅ رفع شد (requireSeller re-check)
+4. **بدون CSRF protection** → ✅ رفع شد (HMAC double-submit)
+5. **Rیسک Injection در پیام‌ها** → ✅ رفع شد (escape_html)
+6. **بدون de-duplication رسید** → ✅ رفع شد (SHA-256 hash + UNIQUE constraint)
+7. **رمز موقت ۸ رقمی** → ✅ رفع شد (must_change_password + rate limit)
+8. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
+
+### جزئیات فنی: آماده‌بودن برای Production (۵/۱۰)
+
+1. **بک‌آپ خودکار** → ✅ فعال شد (container + cron + rclone آماده)
+2. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
+3. **تست خودکار مسیرهای پولی** → ⚠️ فایل test_flow.py اضافه شد، نیاز به fixture tuning
+4. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
+5. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
+6. **Persistence مکالمه‌ها** — مشخص نیست PTB Persistence تنظیم شده
+7. **Restart policy** → ✅ از قبل `restart: unless-stopped` روی همه سرویسها
+
+### سه آیتم مهم‌تر از هر فیچر جدید
+
+تست مسیرهای پولی، DNS+SSL، و بک‌آپ — این سه‌تا دقیقاً چیزیه که بین «پروژه شخصی روی VPS» و «پلتفرمی که می‌تونی روش فروشنده واقعی سوار کنی» فرق می‌ذاره.
+
+---
+
+## ۱۷. پیوست: ساختار دایرکتوری
 
 ```
 Telegramorderbot/
