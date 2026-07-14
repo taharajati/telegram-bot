@@ -75,10 +75,6 @@ services:
       - ./init-scripts:/init-scripts:ro
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-foroshgram_secure_2024}
-      # Rclone config via volume mount
-      - RCLONE_CONFIG_RCLONE_CONFIG=/config/rclone.conf
-    volumes:
-      - ./rclone.conf:/config/rclone.conf:ro
     restart: unless-stopped
     depends_on:
       postgres:

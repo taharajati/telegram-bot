@@ -4,12 +4,8 @@ FROM alpine:3.20
 RUN apk add --no-cache \
     bash curl docker-cli coreutils postgresql16-client gzip findutils
 
-# Install rclone (for S3 remote sync)
-RUN curl -fsSL https://downloads.rclone.org/current/rclone-current-linux-amd64.zip -o /tmp/r.zip \
-    && unzip /tmp/r.zip -d /tmp/ \
-    && cp /tmp/rclone-*/rclone /usr/bin/rclone \
-    && chmod +x /usr/bin/rclone \
-    && rm -rf /tmp/rclone* /tmp/r.zip
+# Install rclone from Alpine repos (simpler, no curl issues)
+RUN apk add --no-cache rclone
 
 COPY scripts/backup.sh /scripts/backup.sh
 RUN chmod +x /scripts/backup.sh

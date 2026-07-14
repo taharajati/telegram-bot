@@ -10,10 +10,11 @@ set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────
 BACKUP_DIR="/backups"                           # mount from docker-compose
-DB_CONTAINER="foroshgram_postgres"
+DB_HOST="postgres"                               # service name in docker-compose
 DB_USER="foroshgram"
 DB_NAME="foroshgram"
-PG_DUMP="docker exec $DB_CONTAINER pg_dump -U $DB_USER -d $DB_NAME"
+PGPASSWORD="${POSTGRES_PASSWORD:-foroshgram_secure_2024}"
+PG_DUMP="pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME"
 
 # Timestamp
 DATE=$(date +%Y%m%d_%H%M%S)
