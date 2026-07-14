@@ -184,9 +184,9 @@ Handler → event_bus.emit(Event.ORDER_PAID, ...)
 | created_at | DateTime | تاریخ ثبت |
 | shipping_cost | Integer default=0 | هزینه ارسال (تومان) |
 | zarinpal_merchant_id | String(36)? | merchant_id زین‌پال (غیرفعال) |
-| card_number | String(16)? | شماره کارت برای کارت‌به‌کارت |
-| card_holder_name | String(100)? | نام صاحب کارت |
-| sheba_number | String(26)? | شماره شبا (برای آینده) |
+| card_number | String(16)? | شماره کارت برای کارت‌به‌کارت (AES-256-GCM encrypted) |
+| card_holder_name | String(100)? | نام صاحب کارت (AES-256-GCM encrypted) |
+| sheba_number | String(26)? | شماره شبا (AES-256-GCM encrypted) |
 | banner_image | String(255)? | file_id عکس کاور فروشگاه |
 
 ### ۳.۲. صاحب فروشگاه (ShopOwner)
@@ -200,6 +200,7 @@ Handler → event_bus.emit(Event.ORDER_PAID, ...)
 | username | String(100)? | یوزرنیم تلگرام |
 | password_hash | String? | هش bcrypt رمز عبور |
 | password_salt | String? | Salt رمز عبور (برای مهاجرت SHA-256) |
+| must_change_password | Boolean default=False | اجبار تغییر رمز بعد از reset |
 | registered_at | DateTime | تاریخ ثبت |
 
 ### ۳.۳. کد دعوت (ClaimCode)
@@ -272,6 +273,7 @@ def available_stock(self) -> int:
 | id | Integer PK | |
 | user_id | BigInteger Unique | شناسه تلگرام |
 | password_hash | String(128) | هش bcrypt |
+| must_change_password | Boolean default=False | اجبار تغییر رمز بعد از reset |
 | created_at | DateTime | |
 
 ### ۳.۸. سبد خرید (CartItem)
@@ -303,13 +305,14 @@ def available_stock(self) -> int:
 | payment_receipt_file_id | String(255)? | file_id عکس رسید |
 | payment_receipt_text | String(500)? | متن شماره تراکنش |
 | payment_receipt_at | DateTime? | زمان آپلود رسید |
+| payment_receipt_hash | String(64)? | SHA-256 hash رسید برای de-duplication |
 | receiver_name | String(150)? | نام گیرنده |
 | shipping_address | String(500) | آدرس گیرنده |
 | phone | String(30) | شماره تماس گیرنده |
 | discount_code | String(50)? | کد تخفیف اعمال شده |
 | discount_amount | Integer default=0 | مبلغ تخفیف (تومان) |
 | status_history | Text (JSON) | تاریخچه قدیمی (دیگر استفاده نمی‌شود، برای backward compatibility) |
-|| cancellation_reason | String(100)? | دلیل لغو |
+| cancellation_reason | String(100)? | دلیل لغو |
 | created_at | DateTime | |
 | updated_at | DateTime | |
 
@@ -459,11 +462,17 @@ def available_stock(self) -> int:
 
 ### ۴.۲. جزئیات فنی
 
-- **JWT** با کتابخانه `jose` (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, ۷ روز)
+- **JWT** با کتابخانه `jose` (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, SameSite=Lax)
 - **bcrypt** برای هش رمز (جایگزین SHA-256 در آپدیت امنیتی)
 - `ADMIN_PASSWORD` از env vars **حذف شده** — رمز ادمین در جدول `admins` با bcrypt
 - **Salt جداگانه** برای هر فروشنده (`password_salt`) — برای مهاجرت از SHA-256 نگه داشته شده
-- **Rate limit**: ۵ تلاش ناموفق → ۱۵ دقیقه قفل (با `admin_login_attempts` دیکشنری درون‌حافظه‌ای)
+- **Rate limit**: Redis-backed با fallback in-memory — ۵ تلاش ناموفق → ۱۵ دقیقه قفل
+- **CSRF protection**: HMAC-SHA256 double-submit cookie pattern روی POST/PATCH/DELETE endpoints
+- **رمزنگاری اطلاعات بانکی**: AES-256-GCM با PBKDF2 key derivation (کلید از `ENCRYPTION_KEY` env)
+- **AJre-check وضعیت فروشگاه**: `requireSeller()` هر ریکوئست `shop.active` و `password_hash` رو از DB چک می‌کنه
+- **اجبار تغییر رمز**: `must_change_password` flag بعد از `/reset_password` — login موفق redirect به `/change-password`
+- **De-duplication رسید**: SHA-256 hash + UNIQUE constraint روی `payment_receipt_hash`
+- **Escape HTML**: همه ورودی‌های کاربر قبل از `parse_mode=HTML` escape می‌شن (جلوگیری از injection)
 - **Middleware** (Next.js): محافظت مسیرهای `/admin/*` و `/seller/*`
 - **Payload JWT**: `{ userId, role, shopId?, firstName?, loginMethod }`
 
