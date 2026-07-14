@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS shops (
     status VARCHAR(20) DEFAULT 'draft',
     created_at TIMESTAMP DEFAULT NOW(),
     zarinpal_merchant_id VARCHAR(36),
+    shipping_cost INTEGER DEFAULT 0,
+    free_shipping_above INTEGER,
+    banner_image VARCHAR(500),
+    channel_link VARCHAR(200),
     card_number TEXT,       -- AES-256-GCM ciphertext (base64, ~60 chars for 16-digit)
     card_holder_name TEXT,  -- AES-256-GCM ciphertext (base64, ~172 chars for 100-char name)
     sheba_number TEXT       -- AES-256-GCM ciphertext (base64, ~72 chars for 26-char IBAN)
