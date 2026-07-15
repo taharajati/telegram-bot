@@ -1,0 +1,15 @@
+# Prometheus config — scrapes the bot's /metrics endpoint
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "foroshgram_bot"
+    static_configs:
+      - targets: ["bot:9090"]
+    metrics_path: /metrics
+
+  - job_name: "foroshgram_postgres"
+    static_configs:
+      - targets: ["postgres:5432"]
+    metrics_path: /metrics  # Requires postgres_exporter sidecar — placeholder

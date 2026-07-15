@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فروشگرام — استوری اینستاگرام (1080×1920)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  .canvas {
+    width: 1080px;
+    height: 1920px;
+    position: relative;
+    overflow: hidden;
+    background: #0f1419;
+    font-family: 'Vazirmatn', sans-serif;
+    direction: rtl;
+  }
+
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+  .orb-1 { width: 700px; height: 700px; background: rgba(0,136,204,0.12); top: -250px; left: -150px; }
+  .orb-2 { width: 600px; height: 600px; background: rgba(91,33,182,0.06); bottom: -200px; right: -100px; }
+  .orb-3 { width: 350px; height: 350px; background: rgba(0,136,204,0.05); top: 40%; right: 65%; }
+
+  .grid-overlay {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative; z-index: 10;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 100px 70px 80px;
+  }
+
+  /* Top safe area */
+  .top-area { display: flex; flex-direction: column; align-items: flex-start; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(0,136,204,0.1); border: 1px solid rgba(0,136,204,0.2);
+    border-radius: 100px; padding: 10px 20px 10px 14px;
+    margin-bottom: 36px;
+  }
+  .badge-icon { width: 26px; height: 26px; background: #0088cc; border-radius: 7px; display:flex; align-items:center; justify-content:center; }
+  .badge-icon svg { width: 15px; height: 15px; fill: white; }
+  .badge-text { font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.8); letter-spacing: 0.01em; }
+
+  .heading { margin-bottom: 24px; }
+  .heading h1 {
+    font-size: 72px; font-weight: 900; line-height: 1.05; color: white; letter-spacing: -0.02em;
+  }
+  .heading .highlight {
+    background: linear-gradient(135deg, #0088cc 0%, #66bfff 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    position: relative;
+  }
+  .heading .underline { position: relative; display: inline-block; }
+  .heading .underline::after {
+    content: ''; position: absolute; left: 0; bottom: 6px;
+    width: 100%; height: 8px;
+    background: rgba(0,136,204,0.25); border-radius: 4px;
+  }
+
+  .subtitle {
+    max-width: 700px; font-size: 24px; font-weight: 400; line-height: 1.55;
+    color: rgba(255,255,255,0.55); margin-bottom: 56px;
+  }
+
+  /* Middle - Phone mockup center */
+  .middle-area { flex: 1; display: flex; justify-content: center; align-items: center; }
+
+  .phone-mockup {
+    width: 340px;
+    height: 700px;
+    border-radius: 48px;
+    border: 3px solid rgba(255,255,255,0.06);
+    background: linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(255,255,255,0.035) 100%);
+    backdrop-filter: blur(24px);
+    position: relative; overflow: hidden;
+    box-shadow: 0 50px 120px rgba(0,0,0,0.45);
+  }
+  .phone-notch { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 130px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 0 0 18px 18px; z-index: 2; }
+  .phone-screen { position: absolute; inset: 0; padding: 60px 24px 24px; display:flex; flex-direction:column; gap: 14px; }
+  .screen-header {
+    display:flex; align-items:center; gap: 12px; padding: 14px 16px;
+    background: rgba(0,136,204,0.08); border-radius: 14px; margin-bottom: 6px;
+  }
+  .screen-header-circle { width: 32px; height: 32px; background: #0088cc; border-radius: 8px; flex-shrink:0; }
+  .screen-header-text { flex: 1; height: 12px; background: rgba(255,255,255,0.15); border-radius: 6px; }
+  .screen-header-text.short { width: 60px; }
+  .screen-row { display:flex; align-items:center; gap: 14px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); }
+  .screen-row.active { background: rgba(0,136,204,0.1); border: 1px solid rgba(0,136,204,0.18); }
+  .screen-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.04); flex-shrink:0; }
+  .screen-icon.blue { background: rgba(0,136,204,0.18); }
+  .screen-lines { flex: 1; display:flex; flex-direction:column; gap: 6px; }
+  .screen-line { height: 10px; border-radius: 5px; background: rgba(255,255,255,0.08); }
+  .screen-line.thin { height: 7px; }
+  .screen-line.wide { width: 85%; }
+  .screen-line.med { width: 60%; }
+  .screen-line.narrow { width: 40%; }
+  .screen-cta-row { display:flex; gap: 10px; margin-top: auto; }
+  .screen-cta { flex: 1; height: 50px; border-radius: 12px; }
+  .screen-cta.outline { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+  .screen-cta.primary { background: linear-gradient(135deg, #0088cc 0%, #006da3 100%); }
+
+  /* Floating notification bubbles around phone */
+  .float-bubble {
+    position: absolute;
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(16px); border-radius: 16px; padding: 14px 18px;
+    font-size: 15px; color: rgba(255,255,255,0.65);
+    animation: float-bubble 6s ease-in-out infinite;
+  }
+  .float-bubble .bubble-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink:0; }
+  .bubble-dot.green { background: #43a047; box-shadow: 0 0 20px rgba(67,160,71,0.4); }
+  .bubble-dot.blue { background: #0088cc; box-shadow: 0 0 20px rgba(0,136,204,0.4); }
+  .bubble-dot.purple { background: #8b5cf6; box-shadow: 0 0 20px rgba(139,92,246,0.4); }
+  .bubble-dot.amber { background: #fb8c00; box-shadow: 0 0 20px rgba(251,140,0,0.4); }
+
+  .fb-1 { top: 8%; left: -12%; animation-delay: 0s; }
+  .fb-2 { top: 22%; right: -15%; animation-delay: -1.5s; }
+  .fb-3 { bottom: 25%; right: -15%; animation-delay: -3s; }
+  .fb-4 { bottom: 10%; left: -12%; animation-delay: -4.5s; }
+
+  @keyframes float-bubble {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.9; }
+    50% { transform: translateY(-12px) scale(1.02); opacity: 1; }
+  }
+
+  /* Bottom area */
+  .bottom-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    padding-top: 20px;
+  }
+
+  .cta-button {
+    display: inline-flex; align-items: center; gap: 14px;
+    background: #0088cc; color: white; font-weight: 700; font-size: 20px;
+    padding: 20px 48px; border-radius: 100px; text-decoration: none;
+    box-shadow: 0 10px 50px rgba(0,136,204,0.4);
+    transition: all 0.2s; border: none; cursor: pointer; font-family: 'Vazirmatn', sans-serif;
+  }
+  .cta-button:hover { background: #006da3; box-shadow: 0 14px 60px rgba(0,136,204,0.5); transform: translateY(-3px); }
+  .cta-arrow { transition: transform 0.2s; }
+  .cta-button:hover .cta-arrow { transform: translateX(-6px); }
+
+  .trust-badges { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  .trust-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 100px; padding: 12px 22px;
+    font-size: 15px; font-weight: 500; color: rgba(255,255,255,0.5);
+  }
+  .trust-badge .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink:0; }
+  .trust-badge .dot.green { background: #43a047; }
+  .trust-badge .dot.blue { background: #0088cc; }
+  .trust-badge .dot.purple { background: #8b5cf6; }
+  .trust-badge .dot.amber { background: #fb8c00; }
+
+  .handle { text-align: center; margin-top: 10px; }
+  .handle-text { font-size: 17px; font-weight: 500; color: rgba(255,255,255,0.35); }
+  .handle-name { font-weight: 800; color: #0088cc; font-size: 18px; }
+
+  /* Swipe up indicator */
+  .swipe-hint {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    margin-top: 10px; opacity: 0.6;
+  }
+  .swipe-text { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.5); }
+  .swipe-arrow { animation: swipe-up 2s ease-in-out infinite; }
+  @keyframes swipe-up { 0%,100%{transform:translateY(0)} 50%{transform:translateY(8px)} }
+
+  /* Responsive */
+  .screen-note { display: none; text-align: center; font-family: 'Vazirmatn', sans-serif; direction: rtl; padding: 40px 20px; }
+  @media (max-width: 600px) { .canvas { display: none; } .screen-note { display: block; } }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="content">
+    <!-- TOP -->
+    <div class="top-area">
+      <div class="badge">
+        <div class="badge-icon">
+          <svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        </div>
+        <span class="badge-text">پلتفرم اتوماسیون فروش در تلگرام</span>
+      </div>
+
+      <div class="heading">
+        <h1>
+          فروشگاه تلگرامیت رو<br>
+          <span class="highlight underline">در ۳ دقیقه</span> راه بنداز
+        </h1>
+      </div>
+
+      <p class="subtitle">
+        ربات اختصاصی، پرداخت مستقیم به کارت، مدیریت محصولات و پیگیری سفارش — همه‌چیز خودکار.
+      </p>
+    </div>
+
+    <!-- MIDDLE - Phone with floating bubbles -->
+    <div class="middle-area">
+      <div class="phone-mockup">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="screen-header">
+            <div class="screen-header-circle"></div>
+            <div class="screen-header-text"></div>
+            <div class="screen-header-text short"></div>
+          </div>
+          <div class="screen-row active">
+            <div class="screen-icon blue"></div>
+            <div class="screen-lines">
+              <div class="screen-line wide"></div>
+              <div class="screen-line thin narrow"></div>
+            </div>
+          </div>
+          <div class="screen-row">
+            <div class="screen-icon"></div>
+            <div class="screen-lines">
+              <div class="screen-line med"></div>
+              <div class="screen-line thin narrow"></div>
+            </div>
+          </div>
+          <div class="screen-row">
+            <div class="screen-icon"></div>
+            <div class="screen-lines">
+              <div class="screen-line wide"></div>
+              <div class="screen-line thin med"></div>
+            </div>
+          </div>
+          <div class="screen-row">
+            <div class="screen-icon"></div>
+            <div class="screen-lines">
+              <div class="screen-line med"></div>
+              <div class="screen-line thin med"></div>
+            </div>
+          </div>
+          <div class="screen-row">
+            <div class="screen-icon"></div>
+            <div class="screen-lines">
+              <div class="screen-line wide"></div>
+              <div class="screen-line thin narrow"></div>
+            </div>
+          </div>
+          <div class="screen-cta-row">
+            <div class="screen-cta outline"></div>
+            <div class="screen-cta primary"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating bubbles around phone -->
+      <div class="float-bubble fb-1"><div class="bubble-dot green"></div> سفارش جدید: ۱۵۰,۰۰۰ تومان</div>
+      <div class="float-bubble fb-2"><div class="bubble-dot blue"></div> فروشگاه «پوشاک مدرن» فعال شد</div>
+      <div class="float-bubble fb-3"><div class="bubble-dot purple"></div> پرداخت کارت‌به‌کارت تأیید گردید</div>
+      <div class="float-bubble fb-4"><div class="bubble-dot amber"></div> ۳ محصول به «کفش رضایی» اضافه شد</div>
+    </div>
+
+    <!-- BOTTOM -->
+    <div class="bottom-area">
+      <a href="#" class="cta-button">
+        شروع کن
+        <svg class="cta-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m14 7 5 5-5 5"/></svg>
+      </a>
+
+      <div class="trust-badges">
+        <div class="trust-badge"><span class="dot green"></span> پرداخت امن و مستقیم</div>
+        <div class="trust-badge"><span class="dot blue"></span> پشتیبانی تلگرامی ۲۴/۷</div>
+        <div class="trust-badge"><span class="dot purple"></span> پیگیری شفاف سفارش</div>
+        <div class="trust-badge"><span class="dot amber"></span> بدون کد نویسی</div>
+      </div>
+
+      <div class="handle">
+        <p class="handle-text">در تلگرام: <span class="handle-name">@Foroshgrambot</span></p>
+      </div>
+
+      <div class="swipe-hint">
+        <span class="swipe-text">برای شروع بکش بالا</span>
+        <svg class="swipe-arrow" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="screen-note">
+  <p style="font-size: 20px; font-weight: 700; color: #0f1419;">فروشگرام — استوری اینستاگرام 1080×1920</p>
+  <p style="margin-top: 8px; color: #5e6c78;">این طراحی برای فرمت استوری (9:16) بهینه شده است.</p>
+</div>
+
+</body>
+</html>

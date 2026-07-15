@@ -1,0 +1,18 @@
+# Backup container — Alpine with docker client + pg_dump + rclone
+FROM alpine:3.20
+
+RUN apk add --no-cache \
+    bash curl docker-cli coreutils postgresql16-client gzip findutils
+
+# Install rclone from Alpine repos (simpler, no curl issues)
+RUN apk add --no-cache rclone
+
+COPY scripts/backup.sh /scripts/backup.sh
+RUN chmod +x /scripts/backup.sh
+
+# Cron schedule: daily at 3 AM
+RUN echo "0 3 * * * /scripts/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+RUN echo "0 12 * * 7 /scripts/backup.sh >> /var/log/backup.log 2>&1" >> /etc/crontabs/root
+
+# Keep crond in foreground
+CMD ["crond", "-f", "-l", "2"]

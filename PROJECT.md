@@ -1,759 +1,859 @@
-# فروشگرام — Foroshgram
+# پروژه فروشگرام (Foroshgram) — Telegram Order Bot
 
-> **اتوماسیون فروش تلگرام — Next.js + ربات تلگرام + PostgreSQL**
-> پلتفرم یکپارچه مدیریت فروشگاه‌های تلگرامی. هر فروشنده ربات مخصوص خودش رو داره، محصولاتش رو مدیریت می‌کنه، و مشتری‌ها از طریق ربات سفارش می‌دن.
-
----
-
-## فهرست مطالب
-1. [معرفی کلی](#۱-معرفی-کلی)
-2. [معماری سیستم](#۲-معماری-سیستم)
-3. [مدل داده‌ها (Database Models)](#۳-مدل-داده‌ها-database-models)
-4. [سیستم احراز هویت (Authentication)](#۴-سیستم-احراز-هویت-authentication)
-5. [سناریوهای ربات تلگرام](#۵-سناریوهای-ربات-تلگرام)
-6. [سناریوهای پنل ادمین در ربات](#۶-سناریوهای-پنل-ادمین-در-ربات)
-7. [سناریوهای پنل فروشنده در ربات](#۷-سناریوهای-پنل-فروشنده-در-ربات)
-8. [سناریوهای سایت (Next.js)](#۸-سناریوهای-سایت-nextjs)
-9. [سناریوهای پرداخت (زرین‌پال)](#۹-سناریوهای-پرداخت-زرین‌پال)
-10. [جریان کامل یک سفارش (End-to-End)](#۱۰-جریان-کامل-یک-سفارش-end-to-end)
-11. [سناریوهای خطا و مدیریت خطا](#۱۱-سناریوهای-خطا-و-مدیریت-خطا)
-12. [کرون‌جاب‌ها و خودکارسازی](#۱۲-کرون‌جاب‌ها-و-خودکارسازی)
-13. [زیرساخت و استقرار](#۱۳-زیرساخت-و-استقرار)
-14. [API Reference](#۱۴-api-reference)
-15. [تغییرات اخیر و نقشه راه](#۱۵-تغییرات-اخیر-و-نقشه-راه)
+> **نسخه:** 2.3 | **تاریخ:** ۱۴۰۵-۰۴-۲۳ (2026-07-14)  
+> **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)  
+> **پلتفرم سفارش آنلاین چندمستأجری تلگرام**
 
 ---
 
-## ۱. معرفی کلی
+## فهرست
 
-**فروشگرام (Foroshgram)** یک پلتفرم چندمستأجری (Multi-Tenant) است که به فروشندگان اجازه می‌دهد فروشگاه آنلاین خود را در تلگرام راه‌اندازی کنند و از طریق یک ربات تلگرام و یک سایت Next.js مدیریت و فروش داشته باشند.
+۱. [معرفی و ویژگی‌ها](#۱-معرفی-و-ویژگی‌ها)  
+۲. [معماری سیستم](#۲-معماری-سیستم)  
+۳. [مدل داده‌ها](#۳-مدل-دادهها)  
+۴. [احراز هویت](#۴-احراز-هویت)  
+۵. [سناریوهای ربات — مشتری](#۵-سناریوهای-ربات--مشتری)  
+۶. [سناریوهای ربات — ادمین](#۶-سناریوهای-ربات--ادمین)  
+۷. [سناریوهای ربات — فروشنده](#۷-سناریوهای-ربات--فروشنده)  
+۸. [فرآیندهای تراکنشی](#۸-فرآیندهای-تراکنشی)  
+۹. [جریان کامل سفارش (End-to-End)](#۹-جریان-کامل-سفارش)  
+۱۰. [کرون‌جاب‌ها](#۱۰-کرونجابها)  
+۱۱. [EventBus معماری رویداد](#۱۱-eventbus-معماری-رویداد)  
+۱۲. [API Reference](#۱۲-api-reference)  
+۱۳. [زیرساخت و استقرار](#۱۳-زیرساخت-و-استقرار)  
+۱۴. [تغییرات و نقشه راه](#۱۴-تغییرات-و-نقشه-راه)  
+۱۵. [پیوست: ساختار دایرکتوری](#۱۵-پیوست-ساختار-دایرکتوری)
 
-### نقش‌های اصلی
-| نقش | دسترسی‌ها |
-|------|-----------|
+---
+
+## ۱. معرفی و ویژگی‌ها
+
+یک پلتفرم فروشگاهی تلگرامی چندمستأجری (multi-tenant) — هر فروشنده فروشگاه مجزای خودش را با دیتای جدا دارد. مشتری‌ها از طریق ربات تلگرام خرید می‌کنند و فروشنده‌ها سفارش‌ها را از ربات مدیریت می‌کنند.
+
+### نقش‌ها
+
+| نقش | دسترسی |
+|------|--------|
 | **ادمین کل (Super Admin)** | دسترسی کامل به همه فروشگاه‌ها، کاربران، سفارش‌ها، تنظیمات سیستم |
 | **فروشنده (Seller)** | مدیریت فروشگاه خودش (محصولات، دسته‌بندی‌ها، سفارش‌ها) |
 | **مشتری (Customer)** | مشاهده محصولات، ثبت سفارش، پیگیری سفارش |
 
 ### خصیصه‌های کلیدی
+
 - **چندمستأجری**: هر فروشنده یک فروشگاه مجزا با دیتای جدا دارد
-- **ثبت‌نام خودکار فروشنده**: ویزارد ۴ مرحله‌ای درون ربات
-- **پرداخت آنلاین و درب منزل**: دو روش پرداخت (زرین‌پال + COD)
-- **مدیریت موجودی اتمیک**: جلوگیری از overselling با رزرو اتمیک SQL
-- **تاریخچه وضعیت سفارش**: رهگیری کامل تغییرات وضعیت سفارش
+- **ثبت‌نام خودکار فروشنده**: ویزارد ۸ مرحله‌ای درون ربات
+- **فقط یک روش پرداخت**: کارت‌به‌کارت
+- **درگاه شخصی فروشنده**: پول مستقیم به حساب فروشنده می‌رود
+- **لینک مستقیم محصول**: `t.me/bot?start=product_X`
+- **لینک مستقیم دسته‌بندی**: `start=category_12`
+- **شروع هوشمند**: `/start` → آخرین فروشگاه یا دعوت به ساخت
+- **منوی سه سطحی (BotCommandScope)**: دستورات متفاوت برای مشتری/فروشنده/ادمین
+- **مدیریت موجودی اتمیک**: جلوگیری از overselling با UPDATE شرطی SQL
+- **تاریخچه وضعیت سفارش (OrderHistory)**: رهگیری کامل تغییرات در جدول جداگانه
+- **سیستم رویداد (EventBus)**: جداسازی نوتیفیکیشن‌ها از هندلرها
+- **سرویس نوتیفیکیشن متمرکز (NotificationService)**: ارسال پیام‌ها از یک نقطه
+- **داشبورد فروشنده**: فروش امروز/هفته/ماه، پرفروش‌ترین، میانگین سفارش، نرخ تبدیل
+- **یادآور موجودی کم**: اعلان خودکار وقتی محصول < ۵ عدد بماند
+- **فیلتر و مرتب‌سازی**: ارزان‌ترین، گران‌ترین، جدیدترین + فقط موجود
+- **علاقه‌مندی‌ها (Wishlist)**: افزودن محصولات مورد علاقه
+- **جستجوی تعاملی**: تایپ نام محصول
+- **سبد خرید رها شده**: یادآوری خودکار پس از ۱۲ ساعت
+- **خرید مجدد (Reorder)**: بازگرداندن محصولات سفارش قبلی به سبد
+- **کد تخفیف**: فروشنده کد درصدی/مبلغی می‌سازد، مشتری در checkout اعمال می‌کند
+- **بنر فروشگاه**: عکس کاور صفحه اصلی فروشگاه
+- **اعلان موجود شدن (Restock)**: subscribe + notify
+- **Progress Bar سفارش**: 📦→✅→📮→🚚→📬
+- **خرید سریع (Fast Checkout)**: اطلاعات ذخیره شده از خرید قبلی
+- **فروشگاه‌های اخیر**: لیست ۵ فروشگاه آخر بازدید شده
+- **گالری چندعکسی**: آلبوم تلگرام (send_media_group) برای محصولات با چند عکس
+- **پشتیبانی (Support)**: ConversationHandler مجزا
+- **افزودن محصول با فوروارد**: فروشنده پیام کانال را فوروارد می‌کند
+- **پیام خریدار-فروشنده (Conversations)**: مشتری از داخل جزئیات سفارش پیام بده، فروشنده اینباکس مجزا دارد
+- **تایید/رد مستقیم از نوتیفیکیشن**: ادمین بدون رفتن به پنل از دکمه‌های inline می‌تواند فروشنده را تایید/رد کند
+- **رمزنگاری اطلاعات بانکی**: AES-256-GCM با PBKDF2 در هر دو سمت (ربات + سایت)
+- **CSRF protection**: HMAC-SHA256 double-submit cookie
+- **Rate limiter توزیع‌شده**: Redis-backed با fallback in-memory
+- **De-duplication رسید پرداخت**: SHA-256 hash + UNIQUE constraint
+- **اجبار تغییر رمز بعد از reset**: must_change_password flag
+- **کمپرس پاسخ‌های طولانی**: کاهش سایز پیام‌های تکراری
 
 ---
 
 ## ۲. معماری سیستم
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Docker Network                     │
-│                                                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │  Next.js 3000 │  │   Bot Bot    │  │ PostgreSQL │ │
-│  │  (Website)   │  │  Python 3.11 │  │   Port 5432│ │
-│  │  SSR + API   │  │  PTB v21.x   │  │   Foroshgram│ │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬─────┘ │
-│         └────────────────┼─────────────────┘        │
-│                          │                           │
-│                    AsyncPG / asyncpg                  │
-└─────────────────────────────────────────────────────┘
-
-  ┌─── External ─────────────────────────────────────┐
-  │                                                    │
-  │  ┌──────────┐     ┌──────────────┐                │
-  │  │ Zarinpal │     │  Telegram API│                │
-  │  │ Payment  │     │  (Polling)   │                │
-  │  └──────────┘     └──────────────┘                │
-  └────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Docker Network                           │
+│                                                               │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────┐  │
+│  │  Next.js 3000     │  │  Bot Python 3.12 │  │ PostgreSQL │  │
+│  │  (Website)        │  │  PTB v22.x       │  │  Port 5432 │  │
+│  │  SSR + API Routes │  │  Async SQLAlchemy│  │            │  │
+│  │  Node.js 20       │  │  APScheduler     │  │            │  │
+│  └────────┬─────────┘  └────────┬─────────┘  └──────┬─────┘  │
+│           └────────────────┼───────────────────────┘         │
+│                            │                                  │
+│                      AsyncPG / asyncpg                        │
+│                                                               │
+│  ┌──────────────────┐  ┌──────────────────┐                   │
+│  │   Prometheus     │  │    Grafana       │   Monitoring      │
+│  │    Port 9091     │  │   Port 3001      │                   │
+│  └──────────────────┘  └──────────────────┘                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### کانتینرها
-| سرویس | نام کانتینر | وظیفه |
-|-------|-------------|--------|
-| PostgreSQL 16 | `foroshgram_postgres` | پایگاه داده اصلی |
-| Next.js | `foroshgram_website` | سایت Next.js (SSR + API Routes) |
-| Python Bot | `foroshgram_bot` | ربات تلگرام (python-telegram-bot v21) |
+
+| سرویس | نام کانتینر | Port | وابستگی |
+|-------|-------------|------|---------|
+| PostgreSQL 16 | `foroshgram_postgres` | ۵۴۳۲ | — |
+| Next.js | `foroshgram_website` | ۳۰۰۰ | postgres (healthy) |
+| Bot | `foroshgram_bot` | — | postgres (healthy) |
 
 ### تکنولوژی‌ها
-- **ربات**: Python 3.11 + python-telegram-bot v21.x (async)
-- **ORM**: SQLAlchemy 2.0 (Async)
-- **سایت**: Next.js 15 (App Router, Turbopack-ready)
-- **دیتابیس**: PostgreSQL 16 / SQLite (توسعه محلی)
-- **اتصال به دیتابیس در سایت**: pg (Node.js native)
-- **JWT**: jose (Edge Runtime compatible)
-- **پرداخت**: Zarinpal REST API v4 (sandbox/production)
+
+- **ربات**: Python 3.12 + python-telegram-bot v22.x (async) — APScheduler
+- **ORM**: SQLAlchemy 2.0 Async + asyncpg
+- **سایت**: Next.js 14 (App Router, Turbopack-ready) + pg (Node.js native driver)
+- **دیتابیس**: PostgreSQL 16 (تولید) / SQLite (توسعه محلی)
+- **JWT**: jose (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, SameSite=Lax)
+- **هش رمز**: bcrypt (ad-hoc wrapper، کتابخانه `bcrypt` روی Alpine)
+- **رمزنگاری**: AES-256-GCM با `cryptography.hazmat` (Python) / `crypto` native (Node.js)
 - **Proxy Bot**: HTTP proxy support برای مناطق تحریمی
+- **مانیتورینگ**: Prometheus + Grafana (با `monitoring.py` ماژولار)
+- **Rate Limiter**: Redis (`redis-py` / `redis` npm) + in-memory fallback
+
+### ماژول‌های اصلی ربات
+
+| ماژول | وظیفه | فایل |
+|-------|-------|------|
+| **Application** | نقطه ورود، build handler tree | `main.py` |
+| **Start** | `/start` هوشمند + لینک مستقیم | `handlers/start.py` |
+| **Menu** | دسته‌بندی‌ها، محصولات، گالری | `handlers/menu.py` |
+| **Cart** | سبد خرید (افزودن/کم/زیاد/حذف) | `handlers/cart.py` |
+| **Order** | ثبت سفارش + تاریخچه + پرداخت | `handlers/order.py` |
+| **Seller Registration** | ویزارد ۸ مرحله‌ای | `handlers/seller_registration.py` |
+| **Seller Panel** | پنل فروشنده + تنظیمات پرداخت | `handlers/seller_panel.py` |
+| **Discount** | ساخت و مدیریت کد تخفیف | `handlers/discount.py` |
+| **Wishlist** | علاقه‌مندی‌ها | `handlers/wishlist.py` |
+| **Search** | جستجوی تعاملی | `handlers/search.py` |
+| **Forward Products** | افزودن محصول با فوروارد | `handlers/forward_products.py` |
+| **Support** | پشتیبانی (ConversationHandler) | `handlers/support.py` |
+| **Help** | راهنمای نقش‌محور | `handlers/help.py` |
+| **Common** | توابع مشترک بین handlers | `handlers/common.py` |
+| **Conversations** | پیام خریدار-فروشنده (اینباکس) | `handlers/conversations.py` |
+| **Admin Approval** | تایید/رد فروشنده از دکمه inline | `handlers/admin_approval.py` |
+| **Admin Panel** | پنل ادمین | `handlers/admin/panel.py` |
+| **Admin Products** | مدیریت محصولات | `handlers/admin/products.py` |
+| **Admin Categories** | مدیریت دسته‌بندی | `handlers/admin/categories.py` |
+| **Admin Orders** | مدیریت سفارش‌ها | `handlers/admin/orders.py` |
+| **Admin Shops** | مدیریت فروشگاه‌ها | `handlers/admin/shops.py` |
+| **Admin Broadcast** | پیام همگانی | `handlers/admin/broadcast.py` |
+| **Crypto (Bot)** | AES-256-GCM رمزنگاری اطلاعات بانکی | `utils/crypto.py` |
+| **Payment Service** | رزرو/آزادسازی/نهایی‌سازی موجودی | `services/payment.py` |
+| **Order Service** | سرویس متمرکز سفارش | `services/order_service.py` |
+| **EventBus** | معماری event-driven | `services/events.py` |
+| **Notification** | سرویس متمرکز نوتیفیکیشن | `services/notification_service.py` |
+| **Restock** | اعلان موجود شدن | `services/restock.py` |
+| **Monitoring** | Metrics + Sentry + Health | `services/monitoring.py` |
+| **Abandoned Cart** | یادآوری سبد رها شده | `services/abandoned_cart.py` |
+
+### جریان داده‌ای EventBus
+
+```
+Handler → event_bus.emit(Event.ORDER_PAID, ...)
+              │
+              ▼
+         EventBus.dispatch()
+              │
+       ┌──────┼──────┐
+       ▼      ▼      ▼
+   Listener Listener Listener
+   (notify) (first_sale) (log)
+```
+
+- رویدادها: `ORDER_PAID`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `FIRST_SALE`
+- Listenerها در `services/event_listeners.py`
+- هر Listener مستقل است — خطای یکی بقیه را نمی‌شکند
 
 ---
 
-## ۳. مدل داده‌ها (Database Models)
+## ۳. مدل داده‌ها
 
 ### ۳.۱. فروشگاه (Shop)
+
 | فیلد | نوع | توضیح |
 |------|------|--------|
 | id | Integer PK | شناسه فروشگاه |
 | name | String(150) | نام فروشگاه |
 | description | String(500)? | توضیحات |
 | phone | String(30)? | شماره تماس |
+| channel_link | String(200)? | لینک کانال تلگرام فروشنده |
 | rejection_reason | String(500)? | دلیل رد (اگر رد شده) |
 | username | String(100)? Unique | یوزرنیم اختصاصی |
 | is_active | Boolean | فعال/غیرفعال |
 | status | String(20) | draft → active → suspended → rejected |
 | created_at | DateTime | تاریخ ثبت |
-
+| shipping_cost | Integer default=0 | هزینه ارسال (تومان) |
+| zarinpal_merchant_id | String(36)? | merchant_id زین‌پال (غیرفعال) |
+| card_number | Text? | شماره کارت برای کارت‌به‌کارت (AES-256-GCM ciphertext ~60 chars) |
+| card_holder_name | Text? | نام صاحب کارت (AES-256-GCM ciphertext ~172 chars) |
+| sheba_number | Text? | شماره شبا (AES-256-GCM ciphertext ~72 chars) |
+| zarinpal_merchant_id | String(36)? | شناسه درگاه زین‌پال |
+| banner_image | String(255)? | file_id عکس کاور فروشگاه |
 ### ۳.۲. صاحب فروشگاه (ShopOwner)
+
 | فیلد | نوع | توضیح |
 |------|------|--------|
 | id | Integer PK | |
-| user_id | BigInteger index | شناسه تلگرام کاربر |
+| user_id | BigInteger index | شناسه تلگرام |
 | shop_id | Integer FK → shops.id | فروشگاه مرتبط |
 | first_name | String(100)? | نام |
 | username | String(100)? | یوزرنیم تلگرام |
-| password_hash | String? | هش SHA-256 رمز عبور |
-| password_salt | String? | Salt رمز عبور |
+| password_hash | String? | هش bcrypt رمز عبور |
+| password_salt | String? | Salt رمز عبور (برای مهاجرت SHA-256) |
+| must_change_password | Boolean default=False | اجبار تغییر رمز بعد از reset |
 | registered_at | DateTime | تاریخ ثبت |
 
 ### ۳.۳. کد دعوت (ClaimCode)
-کد یک‌بارمصرف برای تحویل مالکیت فروشگاه.
 
 | فیلد | نوع | توضیح |
 |------|------|--------|
 | id | Integer PK | |
-| code | String(20) Unique | کد یک‌بارمصرف |
-| shop_id | Integer FK | فروشگاه مرتبط |
-| created_by | BigInteger | ادمین سازنده |
-| is_used | Boolean | استفاده شده؟ |
-| used_by | BigInteger? | فروشنده استفاده‌کننده |
-| used_at | DateTime? | تاریخ استفاده |
-| expires_at | DateTime | تاریخ انقضا |
-| created_at | DateTime | تاریخ ساخت |
+| code | String(50) Unique | کد دعوت |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| expires_at | DateTime? | انقضا |
+| used_at | DateTime? | زمان استفاده |
+| used_by | BigInteger? | کاربر استفاده‌کننده |
 
-### ۳.۴. دسته‌بندی (Category)
+### ۳.۴. محصول (Product)
+
 | فیلد | نوع | توضیح |
 |------|------|--------|
 | id | Integer PK | |
-| shop_id | Integer FK | فروشگاه |
-| name | String(100) | نام دسته |
-| description | String(255)? | توضیحات |
-| created_at | DateTime | |
-
-### ۳.۵. محصول (Product)
-| فیلد | نوع | توضیح |
-|------|------|--------|
-| id | Integer PK | |
-| shop_id | Integer FK | فروشگاه |
-| category_id | Integer FK | دسته‌بندی |
-| name | String(150) | نام |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| category_id | Integer FK → categories.id | دسته‌بندی |
+| name | String(200) | نام محصول |
 | description | Text? | توضیحات |
-| price | Float | قیمت (تومان) |
+| price | BigInteger | قیمت به تومان |
 | stock | Integer | موجودی کل |
-| reserved_stock | Integer | موجودی رزرو شده |
-| image_file_id | String(255)? | file_id عکس در تلگرام |
-| is_active | Boolean | فعال/غیرفعال |
+| image_file_id | String(255)? | file_id عکس اصلی |
+| reserved_stock | Integer default=0 | موجودی رزرو شده در سفارش‌های در حال پردازش |
+| is_active | Boolean default=True | فعال/غیرفعال |
+| has_video | Boolean default=False | آیا ویدیو دارد؟ |
 | created_at | DateTime | |
 | updated_at | DateTime | |
+| CONSTRAINT chk_stock | CHECK | `reserved_stock >= 0 AND reserved_stock <= stock` |
 
-**Property**: `available_stock = stock - reserved_stock`
+**محاسبه موجودی قابل فروش:**
+```python
+@property
+def available_stock(self) -> int:
+    return max(0, self.stock - self.reserved_stock)
+```
 
-### ۳.۶. کاربر (User)
+### ۳.۵. دسته‌بندی (Category)
+
 | فیلد | نوع | توضیح |
 |------|------|--------|
-| user_id | BigInteger PK | شناسه تلگرام کاربر |
-| current_shop_id | Integer? | فروشگاه فعلی |
+| id | Integer PK | |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| name | String(100) | نام دسته |
+| created_at | DateTime | |
+
+### ۳.۶. کاربر (User)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id (user_id) | BigInteger PK | شناسه تلگرام |
 | first_name | String(100)? | |
 | last_name | String(100)? | |
 | username | String(100)? | |
 | phone | String(30)? | |
 | address | String(500)? | آدرس پیش‌فرض |
 | is_blocked | Boolean | مسدود؟ |
+| saved_name | String(100)? | نام ذخیره شده برای خرید سریع |
+| saved_phone | String(20)? | شماره ذخیره شده |
+| saved_address | Text? | آدرس ذخیره شده |
+| recent_shops | Text (JSON array of int) | `[shop_id_1, shop_id_2, ...]` — ۵ فروشگاه آخر |
+| last_shop_id | Integer? | آخرین فروشگاه بازدید شده |
 | registered_at | DateTime | |
 
-### ۳.۷. سبد خرید (CartItem)
-| فیلد | نوع | توضیح |
-|------|------|--------|
-| id | Integer PK | |
-| user_id | BigInteger FK | کاربر |
-| shop_id | Integer FK | فروشگاه |
-| product_id | Integer FK | محصول |
-| quantity | Integer | تعداد |
-| added_at | DateTime | |
+### ۳.۷. ادمین کل (Admin)
 
-### ۳.۸. سفارش (Order)
 | فیلد | نوع | توضیح |
 |------|------|--------|
 | id | Integer PK | |
-| shop_id | Integer FK | فروشگاه |
-| tracking_code | String(20) Unique | کد رهگیری (yymmdd + 4 رقم) |
-| user_id | BigInteger FK | مشتری |
-| total_price | Float | مبلغ کل |
-| status | Enum(OrderStatus) | وضعیت فعلی |
-| payment_method | String(20)? | آنلاین / درب منزل |
-| payment_ref | String(100)? | کد پیگیری زرین‌پال |
-| payment_status | String(20)? | pending / paid |
+| user_id | BigInteger Unique | شناسه تلگرام |
+| password_hash | String(128) | هش bcrypt |
+| must_change_password | Boolean default=False | اجبار تغییر رمز بعد از reset |
+| created_at | DateTime | |
+
+### ۳.۸. سبد خرید (CartItem)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| user_id | BigInteger FK → users.id | کاربر |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| product_id | Integer FK → products.id | محصول |
+| quantity | Integer default=1 | تعداد |
+| created_at | DateTime | |
+
+**UniqueConstraint**: `(user_id, product_id)` — هر محصول فقط یک رکورد در سبد.
+
+### ۳.۹. سفارش (Order)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| tracking_code | String(20) Unique | کد رهگیری (فرمت: `YYMMDD + 6 digit`) |
+| user_id | BigInteger FK → users.id | مشتری |
+| total_price | Integer | جمع کل به تومان (بعد از تخفیف، قبل از ارسال) |
+| status | String(20) | `pending_payment`, `pending`, `paid`, `confirmed`, `shipped`, `delivered`, `cancelled`, `refunded` |
+| payment_method | String(20)? | `card_to_card` (فقط این روش فعال) |
+| payment_ref | String(100)? | شماره مرجع پرداخت (برای آینده) |
+| payment_status | String(20)? | `pending`, `pending_review`, `paid`, `cancelled` |
+| payment_receipt_file_id | String(255)? | file_id عکس رسید |
+| payment_receipt_text | String(500)? | متن شماره تراکنش |
+| payment_receipt_at | DateTime? | زمان آپلود رسید |
+| payment_receipt_hash | String(64)? | SHA-256 hash رسید برای de-duplication |
 | receiver_name | String(150)? | نام گیرنده |
-| shipping_address | String(500) | آدرس ارسال |
+| shipping_address | String(500) | آدرس گیرنده |
 | phone | String(30) | شماره تماس گیرنده |
-| status_history | Text (JSON) | تاریخچه تغییرات |
+| discount_code | String(50)? | کد تخفیف اعمال شده |
+| discount_amount | Integer default=0 | مبلغ تخفیف (تومان) |
+| status_history | Text (JSON) | تاریخچه قدیمی (دیگر استفاده نمی‌شود، برای backward compatibility) |
+| cancellation_reason | String(100)? | دلیل لغو |
 | created_at | DateTime | |
 | updated_at | DateTime | |
 
-### ۳.۹. آیتم سفارش (OrderItem)
+**روابط:**
+- `items: list[OrderItem]` — cascade delete
+- `histories: list[OrderHistory]` — cascade delete
+
+### ۳.۱۰. آیتم سفارش (OrderItem)
+
 | فیلد | نوع | توضیح |
 |------|------|--------|
 | id | Integer PK | |
-| order_id | Integer FK | سفارش |
-| product_id | Integer? FK | محصول (nullable برای محصولات حذف شده) |
-| product_name | String(150) | نام محصول در زمان سفارش |
+| order_id | Integer FK → orders.id | سفارش |
+| product_id | Integer FK → products.id (nullable) | محصول در لحظه سفارش — اگر محصول حذف شود، NULL می‌شود |
+| product_name | String(150) | نام محصول (ذخیره شده در لحظه سفارش) |
 | quantity | Integer | تعداد |
-| unit_price | Float | قیمت واحد |
+| unit_price | Float | قیمت واحد در لحظه سفارش |
 
-### ۳.۱۰. چرخه وضعیت سفارش (OrderStatus)
+**روابط:**
+- `product: Product` — رابطه به محصول (برای بررسی موجودی و جزئیات در زمان تایید پرداخت)
 
-```
-PENDING_PAYMENT ──→ PAID ──→ CONFIRMED ──→ SHIPPED ──→ DELIVERED
-        │              │          │             │
-        └── CANCELLED ←┘          └── CANCELLED ←┘
-        │                                       
-        └── CANCELLED                           
-             │
-             └── REFUNDED
-```
+### ۳.۱۱. تاریخچه سفارش (OrderHistory)
 
-**وضعیت‌ها**:
-- `pending_payment` — منتظر پرداخت آنلاین
-- `pending` — منتظر بررسی (پرداخت درب منزل)
-- `paid` — پرداخت شده (منتظر تأیید فروشنده)
-- `confirmed` — تأیید شده توسط فروشنده
-- `shipped` — ارسال شده
-- `delivered` — تحویل داده شده
-- `cancelled` — لغو شده
-- `refunded` — بازگشت وجه
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| order_id | Integer FK → orders.id | سفارش |
+| status | String(50) | وضعیت جدید |
+| changed_by | String(50) | `system`, `seller`, `admin`, `customer` |
+| description | String(500)? | توضیحات اختیاری |
+| meta_json | Text? | JSON با اطلاعات اضافی (دلیل لغو، آدرس و...) |
+| changed_at | DateTime | زمان تغییر (indexed) |
 
-**انتقالات مجاز** هر وضعیت در `ALLOWED_TRANSITIONS` مدل تعریف شده.
+### ۳.۱۲. عکس محصول (ProductImage)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| product_id | Integer FK → products.id | محصول |
+| file_id | String(255) | file_id تلگرام |
+| position | Integer default=0 | ترتیب نمایش (0 = عکس اصلی) |
+| created_at | DateTime | |
+
+**چند عکس = آلبوم:** اگر `ProductImage.count > 1`، در `show_product_detail` ابتدا عکس اصلی (`product.image_file_id`) با `send_photo` فرستاده می‌شود، سپس بقیه عکس‌ها با `send_media_group` به صورت آلبوم.
+
+### ۳.۱۳. علاقه‌مندی‌ها (WishlistItem)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| user_id | BigInteger FK → users.id | کاربر |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| product_id | Integer FK → products.id | محصول |
+| created_at | DateTime | |
+
+**UniqueConstraint**: `(user_id, shop_id, product_id)`
+
+### ۳.۱۴. کد تخفیف (DiscountCode)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| code | String(50) | کد تخفیف (مثلاً SUMMER20) |
+| discount_type | String(20) | `percent` یا `fixed_amount` |
+| discount_value | Float | مقدار تخفیف (درصد یا مبلغ به تومان) |
+| min_order_amount | Float default=0 | حداقل مبلغ سفارش برای اعمال |
+| max_uses | Integer default=0 | حداکثر دفعات استفاده (0 = نامحدود) |
+| used_count | Integer default=0 | دفعات استفاده شده |
+| is_active | Boolean default=True | فعال/غیرفعال |
+| expires_at | DateTime? | تاریخ انقضا |
+| created_at | DateTime | |
+
+**Index**: `(shop_id, code)` — ترکیبی
+
+**نحوه اعمال در checkout:**
+1. مشتری دکمه `🎁 کد تخفیف` در خلاصه سفارش می‌زند
+2. کد را تایپ می‌کند → validate: فعال بودن، عدم انقضا، عدم اتمام ظرفیت، حداقل مبلغ
+3. اگر `discount_type == "percent"`: `amount = total * value / 100`
+4. اگر `discount_type == "fixed_amount"`: `amount = value`
+5. **Clamp**: `amount = min(amount, total_price)` — مبلغ منفی غیرممکن
+6. `total_price = max(0, total_price - amount)`
+7. نتیجه در `context.user_data["discount_code"]` و `["discount_amount"]` ذخیره می‌شود
+8. در `create_order_from_cart` پارامترهای `discount_code` و `discount_amount` دریافت و در `Order` ذخیره می‌شود
+9. `DiscountCode.used_count++` بعد از ایجاد موفق سفارش
+
+### ۳.۱۵. اعلان موجود شدن (RestockSubscription)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| product_id | Integer FK → products.id | محصول |
+| user_id | BigInteger | کاربر (FK نیست برای سادگی) |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| notified | Boolean default=False | آیا notify شده؟ |
+| subscribed_at | DateTime | تاریخ ثبت‌نام |
+
+**UniqueConstraint**: `(product_id, user_id)` — یک کاربر فقط یک بار می‌تواند برای هر محصول subscribe کند.
+
+**رفتار subscribe:**
+- اگر `notified=False` وجود دارد → "قبلاً ثبت‌نام کرده‌اید"
+- اگر `notified=True` وجود دارد → `notified=False` + `subscribed_at=now` (re-activate)
+- در غیر این صورت → رکورد جدید
+
+**رفتار notify:**
+- وقتی موجودی از ۰ به >۰ می‌رود (`admin/products.py:handle_product_edit_stock`)
+- `_check_and_notify_restock(session, product_id, shop_id, context.bot)` صدا زده می‌شود
+- برای هر subscriber با `notified=False`: پیام "🔔 ... موجود شد!" ارسال می‌شود
+- بعد از ارسال، `notified=True` می‌شود
+
+### ۳.۱۶. مکالمه (Conversation) — پشتیبانی
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+|| id | Integer PK | |
+|| user_id | BigInteger index | شناسه تلگرام |
+|| shop_id | Integer FK → shops.id | فروشگاه مرتبط |
+|| password_hash | String(128) | هش bcrypt |
+|| password_salt | String(32) | Salt برای bcrypt |
+|| must_change_password | Boolean default true | پس از `/reset_password` و لاگین اولیه اجباری |
+|| two_factor_secret | String(32)? | (آینده) |
+|| created_at | DateTime | |
+
+### ۳.۱۷. پیام (Message)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| conversation_id | Integer FK → conversations.id | مکالمه |
+| sender_role | String(10) | `buyer` / `seller` |
+| content | Text | متن پیام |
+| has_attachment | Boolean default=False | آیا پیوست دارد؟ |
+| attachment_file_id | String(255)? | file_id پیوست |
+| read_at | DateTime? | زمان خوانده شدن |
+| created_at | DateTime | |
 
 ---
 
-## ۴. سیستم احراز هویت (Authentication)
+## ۴. احراز هویت
 
-### ۴.۱. لاگین نقش‌محور (یک فرم ورود، سه نقش مختلف)
+### ۴.۱. لاگین نقش‌محور (سایت)
 
 | نقش | شرط | رمز | ریدایرکت |
 |------|------|------|----------|
-| **ادمین** | شناسه در `ADMIN_IDS` | رمز ثابت (`ADMIN_PASSWORD`) | `/admin` |
-| **فروشنده** | شناسه در `shop_owners` | رمز هش‌شده (SHA-256 + salt) | `/seller` |
-| **مشتری** | شناسه در `users` | ندارد | `/` |
+| **ادمین** | شناسه در جدول `admins` | هش bcrypt در دیتابیس | `/admin` |
+| **فروشنده** | شناسه در `shop_owners` | هش bcrypt | `/seller` |
+| **مشتری** | شناسه در `users` | ندارد (فقط userId کافی است) | `/` |
 
 ### ۴.۲. جزئیات فنی
-- **JWT** با کتابخانه `jose` (Edge Runtime compatible)
-- **SHA-256** با Web Crypto API (`crypto.subtle.digest`) — به دلیل باگ Turbopack از `crypto.createHash` استفاده نمی‌شه
-- **Salt** جداگانه برای هر فروشنده (`password_salt`)
-- **Middleware** (Next.js): محافظت مسیرهای `/admin/*` و `/seller/*`
-- **کلوکی**: `fsh_session` (httpOnly, 7 روز)
-- **Payload JWT**: `{ userId, role, shopId?, firstName?, loginMethod }`
 
-### ۴.۳. سناریوی کامل لاگین
-1. کاربر فرم `/login` را با شناسه تلگرام پر می‌کند
-2. API `/api/auth/login` بررسی می‌کند:
-   - آیا کاربر در `ADMIN_IDS` است؟ → نیاز به رمز ادمین
-   - آیا کاربر در `shop_owners` است؟ → نیاز به رمز فروشنده
-   - آیا کاربر در `users` است؟ → لاگین بدون رمز (مشتری)
-3. اگر نیاز به رمز باشد، فرم رمز نمایش می‌یابد
-4. پس از تأیید، JWT ساخته شده و در کلوکی ذخیره می‌شود
-5. Middleware مسیرهای محافظت‌شده را بررسی می‌کند
+- **JWT** با کتابخانه `jose` (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, SameSite=Lax)
+- **bcrypt** برای هش رمز (جایگزین SHA-256 در آپدیت امنیتی)
+- `ADMIN_PASSWORD` از env vars **حذف شده** — رمز ادمین در جدول `admins` با bcrypt
+- **Salt جداگانه** برای هر فروشنده (`password_salt`) — برای مهاجرت از SHA-256 نگه داشته شده
+- **Rate limit**: Redis-backed با fallback in-memory — ۵ تلاش ناموفق → ۱۵ دقیقه قفل
+- **CSRF protection**: HMAC-SHA256 double-submit cookie pattern روی POST/PATCH/DELETE endpoints
+- **رمزنگاری اطلاعات بانکی**: AES-256-GCM با PBKDF2 key derivation (کلید از `ENCRYPTION_KEY` env)
+- **AJre-check وضعیت فروشگاه**: `requireSeller()` هر ریکوئست `shop.active` و `password_hash` رو از DB چک می‌کنه
+- **اجبار تغییر رمز**: `must_change_password` flag بعد از `/reset_password` — login موفق redirect به `/change-password`
+- **De-duplication رسید**: SHA-256 hash + UNIQUE constraint روی `payment_receipt_hash`
+- **Escape HTML**: همه ورودی‌های کاربر قبل از `parse_mode=HTML` escape می‌شن (جلوگیری از injection)
+- **Middleware** (Next.js): محافظت مسیرهای `/admin/*` و `/seller/*`
+- **Payload JWT**: `{ userId, role, shopId?, firstName?, loginMethod }`
 
 ---
 
-## ۵. سناریوهای ربات تلگرام
+## ۵. سناریوهای ربات — مشتری
 
 ### ۵.۱. شروع کار (`/start`)
 
-#### سناریوی خوش‌آمدگویی
+#### با پارامتر (`?start=shop_X` یا `?start=product_X` یا `?start=category_X`)
+
 1. کاربر `/start` را می‌فرستد
-2. ربات چک می‌کند کاربر بلاک نیست
-3. اگر `start=shop_X` (لینک فروشگاه): فروشگاه راستی‌آزمایی می‌شود
+2. ربات چک می‌کند کاربر بلاک نیست و `user_id` در جدول `users` وجود دارد
+3. اگر `start=shop_X` (لینک فروشگاه):
    - فروشگاه وجود ندارد → `❌ فروشگاه مورد نظر یافت نشد`
-   - فروشگاه غیرفعال/درraf/suspended → پیام خطای مناسب
-   - فروشگاه فعال → ثبت کاربر و نمایش منوی فروشگاه
-4. اگر کاربر فروشنده/ادمین است → مستقیم پنل مدیریت را نمایش می‌دهد
-5. اگر کاربر جدید است → ثبت در دیتابیس + منوی اصلی مشتری
-6. اگر کاربر قبلاً ثبت شده → به‌روزرسانی اطلاعات + منوی اصلی
+   - فروشگاه غیرفعال → `🚫 این فروشگاه معلق شده`
+   - OK → ثبت/بروز `last_shop_id` کاربر + نمایش منوی فروشگاه
+4. اگر `start=product_X` (لینک مستقیم محصول):
+   - محصول + فروشگاه مجازند → نمایش جزئیات محصول
+   - `shop_id` کاربر بروز می‌شود
+5. اگر `start=category_X` (لینک مستقیم دسته‌بندی):
+   - دسته + فروشگاه مجازند → نمایش محصولات آن دسته
+6. پارامتر نامعتبر → `❌ لینک نامعتبر`
 
-#### دکمه‌های منوی اصلی مشتری
+#### بدون پارامتر (شروع هوشمند)
+
+1. اگر `last_shop_id` دارد و فروشگاه فعال است:
+   - نمایش: «آخرین باری که اینجا بودی تو فروشگاه «X» بودی.»
+   - دکمه‌ها: `🛍 مشاهده محصولات` + `🛒 سبد خرید` + `📦 سفارش‌های من`
+2. اگر `last_shop_id` ندارد یا فروشگاه غیرفعال:
+   - پیام معرفی پلتفرم + دعوت به ساخت فروشگاه
+   - دکمه‌ها: `🏪 می‌خوام فروشگاه بسازم` + `ℹ️ درباره فروشگرام`
+
+### ۵.۲. منوی اصلی و دسته‌بندی‌ها
+
 ```
-🛍 مشاهده محصولات
-🛒 سبد خرید
-📦 سفارش‌های من
-🏪 می‌خوام فروشگاه بسازم
-☎️ پشتیبانی
+cat:list → cat:open:{id}:{page} → prod:open:{id}:{cat}:{page}
+```
+دسته‌بندی‌ها با دکمه نمایش داده می‌شوند. انتخاب دسته → محصولات (۸ عدد در هر صفحه با صفحه‌بندی). مرتب‌سازی: ارزان‌ترین / گران‌ترین / جدیدترین. فیلتر `فقط موجود`.
+
+### ۵.۳. جزئیات محصول
+
+- عکس اصلی (`product.image_file_id`) + در صورت وجود عکس‌های اضافه (`ProductImage`) → آلبوم (`send_media_group`)
+- متن: نام، قیمت، توضیحات، ⭐ امتیاز (آینده)، موجودی
+- دکمه‌ها:
+  - `➕ افزودن به سبد خرید` — اگر موجود، با دکمه تعداد
+  - `💚 افزودن به علاقه‌مندی‌ها` / اگر قبلاً اضافه شده: `💔 حذف از علاقه‌مندی‌ها`
+  - `🔔 وقتی موجود شد خبرم کن` — اگر `available_stock == 0`
+  - `🔙 بازگشت`
+  - `🛒 مشاهده سبد خرید` (بعد از افزودن)
+  - `🛍 ادامه خرید` (بعد از افزودن)
+  - `🗑 حذف از سبد` (بعد از افزودن)
+
+### ۵.۴. سبد خرید
+
+- **افزودن**: `cart:add:{product_id}` → `+1` به تعداد / اگر موجود نیست → رکورد جدید
+- **مشاهده**: `cart:view` → لیست اقلام با قیمت و جمع کل
+- **تغییر تعداد**: `cart:inc:{id}` / `cart:dec:{id}`
+- **حذف**: `cart:remove:{id}`
+- **خالی کردن**: `cart:clear`
+- **ثبت سفارش**: `order:start` → شروع ویزارد checkout
+
+### ۵.۵. ثبت سفارش (ConversationHandler)
+
+States در `handlers/order.py`:
+
+| State | مقدار | Handler | توضیح |
+|-------|-------|---------|--------|
+| ASK_NAME | 0 | `ask_name` | دریافت نام گیرنده (۲-۱۰۰ کاراکتر) |
+| ASK_PHONE | 1 | `ask_phone` | شماره تماس ۱۱ رقمی (`^09\d{9}$` با تبدیل اعداد فارسی) |
+| ASK_ADDRESS | 2 | `ask_address` | آدرس (حداکثر ۵۰۰ کاراکتر) — اگر `saved_address` موجود باشد → دکمه `✅ بله، از اطلاعات قبلی` |
+| ASK_PAYMENT_METHOD | 3 | `ask_payment_method` | انتخاب روش پرداخت (داینامیک بر اساس تنظیمات فروشنده) — فعلاً فقط `💳 کارت به کارت` |
+| CONFIRM | 4 | `_show_order_summary` | خلاصه سفارش با دکمه‌های: `✅ ثبت نهایی`, `🎁 کد تخفیف`, `✏️ ویرایش اطلاعات`, `🔙 بازگشت` |
+| ASK_CARD_RECEIPT | 5 | `handle_card_receipt` | دریافت عکس/متن رسید (برای `card_to_card`) |
+| ASK_DISCOUNT | 6 | `receive_discount` | دریافت کد تخفیف متنی |
+
+**جریان کامل:**
+
+```
+order:start → (اگر fast-checkout) ASK_NAME
+  → ASK_PHONE → ASK_ADDRESS
+    → [اگر saved info موجود: دکمه "استفاده از اطلاعات قبلی"]
+    → ASK_PAYMENT_METHOD → CONFIRM
+      → 🎁 کد تخفیف → ASK_DISCOUNT → validate → CONFIRM (با تخفیف)
+      → ✅ ثبت نهایی → create_order_from_cart()
+        → اگر COD: OrderStatus.PENDING → done
+        → اگر card_to_card: OrderStatus.PENDING_PAYMENT → ASK_CARD_RECEIPT → ارسال عکس رسید → done
 ```
 
-### ۵.۲. مشاهده محصولات (`cat:list`)
+**دکمه‌های درون CONFIRM:**
+- `order:confirm` — ثبت نهایی
+- `order:ask_discount` — رفتن به ASK_DISCOUNT
+- `order:change_name` / `phone` / `address` — ویرایش مرحله قبل
+- `order:change_payment` — تغییر روش پرداخت
+- `order:cancel` — انصراف (ConversationHandler.END)
 
-1. کاربر دکمه `🛍 مشاهده محصولات` را می‌زند
-2. ربات دسته‌بندی‌های فروشگاه فعلی را نمایش می‌دهد
-3. اگر دسته‌بندی وجود نداشته باشد → `فعلاً هیچ دسته‌بندی‌ای ثبت نشده`
-4. کاربر روی یک دسته کلیک می‌کند
-5. محصولات فعال آن دسته با صفحه‌بندی نمایش داده می‌شود
-6. هر محصول: `نام — قیمت` + نشان `(ناموجود)` اگر stock = 0
-7. دکمه‌های قبلی/بعدی برای صفحه‌بندی (۶ محصول در هر صفحه)
+**Fallbackهای مکالمه (هرجایی قابل استفاده):**
+- `order:pay_cancel:{id}` — انصراف در مرحله پرداخت + پاک کردن state
+- `order:start` — شروع مجدد checkout (اگر مکالمه گیر کرده باشد)
 
-#### جزئیات محصول (`prod:open`)
-1. کاربر روی نام محصول کلیک می‌کند
-2. نمایش: نام، توضیحات، قیمت، وضعیت موجودی
-3. اگر محصول ناموجود باشد، دکمه اضافه به سبد خرید نمایش نمی‌یابد
-4. دکمه `➕ افزودن به سبد خرید` (فقط اگر موجود باشد)
-5. دکمه بازگشت به محصولات (با حفظ صفحه)
+### ۵.۶. پرداخت کارت‌به‌کارت
 
-### ۵.۳. سبد خرید (`cart`)
+1. مشتری در خلاصه سفارش `✅ ثبت نهایی` می‌زند
+2. `create_order_from_cart` صدا زده می‌شود (رزرو اتمیک موجودی در تراکنش واحد)
+3. ربات شماره کارت فروشنده + نام صاحب کارت + مبلغ را نمایش می‌دهد
+4. مشتری عکس رسید (فایل عکس) یا شماره تراکنش (متن) می‌فرستد → `ASK_CARD_RECEIPT`
+5. سفارش `PENDING_PAYMENT` + `attach_card_receipt()` → رسید ذخیره می‌شود
+   - `payment_receipt_hash = SHA-256(receipt_text or file_id)` — UNIQUE constraint جلوگیری از رسید تکراری
+6. فروشنده پیام حاوی رسید + دکمه‌های `✅ تایید` / `❌ رد`
+7. **تأیید**: `transition_order(PAID)` → نهایی‌سازی موجودی → نوتیفیکیشن به مشتری
+8. **رد**: مشتری ۲ گزینه:
+   - `pay:receipt_retry:{id}` — آپلود مجدد رسید
+   - `pay:cancel:{id}` — لغو کامل (`cancel_order_and_release_stock`)
+9. **عدم اقدام فروشنده تا ۱۵ دقیقه** (بدون رسید) یا **۴۸ ساعت** (بعد از رسید) → کرون‌جاب آزادسازی خودکار (`cleanup_abandoned_payments`)
 
-#### نمایش سبد خرید (`cart:view`)
-1. اگر سبد خالی است → `سبد خریدت خالیه 🛒` + دکمه مشاهده محصولات
-2. اگر سبد پر است → نمایش اقلام با جمع کل
-3. هر آیتم: `نام × تعداد = قیمت` با دکمه‌های ➖ و ➕ و 🗑
-4. دکمه `✅ ثبت سفارش`
-5. دکمه `🗑 خالی کردن سبد`
+### ۵.۷. تاریخچه و پیگیری سفارش
 
-#### افزودن به سبد خرید (`cart:add`)
-1. کاربر دکمه افزودن را می‌زند
-2. اگر فروشگاه انتخاب نشده → آلرت `لطفاً با لینک فروشگاه وارد شوید`
-3. اگر موجودی کافی نباشد → آلرت خطا
-4. اگر محصول از قبل در سبد هست → افزایش quantity
-5. اگر محصول جدید است → افزودن به سبد
-6. پیام `به سبد خرید اضافه شد ✅`
+- `order:history` → لیست سفارش‌ها با کد رهگیری، وضعیت، مبلغ، تاریخ شمسی
+- `order:detail:{id}` → جزئیات کامل + **Progress Bar**:
+  ```
+  📦 ثبت سفارش → ✅ پرداخت → 📮 آماده‌سازی → 🚚 ارسال → 📬 تحویل
+  ⬜⬜⬜⬜⬜ (همه خاکستری اگر CANCELLED/REFUNDED)
+  ```
+  هر مرحله سپری شده: ✅ | فعلی: ⬜ | آینده: ⬜
+- `order:reorder:{id}` → خرید مجدد: همه OrderItem → CartItem (اگر محصول هنوز موجود و فعال باشد)
 
-#### تغییر تعداد (`cart:inc` / `cart:dec`)
-1. افزایش: اگر به سقف موجودی رسیده → آلرت
-2. کاهش: اگر به صفر برسد → حذف آیتم از سبد
-3. رفرش نمایش سبد
+### ۵.۸. علاقه‌مندی‌ها
 
-#### حذف آیتم (`cart:remove`)
-1. حذف آیتم از سبد
-2. رفرش نمایش سبد
+- `wishlist:add:{pid}` — افزودن (اگر قبلاً نیست)
+- `wishlist:remove:{pid}` — حذف
+- `wishlist:view` — لیست محصولات با دکمه خرید مستقیم
 
-#### خالی کردن سبد (`cart:clear`)
-1. نمایش تأیید: `🗑 آیا از خالی کردن سبد خرید مطمئنی؟`
-2. تأیید (`cart:clear:confirm`): حذف همه آیتم‌ها
-3. انصراف: بازگشت به سبد
+### ۵.۹. جستجو
 
-### ۵.۴. ثبت سفارش (Conversation Handler)
+- دستور `/search` یا دکمه `🔍 جستجو`
+- کاربر نام محصول را تایپ می‌کند → `LIKE %text%` جستجو در `Product.name` با شرط `shop_id`
+- نتایج: هر کدام با دکمه مشاهده مستقیم
+- دکمه `🔙 بازگشت` در پایین
 
-#### مرحله ۱: شروع (`order:start`)
-1. چک بلاک بودن کاربر
-2. چک وجود shop_id
-3. اعتبارسنجی موجودی همه آیتم‌ها
-   - اگر موجودی کافی نباشد → نمایش خطا + دکمه ویرایش سبد
-4. ذخیره `checkout_shop_id`
+### ۵.۱۰. خرید سریع (Fast Checkout)
 
-#### مرحله ۲: دریافت نام گیرنده (ASK_NAME)
-1. پیام: `برای ثبت سفارش، لطفاً نام و نام خانوادگی گیرنده رو وارد کن`
-2. اعتبارسنجی: حداقل ۳ کاراکتر، فقط حروف
-3. خطا: `لطفاً نام معتبر وارد کن`
+- وقتی کاربر اطلاعات قبلی دارد (`user.saved_name/phone/address`)
+- بعد از ASK_ADDRESS → دکمه `✅ بله، از اطلاعات قبلی استفاده کن`
+- با زدن دکمه، `context.user_data` پر می‌شود و مستقیم به CONFIRM می‌رود
+- بعد از سفارش موفق، `user.saved_name/phone/address` بروز می‌شوند
 
-#### مرحله ۳: دریافت شماره تماس (ASK_PHONE)
-1. پیام: `شماره تماس رو وارد کن (مثال: 09123456789)`
-2. تبدیل ارقام فارسی به انگلیسی
-3. الگو: `^09\d{9}$`
-4. خطا: `شماره وارد شده معتبر نیست`
+### ۵.۱۱. فروشگاه‌های اخیر
 
-#### مرحله ۴: دریافت آدرس (ASK_ADDRESS)
-1. پیام: `آدرس کامل ارسال رو وارد کن`
-2. اعتبارسنجی: حداقل ۱۰ کاراکتر
-3. ذخیره آدرس در پروفایل کاربر برای استفاده بعدی
+- `shop:recent` → لیست ۵ فروشگاه آخر (`user.recent_shops` JSON array)
+- `shop:open:{id}` → باز کردن فروشگاه (set `current_shop_id` + منوی اصلی)
 
-#### مرحله ۵: انتخاب روش پرداخت (ASK_PAYMENT_METHOD)
-گزینه‌ها:
-- `💳 پرداخت آنلاین (زرین‌پال)`
-- `🚚 پرداخت درب منزل`
-- `❌ انصراف`
+### ۵.۱۲. اعمال کد تخفیف
 
-#### مرحله ۶: نمایش خلاصه سفارش (CONFIRM)
-نمایش:
-- اقلام سفارش (نام × تعداد = قیمت)
-- گیرنده، تماس، آدرس
-- روش پرداخت
-- مبلغ قابل پرداخت
+- در CONFIRM: دکمه `🎁 اعمال کد تخفیف` (اگر قبلاً اعمال نشده باشد)
+- → `ASK_DISCOUNT`: کاربر کد را تایپ می‌کند
+- validate:
+  - `is_active == True`
+  - `expires_at` نگذشته (اگر دارد)
+  - `max_uses == 0 or used_count < max_uses`
+  - `total_price >= min_order_amount`
+- محاسبه مقدار تخفیف، clamp روی `total_price`
+- ذخیره در `context.user_data["discount_code"]` و `["discount_amount"]`
+- بازگشت به CONFIRM با مبلغ جدید
+- در صورت خطا: پیام خطا + دکمه `❌ انصراف`
 
-دکمه‌ها:
-- `✅ ثبت نهایی سفارش`
-- `🔙 تغییر روش پرداخت`
-- `❌ انصراف`
+### ۵.۱۳. پشتیبانی
 
-#### مرحله ۷: ثبت نهایی سفارش (`order:confirm`)
-
-**برای پرداخت آنلاین:**
-1. ایجاد سفارش با وضعیت `PENDING_PAYMENT`
-2. رزرو اتمیک موجودی
-   - اگر ناموفق → لغو سفارش + پیام خطا
-3. ایجاد لینک پرداخت زرین‌پال
-   - اگر ناموفق → آزادسازی رزرو + لغو سفارش
-4. نمایش لینک پرداخت + دکمه `✅ پرداخت انجام شد`
-5. ارسال نوتیفیکیشن به کانال + صاحب فروشگاه
-
-**برای پرداخت درب منزل:**
-1. ایجاد سفارش با وضعیت `PENDING`
-2. رزرو اتمیک موجودی
-   - اگر ناموفق → لغو سفارش + پیام خطا
-3. پیام تأیید با کد رهگیری
-4. ارسال نوتیفیکیشن
-
-#### مدیریت خطاها در حین ثبت سفارش
-- `/cancel` در هر مرحله: لغو + پاکسازی context
-- `order:cancel`: بازگشت به سبد خرید بدون تغییر
-- `order:change_payment`: بازگشت به انتخاب روش پرداخت
-- اگر سبد خالی شود → `سبد خریدت خالی شده، عملیات لغو شد`
-
-### ۵.۵. تایید پرداخت (`pay:verify`)
-
-1. کاربر دکمه `✅ پرداخت انجام شد` را می‌زند
-2. ربات با زرین‌پال تأیید می‌گیرد (`verify_payment`)
-3. اگر موفق:
-   - ذخیره `payment_ref` و `ref_id`
-   - نهایی‌سازی موجودی (`finalize_stock_deduction`)
-   - تغییر وضعیت به `PAID`
-   - پیام تأیید
-4. اگر ناموفق:
-   - نمایش خطا + پیشنهاد روش پرداخت درب منزل
-
-### ۵.۶. لغو سفارش در حال پرداخت (`pay:cancel`)
-1. کاربر دکمه `❌ لغو سفارش` را می‌زند
-2. رزرو موجودی آزاد می‌شود
-3. وضعیت سفارش → `CANCELLED`
-
-### ۵.۷. تاریخچه سفارش‌ها (`order:history`)
-
-1. نمایش لیست ۱۵ سفارش آخر کاربر در فروشگاه فعلی
-2. هر آیتم: `#کد_رهگیری — وضعیت — مبلغ`
-3. کلیک روی هرکدام → جزئیات کامل سفارش
-4. جزئیات شامل: کد رهگیری، وضعیت، روش پرداخت، گیرنده، تماس، آدرس، تاریخ شمسی، اقلام، جمع کل
-5. تاریخچه تغییرات وضعیت (چه کسی و کی تغییر داده)
-
-### ۵.۸. ثبت‌نام فروشنده (Conversation Handler)
-
-ویزارد ۴ مرحله‌ای:
-
-#### مرحله ۱: نام فروشگاه (ASK_NAME)
-1. کاربر دکمه `🏪 می‌خوام فروشگاه بسازم` را می‌زند
-2. چک: آیا کاربر قبلاً فروشگاه دارد؟
-   - اگر فروشگاه فعال → پیام `فروشگاه شما فعال است`
-   - اگر در صف تأیید → `درخواست شما در صف تایید است`
-   - اگر معلق → `فروشگاه شما معلق شده`
-   - اگر رد شده → نمایش دلیل رد
-3. نمایش متن خوش‌آمدگویی ویزارد
-4. دریافت نام فروشگاه (۲-۱۵۰ کاراکتر)
-
-#### مرحله ۲: توضیحات + شماره تماس (ASK_DESC → ASK_PHONE)
-1. دریافت توضیحات (حداکثر ۵۰۰ کاراکتر)
-2. دریافت شماره تماس (با اعتبارسنجی `^09\d{9}$`)
-3. تبدیل ارقام فارسی
-
-#### مرحله ۳: رمز عبور (ASK_PASSWORD)
-1. دریافت رمز (حداقل ۶ کاراکتر)
-2. هش کردن با SHA-256 + salt تصادفی
-3. ثبت فروشگاه با وضعیت `draft`
-4. اتصال مالکیت خودکار
-
-#### مرحله ۴: ارسال به ادمین
-1. ایجاد فروشگاه در دیتابیس (status = draft)
-2. ایجاد ShopOwner با رمز هش شده
-3. ارسال پیام به همه ادمین‌ها با دکمه‌های تایید/رد
-4. پیام تأیید به فروشنده: `درخواست شما با موفقیت ثبت شد`
-
-### ۵.۹. پشتیبانی (`support:open`)
-
-1. نمایش متن پشتیبانی
-2. پیام‌های متنی آزاد کاربر (خارج از مکالمه) به کانال نوتیفیکیشن فوروارد می‌شود
-3. پیام شامل: نام، یوزرنیم، آیدی، متن پیام
-
-### ۵.۱۰. منوی اصلی (`nav:main`)
-
-1. بازگشت به منوی اصلی با نمایش نام فروشگاه
-2. به‌روزرسانی `current_shop_id` کاربر
+- `support:open` → ConversationHandler مجزا
+- پیام متنی کاربر فوروارد می‌شود به کانال نوتیفیکیشن
+- شامل: نام، یوزرنیم، آیدی، متن پیام
+- دکمه `🔙 بازگشت`
 
 ---
 
-## ۶. سناریوهای پنل ادمین در ربات
+## ۶. سناریوهای ربات — ادمین
 
-### ۶.۱. ورود به پنل (`/admin` یا دکمه)
+### ۶.۱. ورود به پنل (`/admin`)
 
-- اگر ادمین کل است → پنل مدیریت کل با دکمه‌های:
-  - 📊 آمار کلی
-  - 📦 سفارش‌های در حال پیگیری
-  - 📜 تاریخچه سفارش‌ها
-  - 🗂 مدیریت فروشگاه‌ها
-  - 📢 پیام همگانی
+- ادمین کل → پنل مدیریت کل
+- فروشنده → مستقیم به `/myshop`
+- مزاحم → `❌ دسترسی ندارید`
 
-- اگر فروشنده است → پنل فروشگاه خودش با دکمه‌های:
-  - 📊 آمار فروشگاه
-  - 🗂 مدیریت دسته‌بندی‌ها
-  - 📦 مدیریت محصولات
-  - 🧾 سفارش‌های در حال پیگیری
-  - 📜 تاریخچه سفارش‌ها
+### ۶.۲. پنل اصلی
 
-### ۶.۲. آمار (`admin:stats`)
+| دکمه | Callback | توضیح |
+|------|----------|-------|
+| 📊 آمار | `admin:stats` | |
+| 📦 مدیریت محصولات | `admin:products:list:0` | |
+| 🗂 مدیریت دسته‌بندی‌ها | `admin:categories` | |
+| 🧾 سفارش‌های در حال پیگیری | `admin:orders:pending:0` | |
+| 📜 تاریخچه سفارش‌ها | `admin:orders:history:0` | |
+| 🏬 مدیریت فروشگاه‌ها | `admin:shops:list:0` | فقط ادمین کل |
+| 📣 پیام همگانی | `admin:broadcast:start` | فقط ادمین کل |
+| 🔙 بازگشت | `admin:panel` | |
 
-**ادمین کل:**
-- کل فروشگاه‌ها (فعال)
-- محصولات فعال
-- کل سفارش‌ها
-- در حال پیگیری
-- درآمد پرداختی
+### ۶.۳. آمار (`admin:stats`)
 
-**فروشنده:**
-- محصولات فعال
-- کل سفارش‌ها
-- در حال پیگیری
-- درآمد پرداختی فروشگاه خودش
+**ادمین کل:** کل فروشگاه‌ها (فعال)، محصولات فعال، کل سفارش‌ها، در حال پیگیری، درآمد پرداختی  
+**فروشنده:** محصولات فعال، کل سفارش‌ها، در حال پیگیری، درآمد پرداختی فروشگاه خودش
 
-### ۶.۳. مدیریت محصولات (فروشنده/ادمین)
+### ۶.۴. مدیریت محصولات
 
-#### لیست محصولات (`admin:products:list:X`)
-1. نمایش محصولات با صفحه‌بندی (۸ عدد در هر صفحه)
-2. هر آیتم: `✏️ نام — قیمت`
-3. دکمه `➕ افزودن محصول جدید`
-4. کلیک روی هر محصول → صفحه ویرایش
+- لیست با صفحه‌بندی (۸ عدد در هر صفحه)
+- افزودن محصول (Conversation ۶ مرحله): نام → توضیحات → قیمت → دسته‌بندی → موجودی → عکس
+- ویرایش فیلد: کلیک روی `✏️ فیلد` → تایپ مقدار جدید
+  - **موجودی**: `old_stock = product.stock` → `setattr(product, "stock", int(value))` → اگر `old_stock == 0 and value > 0` → `_check_and_notify_restock(product_id, shop_id, context.bot)`
+- تغییر عکس: `start_change_photo` → ارسال عکس جدید / "حذف" / "انصراف"
+- تغییر وضعیت: `toggle_product`
+- لینک مستقیم: `product_link` → نمایش `t.me/bot?start=product_123`
+- حذف: تأیید دوم → `DELETE products WHERE id=X` (قبلاً `OrderItem.product_id=NULL` شده)
 
-#### افزودن محصول (Conversation - ۶ مرحله)
-1. **نام محصول**: دریافت نام
-2. **توضیحات**: دریافت توضیحات (یا `ندارد`)
-3. **قیمت**: عدد به تومان (با پشتیبانی از ویرگول)
-4. **دسته‌بندی**: انتخاب از دسته‌بندی‌های فروشگاه (اگر دسته‌ای نیست → خطا)
-5. **موجودی**: عدد صحیح
-6. **عکس**: آپلود عکس یا `رد شو`
+### ۶.۵. مدیریت دسته‌بندی‌ها
 
-#### ویرایش محصول
-صفحه جزئیات محصول شامل:
-- نام، قیمت، موجودی، موجودی قابل فروش، وضعیت فعال/غیرفعال
-- دکمه‌های ویرایش هر فیلد
-- `🖼 تغییر عکس`
-- `🔴/🟢 تغییر وضعیت فعال/غیرفعال`
-- `🗑 حذف محصول` (با تأیید)
+- لیست + دکمه `➕ افزودن`
+- حذف: `Category.id → products → order_items.product_id=NULL → cart_items DELETE → products DELETE → category DELETE`
 
-**ویرایش فیلد**: کلیک روی دکمه → دریافت مقدار جدید → ذخیره
+### ۶.۶. مدیریت سفارش‌ها
 
-**تغییر عکس**: آپلود عکس جدید / `حذف` برای حذف عکس / `انصراف`
+- **در حال پیگیری**: `PENDING_PAYMENT`, `PENDING`, `PAID`, `CONFIRMED`, `SHIPPED`
+- **تاریخچه کامل**: همه سفارش‌ها با صفحه‌بندی
+- **جزئیات**: کد رهگیری، وضعیت، روش پرداخت، گیرنده، آدرس، تاریخ شمسی، اقلام، جمع کل، تاریخچه تغییرات
+- **تغییر وضعیت**: دکمه‌های داینامیک بر اساس `can_transition()`
 
-**حذف محصول**: تأیید دوم → حذف + پاکسازی CartItem و OrderItem مرتبط
+### ۶.۷. مدیریت فروشگاه‌ها (فقط ادمین کل)
 
-### ۶.۴. مدیریت دسته‌بندی‌ها (فروشنده/ادمین)
+- لیست + صفحه‌بندی
+- فعال/غیرفعال کردن
+- ویرایش: نام، وضعیت، توضیحات
+- حذف: تأیید دوم → اخطار آبشار → حذف cascade با SQL مستقیم
 
-1. نمایش لیست دسته‌بندی‌ها با دکمه حذف
-2. افزودن دسته‌بندی جدید (دریافت نام)
-3. حذف دسته‌بندی: تأیید + اخطار تعداد محصولات داخلش → حذف دسته + محصولات + CartItem + OrderItem مرتبط
+### ۶.۸. پیام همگانی (Broadcast)
 
-### ۶.۵. مدیریت سفارش‌ها (فروشنده/ادمین)
+- دریافت متن → ارسال به همه کاربران `is_blocked=False`
+- فاصله ۰.۰۴ ثانیه (Rate Limit)
+- Forbidden → علامت‌گذاری کاربر `blocked`
+- آمار نهایی: موفق / ناموفق / بلاک
 
-#### سفارش‌های در حال پیگیری (`admin:orders:pending:X`)
-وضعیت‌های شامل: PENDING_PAYMENT, PENDING, PAID, CONFIRMED, SHIPPED
+### ۶.۹. تایید/رد فروشنده
 
-#### تاریخچه کامل سفارش‌ها (`admin:orders:history:X`)
-همه سفارش‌ها
-
-#### جزئیات سفارش (`admin:orders:detail`)
-- کد رهگیری، وضعیت، روش پرداخت، وضعیت پرداخت
-- گیرنده، تماس، آدرس، تاریخ شمسی
-- اقلام سفارش
-- جمع کل
-- تاریخچه تغییرات وضعیت
-- دکمه‌های تغییر وضعیت (بر اساس `ALLOWED_TRANSITIONS` + `can_transition`)
-
-#### تغییر وضعیت سفارش (`admin:orders:status`)
-1. اعتبارسنجی با `can_transition`
-2. اگر پرداخت درب منزل و وضعیت‌→CONFIRMED: نهایی‌سازی موجودی (`finalize_stock_deduction`)
-3. ذخیره در تاریخچه با نام ادمین
-4. ارسال نوتیفیکیشن به مشتری: `📦 وضعیت سفارش #کد به‌روزرسانی شد: وضعیت جدید`
-
-### ۶.۶. مدیریت فروشگاه‌ها (فقط ادمین کل)
-
-#### لیست فروشگاه‌ها (`admin:shops:list:X`)
-1. نمایش با صفحه‌بندی (۸ عدد)
-2. هر آیتم: `🟢/🔴 نام (ID:X)`
-
-#### ویرایش فروشگاه (`admin:shops:edit`)
-- نمایش: نام، وضعیت، توضیحات، لینک دسترسی
-- `🔄 تغییر وضعیت` فعال/غیرفعال
-- `🗑 حذف فروشگاه` (با تأیید + اخطار)
-
-#### افزودن فروشگاه (ادمین کل)
-1. دریافت نام
-2. دریافت توضیحات
-3. ایجاد + نمایش لینک
-
-#### حذف فروشگاه (ادمین کل — با تأیید دوم)
-1. نمایش اخطار: همه محصولات، دسته‌بندی‌ها، سفارش‌ها، سبد خرید، دسترسی مالک حذف می‌شوند
-2. تأیید → حذف cascade با SQL مستقیم
-3. غیرقابل بازگشت (تأکید در پیام)
-
-### ۶.۷. پیام همگانی (Broadcast — فقط ادمین کل)
-
-1. دریافت متن پیام
-2. ارسال به همه کاربرانی که `is_blocked = False`
-3. فاصله ۰.۰۴ ثانیه بین ارسال‌ها (Rate Limit)
-4. مدیریت خطا: Forbidden → علامت‌گذاری کاربر به عنوان بلاک شده
-5. آمار نهایی: موفق، ناموفق، تعداد کاربران بلاک‌کننده ربات
-
-### ۶.۸. تایید/رد فروشنده (از طریق دکمه‌های inline)
-
-#### تایید (`admin:seller:approve`)
-1. ادمین دکمه `✅ تایید و فعال‌سازی` را روی پیام اعلان می‌زند
-2. فقط ادمین کل دسترسی دارد
-3. تغییر وضعیت shop → `active`
-4. ارسال پیام خوش‌آمدگویی به فروشنده با لینک فروشگاه
-5. به‌روزرسانی پیام اعلان: اضافه شدن `✅ تایید شد!`
-
-#### رد (`admin:seller:reject`)
-1. ادمین دکمه `❌ رد کردن` را می‌زند
-2. وارد Conversation برای دریافت دلیل رد (اختیاری)
-3. تغییر وضعیت shop → `rejected` با ذخیره دلیل
-4. ارسال پیام به فروشنده با دلیل رد
-5. فروشنده می‌تواند بعداً دوباره تلاش کند
+- **تایید**: `admin:seller:approve` → `shop.status = "active"` → پیام خوش‌آمدگویی به فروشنده + لینک فروشگاه
+- **رد**: `admin:seller:reject` → Conversation برای دلیل → `shop.status = "rejected"` + پیام به فروشنده
 
 ---
 
-## ۷. سناریوهای پنل فروشنده در ربات
+## ۷. سناریوهای ربات — فروشنده
 
-### ۷.۱. پنل فروشنده (`/my_panel`)
+### ۷.۱. `/my_panel` — تنظیمات فروشنده
 
-1. چک: آیا کاربر فروشنده است؟
-   - خیر → پیام `❌ شما فروشنده نیستید` + دکمه ثبت فروشگاه
-2. نمایش:
-   - نام فروشگاه، وضعیت
-   - وضعیت رمز عبور (✅ فعال / ❌ تنظیم نشده)
-   - لینک فروشگاه
-3. دکمه‌ها:
-   - `🌐 باز کردن پنل سایت`
-   - `🔑 تغییر رمز عبور`
-   - `🔙 منوی اصلی`
+| دکمه | توضیح |
+|------|--------|
+| `🧾 تنظیمات دریافت وجه` | تنظیم شماره کارت + نام صاحب کارت |
+| `🔑 تغییر رمز عبور` | دریافت رمز جدید (≥۶ کاراکتر) |
+| `📊 داشبورد فروشنده` | آمار فروش |
+| `📷 تنظیم بنر` | آپلود عکس کاور فروشگاه |
+| `🎁 مدیریت کدهای تخفیف` | ساخت/مشاهده کدهای تخفیف |
+| `🌐 باز کردن پنل سایت` | لینک به سایت |
 
-### ۷.۲. تغییر رمز عبور (`seller:change_password`)
+### ۷.۲. `/myshop` — مدیریت فروشگاه
 
-1. دریافت رمز جدید (حداقل ۶ کاراکتر)
-2. هش SHA-256 با salt جدید
-3. ذخیره در `shop_owners`
-4. پیام تأیید: `رمز عبور شما با موفقیت تغییر کرد`
+| دکمه | توضیح |
+|------|--------|
+| `🗂 مدیریت دسته‌بندی‌ها` | |
+| `📦 مدیریت محصولات` | |
+| `🧾 سفارش‌های در حال پیگیری` | |
+| `📜 تاریخچه سفارش‌ها` | |
 
----
+### ۷.۳. رمز عبور
 
-## ۸. سناریوهای سایت (Next.js)
+- دریافت رمز جدید (حداقل ۶ کاراکتر)
+- هش bcrypt + ذخیره در `shop_owners.password_hash`
+- Salt جدید هر بار تولید می‌شود
+- `must_change_password = True` بعد از `/reset_password` — لاگین بعدی الزاماً به `/change-password` ریدایرکت می‌شود
 
-### ۸.۱. صفحه اصلی (`/`) — لندینگ
+### ۷.۴. کد تخفیف
 
-- **Hero**: عنوان و زیرعنوان پویا از `site_content`
-- **چطور کار می‌کند؟**: ۳ مرحله (کد دعوت بگیر → فروشگاه ثبت کن → لینک بده و بفروش)
-- **ویژگی‌ها**: ۶ ویژگی پویا از دیتابیس (ربات اختصاصی، درگاه پرداخت، داشبورد، صفحه اختصاصی، تاریخچه، امنیت)
-- **نمونه محصولات**: ۴ محصول تصادفی فعال از دیتابیس
-- **فروشگاه‌های فعال**: لیست فروشگاه‌های فعال
-- **اعتماد**: پرداخت امن، پشتیبانی تلگرامی، پیگیری دقیق
-- **CTA نهایی**: دکمه ورود به فروشگرام
+1. `discount:list` → لیست کدهای موجود
+2. `discount:create` → ویزارد:
+   - نوع: درصدی / مبلغی
+   - مقدار
+   - (اختیاری) حداقل مبلغ سفارش
+   - (اختیاری) حداکثر دفعات استفاده
+3. `discount:toggle:{id}` → فعال/غیرفعال
 
-### ۸.۲. صفحه لاگین (`/login`)
+### ۷.۵. بنر فروشگاه
 
-1. فرم ورود با شناسه تلگرام
-2. تشخیص خودکار نقش (ادمین/فروشنده/مشتری)
-3. نمایش رمز فقط در صورت نیاز
-4. ریدایرکت بر اساس نقش:
-   - ادمین → `/admin`
-   - فروشنده → `/seller`
-   - مشتری → `/`
+- `shop:banner` → آپلود عکس → `shop.banner_image = file_id`
+- اگر بنر فعال باشد → در `nav:main` ابتدا `send_photo` با بنر + کپشن + `📷 مشاهده محصولات`
 
-### ۸.۳. پنل ادمین (`/admin/*`)
+### ۷.۶. تنظیمات پرداخت (`seller:payment_settings`)
 
-#### داشبورد (`/admin`)
-- ۶ کارت آمار: فروشگاه‌ها (فعال)، محصولات، کل سفارش‌ها، در انتظار، پرداخت شده، کاربران
-- جدول ۱۰ سفارش آخر با کد، مبلغ، وضعیت، گیرنده، تاریخ
+- `🔢 تنظیم شماره کارت` → دریافت ۱۶ رقمی → AES-256-GCM رمزنگاری می‌شود
+- `👤 تنظیم نام صاحب کارت` → AES-256-GCM رمزنگاری می‌شود
+- `🆔 تنظیم merchant_id زین‌پال` (غیرفعال)
+- رمزگشایی فقط در لحظه نمایش به مشتری در مرحله پرداخت (both bot & website)
 
-#### مدیریت فروشگاه‌ها (`/admin/shops`)
-- لیست + تغییر وضعیت فعال/غیرفعال
+### ۷.۷. داشبورد فروشنده
 
-#### مدیریت محصولات (`/admin/products`)
-- لیست محصولات با جزئیات
-
-#### مدیریت سفارش‌ها (`/admin/orders`)
-- لیست سفارش‌ها
-- جزئیات سفارش (`/admin/orders/[id]`)
-- تغییر وضعیت
-
-#### مدیریت کاربران (`/admin/users`)
-- لیست کاربران + بلاک/آنبلاک
-
-#### کدهای دعوت (`/admin/claim-codes`)
-- ایجاد و مدیریت کدهای دعوت
-
-#### مدیریت دسته‌بندی‌ها (`/admin/categories`)
-- لیست + افزودن/حذف
-
-### ۸.۴. پنل فروشنده (`/seller/*`)
-
-#### داشبورد (`/seller`)
-- ۵ کارت آمار: محصولات، کل سفارش‌ها، در انتظار، پرداخت شده، مجموع فروش
-- جدول ۱۰ سفارش آخر
-
-#### مدیریت محصولات (`/seller/products`)
-- لیست + افزودن/ویرایش/حذف محصولات فروشگاه خودش
-
-#### مدیریت سفارش‌ها (`/seller/orders`)
-- لیست سفارش‌های فروشگاه خودش
-- جزئیات + تغییر وضعیت
-
-### ۸.۵. API Routes
-
-| مسیر | متد | توضیح | نیاز به احراز |
-|------|------|--------|---------------|
-| `/api/auth/login` | POST | لاگین نقش‌محور | خیر |
-| `/api/auth/logout` | POST | خروج + پاک کردن سشن | خیر |
-| `/api/auth/me` | GET | دریافت اطلاعات کاربر فعلی | بله |
-| `/api/admin/create-claim-code` | POST | ایجاد کد دعوت | ادمین |
-| `/api/admin/orders/[id]/status` | PATCH | تغییر وضعیت سفارش | ادمین |
-| `/api/admin/toggle-shop` | POST | فعال/غیرفعال کردن فروشگاه | ادمین |
-| `/api/admin/toggle-user-block` | POST | بلاک/آنبلاک کاربر | ادمین |
-| `/api/seller/orders/[id]/status` | PATCH | تغییر وضعیت سفارش توسط فروشنده | فروشنده |
-| `/api/seller/shop-info` | GET | اطلاعات فروشگاه فروشنده | فروشنده |
-| `/api/seller/toggle-product` | POST | فعال/غیرفعال کردن محصول | فروشنده |
+- امروز / این هفته / این ماه
+- پرفروش‌ترین محصول
+- کم‌فروش‌ترین محصول
+- میانگین مبلغ سفارش
+- نرخ تبدیل (تعداد سفارش / تعداد بازدید)
 
 ---
 
-## ۹. سناریوهای پرداخت (زرین‌پال)
+## ۸. فرآیندهای تراکنشی
 
-### ۹.۱. ایجاد لینک پرداخت
+### ۸.۱. `create_order_from_cart` (سرویس متمرکز سفارش)
 
-1. پس از ثبت سفارش آنلاین، درخواست به زرین‌پال ارسال می‌شود
-2. پارامترها: merchant_id, amount, description, metadata.phone, callback_url
-3. حالت Sandbox: `https://sandbox.zarinpal.com/pg/v4/payment/request.json`
-4. حالت Production: `https://api.zarinpal.com/pg/v4/payment/request.json`
-5. اگر کد ۱۰۰ → موفق: `{ "url": "...", "authority": "..." }`
-6. اگر خطا → `{ "error": "..." }`
+این تابع در `services/order_service.py` — **تنها مسیر ایجاد سفارش** برای هر دو روش پرداخت.
 
-### ۹.۲. تایید پرداخت
+```python
+async def create_order_from_cart(
+    user_id, shop_id, customer_info, payment_method,
+    discount_code="", discount_amount=0
+) -> OrderResult:
+```
 
-1. کاربر دکمه `✅ پرداخت انجام شد` را می‌زند
-2. درخواست به `{base}/verify.json` با authority و amount
-3. اگر کد ۱۰۰ یا ۱۰۱ → موفق: `{ "ref_id": "...", "card_pan": "..." }`
-4. اگر خطا → `{ "error": "..." }`
+**مراحل در یک تراکنش واحد:**
 
-### ۹.۳. رزرو اتمیک موجودی (`reserve_stock_atomic`)
+1. **بارگذاری سبد**: `SELECT ... FOR UPDATE` روی `Product` برای هر آیتم
+2. **اعتبارسنجی**: محصول فعال است؟ shop_id درست است؟ موجودی کافی؟
+3. **رزرو اتمیک**: `reserve_stock_atomic` — UPDATE شرطی با چک `stock - reserved_stock >= qty`
+4. **محاسبه قیمت**: `total = sum(price * quantity) + shipping_cost` → `total = max(0, total - discount_amount)` (clamp)
+5. **ساخت Order**: با `tracking_code`, `discount_code`, `discount_amount`, `receiver_name`, `phone`, `shipping_address`
+6. **ساخت OrderItemها**: از داده‌های لحظه سفارش (`product_name`, `unit_price`)
+7. **تاریخچه**: `order.add_status_entry(initial_status, by="system")`
+8. **خالی کردن سبد**: `DELETE cart_items`
+9. **commit**
 
-با UPDATE شرطی SQL از overselling جلوگیری می‌کند:
+**خروجی `OrderResult`:**
+```python
+@dataclass
+class OrderResult:
+    order: Order
+    tracking_code: str
+    total_price: int
+    items_count: int
+    discount_code: str = ""
+    discount_amount: int = 0
+```
+
+### ۸.۲. رزرو اتمیک موجودی (`reserve_stock_atomic`)
+
 ```sql
 UPDATE products 
 SET reserved_stock = reserved_stock + :qty 
 WHERE id = :pid AND (stock - reserved_stock) >= :qty
 ```
-- اگر `rowcount = 0` برای هر آیتم → رول‌بک + False
-- هدف: جلوگیری از فروش بیش از موجودی در محیط هم‌روند
 
-### ۹.۴. آزادسازی رزرو (`release_reserved_stock`)
+- اگر `rowcount == 0` برای هر آیتم → رول‌بک کامل
+- `nowait=False` — در Deadlock منتظر می‌ماند
 
-در صورت لغو سفارش یا خطا در پرداخت:
+### ۸.۳. آزادسازی رزرو (`release_reserved_stock`)
+
 ```sql
 UPDATE products 
-SET reserved_stock = MAX(0, reserved_stock - :qty) 
+SET reserved_stock = GREATEST(0, reserved_stock - :qty) 
 WHERE id = :pid
 ```
 
-### ۹.۵. نهایی‌سازی موجودی (`finalize_stock_deduction`)
+- `GREATEST(0, ...)` برای جلوگیری از منفی شدن
 
-پس از پرداخت موفق:
+### ۸.۴. نهایی‌سازی موجودی (`finalize_stock_deduction` — در `transition_order`)
+
+وقتی سفارش به `PAID` (برای card_to_card) یا `CONFIRMED` (برای COD) می‌رسد:
+
 ```sql
 UPDATE products 
 SET stock = MAX(0, stock - :qty),
@@ -761,434 +861,771 @@ SET stock = MAX(0, stock - :qty),
 WHERE id = :pid
 ```
 
-### ۹.۶. پاکسازی سفارش‌های رها شده (`cleanup_abandoned_payments`)
+**توجه**: `stock` (`Product.stock`) ستون است، نه تابع. `MAX(0, stock - qty)` در SQL `stock - qty` را محاسبه می‌کند و PostgreSQL `MAX` aggregate روی دو اسکالر کار نمی‌کند. از `GREATEST` استفاده کنید:
 
-کرون‌جاب: سفارش‌های `PENDING_PAYMENT` که بیش از ۳۰ دقیقه از ایجادشان گذشته را لغو می‌کند و موجودی را آزاد می‌کند.
+```python
+values(stock=Product.stock - item.quantity, reserved_stock=Product.reserved_stock - item.quantity)
+```
+مقادیر در پایتون محاسبه می‌شوند، `GREATEST` در SQL نیست. اگر `stock` به SQL ارسال شود، مقدار محاسبه شده پایتون ارسال می‌شود — `stock - qty` ممکن است منفی شود. برای ایمنی:
 
-### ۹.۷. سناریوهای خطای پرداخت
+```python
+values(stock=func.greatest(0, Product.stock - item.quantity),
+       reserved_stock=func.greatest(0, Product.reserved_stock - item.quantity))
+```
 
-1. **Merchant ID تنظیم نشده**: `{ "error": "شناسه درگاه پرداخت تنظیم نشده" }`
-2. **خطای شبکه**: اتصال به زرین‌پال برقرار نمی‌شود → رزرو آزاد + لغو سفارش
-3. **تأیید ناموفق**: کاربر می‌تواند روش پرداخت درب منزل انتخاب کند
-4. **انقضای لینک پرداخت**: کاربر لینک را ذخیره نکرده → دوباره ثبت سفارش کند
-5. **موجودی ناکافی در لحظه پرداخت**: لغو خودکار سفارش
+### ۸.۵. `transition_order` (تغییر وضعیت مرکزی)
 
----
+```python
+async def transition_order(order_id, target_status, actor="admin", bot=None) -> Order:
+```
 
-## ۱۰. جریان کامل یک سفارش (End-to-End)
+- اعتبارسنجی: `can_transition(order, target_status, actor)` در `utils/order_validator.py`
+- `ALLOWED_TRANSITIONS` دیکشنری وضعیت‌های مجاز
+- منطق جانبی:
+  - **PAID** (card_to_card): نهایی‌سازی موجودی + `_check_low_stock_after_reduction`
+  - **CONFIRMED** (COD): نهایی‌سازی موجودی + `_check_low_stock_after_reduction`
+  - **CANCELLED**: آزادسازی رزرو
+- **Emit رویداد**: `EventBus.emit` برای ORDER_PAID / ORDER_CONFIRMED / ORDER_CANCELLED
 
-### سناریوی A: مشتری با پرداخت آنلاین
+### ۸.۶. `cancel_order_and_release_stock`
 
-1. مشتری روی لینک فروشگاه کلیک می‌کند (`t.me/bot?start=shop_5`)
-2. ربات `/start` → منوی اصلی فروشگاه
-3. `🛍 مشاهده محصولات` → انتخاب دسته → انتخاب محصول
-4. `➕ افزودن به سبد خرید`
-5. `🛒 سبد خرید` → بررسی → `✅ ثبت سفارش`
-6. ویزارد: نام گیرنده → شماره تماس → آدرس → انتخاب `💳 پرداخت آنلاین`
-7. `✅ ثبت نهایی سفارش`:
-   - رزرو اتمیک موجودی ✅
-   - ایجاد لینک زرین‌پال ✅
-   - نمایش لینک به مشتری
-8. مشتری پرداخت را انجام می‌دهد
-9. `✅ پرداخت انجام شد`:
-   - تأیید با زرین‌پال ✅
-   - نهایی‌سازی موجودی ✅
-   - وضعیت → `PAID`
-10. نوتیفیکیشن به فروشنده: `🆕 سفارش جدید #2407081234`
-11. فروشنده از پنل: بررسی → `CONFIRMED` → `SHIPPED` → `DELIVERED`
-12. مشتری در هر مرحله نوتیفیکیشن دریافت می‌کند
-
-### سناریوی B: مشتری با پرداخت درب منزل
-
-1-6. مشابه سناریوی A تا مرحله انتخاب `🚚 پرداخت درب منزل`
-7. `✅ ثبت نهایی سفارش`:
-   - رزرو اتمیک موجودی ✅
-   - وضعیت → `PENDING`
-8. فروشنده تأیید می‌کند → وضعیت `CONFIRMED` → نهایی‌سازی موجودی
-9. `SHIPPED` → `DELIVERED`
-
-### سناریوی C: فروشنده جدید ثبت‌نام می‌کند
-
-1. کاربر `🏪 می‌خوام فروشگاه بسازم` را می‌زند
-2. نام → توضیحات → شماره → رمز عبور → ارسال
-3. ادمین پیام اعلان دریافت می‌کند
-4. ادمین `✅ تایید و فعال‌سازی` را می‌زند
-5. فروشنده پیام خوش‌آمدگویی با لینک فروشگاه دریافت می‌کند
-6. فروشنده محصولات و دسته‌بندی‌ها را اضافه می‌کند
-7. مشتری‌ها وارد فروشگاه می‌شوند
-
-### سناریوی D: ورود ادمین به سایت
-
-1. ادمین آدرس سایت را باز می‌کند → صفحه اصلی
-2. کلیک `ورود` → فرم لاگین
-3. وارد کردن شناسه تلگرام → تشخیص ادمین → درخواست رمز
-4. ورود رمز ادمین → ریدایرکت به `/admin`
-5. مشاهده آمار، سفارش‌ها، مدیریت فروشگاه‌ها
+- چک می‌کند وضعیت قابل لغو است (نه DELIVERED/CANCELLED/REFUNDED)
+- `release_reserved_stock`
+- `order.status = CANCELLED`
+- **Emit رویداد**: `Event.ORDER_CANCELLED` (اگر `bot` پاس داده شود)
 
 ---
 
-## ۱۱. سناریوهای خطا و مدیریت خطا
+## ۹. جریان کامل سفارش
 
-### ۱۱.۱. خطاهای دیتابیس
-- **اتصال قطع**: لاگ خطا + تلاش مجدد (ربات auto-reconnect دارد)
-- **Deadlock در رزرو موجودی**: رول‌بک + پیام به کاربر
-- **Constraint violation**: لاگ + پیام مناسب
+### سناریوی A: مشتری — کارت‌به‌کارت
 
-### ۱۱.۲. خطاهای تلگرام
-- **RetryAfter (Rate Limit)**: پیام `⏳ تعداد درخواست‌ها زیاد شد`
-- **Forbidden (بلاک)**: علامت‌گذاری کاربر به عنوان بلاک شده
-- **TimedOut**: تلاش مجدد با تأخیر
-- **Chat not found**: لاگ و رد شدن (برای نوتیفیکیشن‌ها)
+```
+1. لینک فروشگاه → /start → منوی اصلی
+2. 🛍 مشاهده محصولات → دسته → محصول
+3. ➕ افزودن به سبد خرید
+4. 🛒 سبد خرید → ✅ ثبت سفارش
+5. ویزارد: نام گیرنده → شماره تماس → آدرس → 💳 کارت به کارت
+6. 🎁 (اختیاری) کد تخفیف → اعمال
+7. ✅ ثبت نهایی سفارش:
+   ├── create_order_from_cart() → رزرو اتمیک ✅
+   └── نمایش شماره کارت فروشنده + مبلغ
+8. ارسال عکس رسید → attach_card_receipt() → نوتیفیکیشن به فروشنده
+9. فروشنده: ✅ تایید → transition_order(PAID) → نوتیفیکیشن به مشتری
+10. فروشنده ارسال می‌کند → CONFIRMED → SHIPPED → DELIVERED
+```
 
-### ۱۱.۳. خطاهای پرداخت
-- عدم اتصال به زرین‌پال → لغو سفارش + آزادسازی موجودی
-- موجودی ناکافی حین رزرو → پیام + ویرایش سبد
-- تأیید ناموفق → پیشنهاد روش درب منزل
-- Merchant ID نامعتبر → خطای داخلی
+### سناریوی B: فروشنده جدید ثبت‌نام می‌کند
 
-### ۱۱.۴. خطاهای کاربری
-- **کاربر بلاک شده**: `⚠️ حساب کاربری شما مسدود شده است`
-- **دسترسی غیرمجاز**: `❌ دسترسی ندارید ⛔`
-- **ورود نامعتبر**: `شناسه کاربری نامعتبر است`
-- **عدم وجود فروشگاه**: `❌ فروشگاه مورد نظر یافت نشد`
-- **فروشگاه غیرفعال**: `🚫 این فروشگاه معلق شده`
-- **تغییر وضعیت غیرمجاز**: هشدار `can_transition` + آلرت
+```
+1. 🏪 می‌خوام فروشگاه بسازم
+2. نام → توضیحات → شماره تماس → لینک کانال تلگرام → شماره کارت
+3. صاحب کارت → رمز عبور → تأیید و ارسال
+4. ادمین پیام + دکمه ✅ تایید / ❌ رد دریافت می‌کند
+5. ✅ تایید → shop.status = "active" → پیام خوش‌آمدگویی
+6. فروشنده تنظیمات پرداخت + محصولات را اضافه می‌کند
+```
 
-### ۱۱.۵. خطاهای سراسری (Global Error Handler)
-- **RetryAfter**: پیام با `retry_after` ثانیه
-- **سایر خطاها**: `❌ یه مشکل غیرمنتظره پیش اومد` + لاگ خطا
+### سناریوی C: اعلان موجود شدن
 
-### ۱۱.۶. مکانیزم‌های resiliency
-- **ربات**: حلقه `while True` با ری‌استارت خودکار در ۳ ثانیه
-- **پرداخت**: cleanup خودکار سفارش‌های رها شده (۳۰ دقیقه)
-- **دیتابیس**: Connection pooling در bot و website
-- **Proxy**: پشتیبانی از HTTP proxy برای مناطق تحریمی
+```
+1. فروشنده `restock:subscribe:{pid}` → رکورد در RestockSubscription
+2. فروشنده موجودی محصول را از ۰ به >۰ می‌کند
+3. save_edit_field() → old_stock==0, value>0 → _check_and_notify_restock()
+4. برای هر subscriber با notified=False:
+   → context.bot.send_message("🔔 محصول «X» دوباره موجود شد!")
+   → notified = True
+```
 
 ---
 
-## ۱۲. کرون‌جاب‌ها و خودکارسازی
+## ۱۰. کرون‌جاب‌ها
 
-### ۱۲.۱. پاکسازی سفارش‌های پرداخت‌نشده
+### ۱۰.۱. پاک‌سازی خودکار سفارش‌های پرداخت‌نشده (APScheduler)
+
+- `cleanup_abandoned_payments()`:
+  - **بدون رسید**: ۱۵ دقیقه پس از ایجاد → CANCELLED و آزادسازی `reserved_stock`
+  - **بعد از رسید**: ۴۸ ساعت (فروشنده فرصت کافی دارد)
+  - **COD (PENDING)**: ۳۰ روز → CANCELLED
+- اجرا: هر ۵ دقیقه (`payment._post_init`)
 
 ```python
 async def cleanup_task():
-    while True:
-        await asyncio.sleep(1800)  # هر ۳۰ دقیقه
-        await payment_svc.cleanup_abandoned_payments(minutes=30)
+    await payment_svc.cleanup_abandoned_payments()
+```
+- سفارش‌های بدون رسید `created_at < now - 15min` → CANCELLED
+- سفارش‌های با رسید (بیش از ۴۸ ساعت) → CANCELLED
+- COD سفارش‌های `PENDING` قدیمی‌تر از ۳۰ روز → CANCELLED
+- موجودی رزرو شده آزاد می‌شود
+- از `TIMESTAMP WITHOUT TIME ZONE` → `.replace(tzinfo=None)` برای مقایسه
+
+### ۱۰.۲. یادآوری سبد رها شده (APScheduler)
+
+```python
+scheduler.add_job(check_abandoned_carts, "interval", minutes=30)
 ```
 
-- شروع در `_post_init` ربات
-- بررسی سفارش‌های `PENDING_PAYMENT` قدیمی‌تر از ۳۰ دقیقه
-- لغو خودکار + آزادسازی رزرو موجودی
+- اجرا: هر ۳۰ دقیقه
+- سبدهایی که بیش از ۱۲ ساعت از آخرین بروزرسانی (آخرین آیتم) گذشته است
+- به کاربر پیام یادآوری می‌فرستد
+- اگر کاربر سبد را خالی کرده یا سفارش داده باشد → رد می‌شود
 
-### ۱۲.۲. خودکارسازی‌های برنامه‌ریزی‌شده برای آینده
-- [ ] ارسال یادآوری به فروشنده برای سفارش‌های در انتظار
-- [ ] پشتیبان‌گیری خودکار دیتابیس
+### ۱۰.۳. برنامه آینده
+
+- [x] ارسال یادآوری به فروشنده برای سفارش‌های در انتظار
+- [x] پشتیبان‌گیری خودکار دیتابیس — کانتینر foroshgram_backup با crond (روزانه ۳ صبح + هفتگی)
 - [ ] گزارش روزانه فروش به ادمین
+
+---
+
+## ۱۱. EventBus معماری رویداد
+
+### ۱۱.۱. Event enum
+
+```python
+class Event(str, Enum):  # مقدار = نام رویداد برای ارسال به listener
+    ORDER_PAID = "order_paid"
+    ORDER_CONFIRMED = "order_confirmed" 
+    ORDER_CANCELLED = "order_cancelled"
+    FIRST_SALE = "first_sale"
+```
+
+### ۱۱.۲. EventBus
+
+```python
+class EventBus:
+    _listeners: dict[str, list[Callable]]
+    
+    def on(self, event: Event, listener):    # ثبت listener
+    async def emit(self, event, **payload):  # انتشار رویداد
+    
+    # payload شامل: order_id, shop_id, bot, tracking_code, is_first_sale, cancelled_by
+```
+
+### ۱۱.۳. Listenerهای ثبت شده (در `event_listeners.py`)
+
+| رویداد | Listener | توضیح |
+|--------|----------|-------|
+| ORDER_PAID | `notify_shop_owner_new_order` | ارسال سفارش جدید به فروشنده |
+| ORDER_PAID | `notify_customer_order_paid` | پیام تأیید پرداخت برای مشتری |
+| ORDER_CONFIRMED | `notify_customer_confirmed` | پیام "سفارش تأیید شد" |
+| ORDER_CANCELLED | `notify_customer_cancelled` | پیام لغو سفارش |
+| ORDER_CANCELLED | `notify_shop_owner_cancelled` | اطلاع به فروشنده از لغو |
+| FIRST_SALE | `celebrate_first_sale` | 🎉 جشن اولین فروش |
+
+### ۱۱.۴. جریان انتشار
+
+```
+transition_order(PAID)
+  → EventBus.emit(Event.ORDER_PAID, order_id=..., shop_id=..., bot=..., is_first_sale=True|False)
+    → notify_shop_owner_new_order(payload)
+    → notify_customer_order_paid(payload)
+    → (اگر is_first_sale) celebrate_first_sale(payload)
+```
+
+---
+
+## ۱۲. API Reference
+
+### ۱۲.۱. مسیرهای داخلی (Next.js API Routes)
+
+| مسیر | متد | پارامترها | پاسخ موفق | نیاز به احراز |
+|------|------|-----------|-----------|---------------|
+| `/api/auth/login` | POST | `{ userId, password? }` | `{ success, role, shopId? }` | خیر |
+| `/api/auth/logout` | POST | — | `{ success: true }` | خیر |
+| `/api/auth/me` | GET | — | `{ userId, role, shopId? }` | بله |
+| `/api/admin/create-claim-code` | POST | `{ shopId, expiresAt }` | `{ code }` | ادمین |
+| `/api/admin/orders/[id]/status` | PATCH | `{ status }` | `{ success: true }` | ادمین |
+| `/api/admin/toggle-shop` | POST | `{ shopId }` | `{ success }` | ادمین |
+| `/api/admin/toggle-user-block` | POST | `{ userId }` | `{ success }` | ادمین |
+| `/api/seller/orders/[id]/status` | PATCH | `{ status }` | `{ success }` | فروشنده |
+| `/api/seller/shop-info` | GET | — | `{ shop }` | فروشنده |
+| `/api/seller/toggle-product` | POST | `{ productId }` | `{ success }` | فروشنده |
+| `/api/product-image/[id]` | GET | — | image file | خیر |
+
+### ۱۲.۲. سیستم پیام خریدار-فروشنده (Conversations)
+
+| فایل | توضیح |
+|------|-------|
+| `handlers/conversations.py` | ConversationHandler مجزا — مشتری از `order:conversation:{id}` شروع می‌کند |
+| فروشنده اینباکس در پنل `seller:inbox` دارد | |
+| `Conversation` | جدول: `id`, `buyer_id`, `shop_id`, `order_id?`, `status` (open/closed) |
+| `Message` | جدول: `id`, `conversation_id`, `sender_role` (buyer/seller), `content`, `has_attachment`, `attachment_file_id`, `read_at` |
+| `/cancel` | لغو مکالمه فعلی |
+
+جریان: خریدار from `order:detail` → `conv:open:{id}` → ارسال متن/عکس → فروشنده in `seller:conversations` می‌بیند → پاسخ می‌دهد.
+
+### ۱۲.۳. Callback Pattern‌های ربات — مشتری
+
+| Pattern | Handler | توضیح |
+|---------|---------|-------|
+| `nav:main` | `main_menu_callback` | بازگشت به منوی اصلی |
+| `cat:list` | `show_categories` | نمایش دسته‌بندی‌ها |
+| `cat:open:{id}:{page}` | `show_products` | محصولات یک دسته |
+| `cat:sort:{cat_id}:{sort}` | `sort_products` | مرتب‌سازی (price_asc/price_desc/newest) |
+| `cat:stock:{cat_id}` | `stock_filter` | فیلتر فقط موجود |
+| `prod:open:{id}:{cat}:{page}` | `show_product_detail` | جزئیات محصول |
+| `cart:add:{pid}` | `add_to_cart` | افزودن به سبد |
+| `cart:view` | `view_cart` | نمایش سبد خرید |
+| `cart:inc:{id}` | `change_quantity` | افزایش تعداد |
+| `cart:dec:{id}` | `change_quantity` | کاهش تعداد |
+| `cart:remove:{id}` | `remove_from_cart` | حذف از سبد |
+| `cart:clear` | `clear_cart` | خالی کردن سبد |
+| `order:start` | `start_checkout` | شروع ثبت سفارش |
+| `order:confirm` | `confirm_order` | ثبت نهایی |
+| `order:change_payment` | `change_payment_method` | تغییر روش پرداخت |
+| `order:cancel` | `cancel_order` | انصراف |
+| `order:history` | `order_history` | تاریخچه سفارش‌ها |
+| `order:detail:{id}` | `order_detail_customer` | جزئیات سفارش مشتری |
+| `order:reorder:{id}` | `handle_reorder` | خرید مجدد |
+| `order:ask_discount` | `ask_discount` | درخواست کد تخفیف |
+| `pay:card_to_card` | `ask_payment_method` | انتخاب کارت‌به‌کارت |
+| `pay:verify:{id}:{authority}` | `verify_payment_callback` | تأیید پرداخت (قدیمی) |
+| `pay:cancel:{id}` | `cancel_order_payment` | لغو سفارش |
+| `pay:receipt_retry:{id}` | `handle_card_receipt_retry` | آپلود مجدد رسید |
+| `pay:convert_cod:{id}` | `handle_convert_to_cod` | تغییر به درب منزل |
+|| `wishlist:add:{pid}:{cat}:{page}` | `toggle_wishlist` | افزودن/حذف از علاقه‌مندی‌ها |
+|| `wishlist:remove:{pid}:{cat}:{page}` | `toggle_wishlist` | حذف از علاقه‌مندی‌ها |
+|| `wishlist:view` | `view_wishlist` | نمایش علاقه‌مندی‌ها |
+| `search:start` | `start_search` | شروع جستجو |
+| `search:result:{pid}` | `search_result_callback` | نتیجه جستجو |
+| `restock:subscribe:{pid}` | `subscribe_restock` | سابسکرایب موجود شدن |
+| `restock:unsubscribe:{pid}` | `unsubscribe_restock` | لغو سابسکرایب |
+| `shop:recent` | `show_recent_shops` | فروشگاه‌های اخیر |
+| `shop:open:{id}` | `open_shop_from_recent` | باز کردن فروشگاه |
+| `support:open` | `support` | پشتیبانی |
+| `noop` | `noop_callback` | دکمه صرفاً نمایشی |
+| `order:conversation:{id}` | `open_conversation_buyer` | شروع مکالمه با فروشنده |
+| `conv:back` | `back_to_order_detail` | بازگشت به جزئیات سفارش |
+
+### ۱۲.۴. Callback Pattern‌های ربات — فروشنده
+
+| Pattern | Handler | توضیح |
+|---------|---------|-------|
+| `seller_reg:start` | `seller_registration_start` | شروع ثبت‌نام فروشنده |
+| `seller_reg:cancel` | `cancel_registration` | لغو ثبت‌نام |
+| `seller:change_password` | `change_password_start` | تغییر رمز |
+| `seller:cancel_password` | `cancel_change_password` | لغو تغییر رمز |
+| `seller:payment_settings` | `payment_settings` | تنظیمات پرداخت |
+| `seller:set_card` | `ask_card_number` | تنظیم شماره کارت |
+| `seller:set_card_holder` | `ask_card_holder_name` | تنظیم نام صاحب کارت |
+| `seller:set_banner` | `ask_banner_image` | تنظیم بنر |
+| `discount:list` | `_show_discount_menu` | لیست کد تخفیف |
+| `discount:create` | `apply_discount_start` | ساخت کد جدید |
+| `discount:toggle:{id}` | `toggle_discount` | فعال/غیرفعال |
+| `seller:inbox` | `seller_conversations_list` | لیست مکالمات خریداران |
+| `seller:conv:open:{conv_id}` | `open_conversation_seller` | باز کردن مکالمه |
+| `seller:conv:back` | `back_to_inbox` | بازگشت به اینباکس |
+
+### ۱۲.۵. Callback Pattern‌های ربات — ادمین
+
+| Pattern | Handler | توضیح |
+|---------|---------|-------|
+| `admin:panel` | `admin_panel_callback` | پنل ادمین |
+| `admin:stats` | `admin_stats` | آمار |
+| `admin:products:list:{page}` | `list_products` | لیست محصولات |
+| `admin:products:add` | `start_add_product` | افزودن محصول |
+| `admin:products:edit:{id}` | `open_product_edit` | ویرایش محصول |
+| `admin:products:link:{id}` | `product_link` | لینک مستقیم |
+| `admin:products:toggle:{id}` | `toggle_product` | فعال/غیرفعال |
+| `admin:products:delete:{id}` | `delete_product_confirm` | تأیید حذف |
+| `admin:products:delete_final:{id}` | `delete_product_final` | حذف نهایی |
+| `admin:products:field:{id}:{field}` | `start_edit_field` | ویرایش فیلد |
+| `admin:products:photo:{id}` | `start_change_photo` | تغییر عکس |
+| `admin:categories` | `list_categories` | لیست دسته‌ها |
+| `admin:categories:add` | `start_add_category` | افزودن دسته |
+| `admin:categories:delete:{id}` | `delete_category_confirm` | تأیید حذف |
+| `admin:categories:delete_final:{id}` | `delete_category_final` | حذف نهایی |
+| `admin:orders:pending:{page}` | `list_pending_orders` | سفارش‌های جاری |
+| `admin:orders:history:{page}` | `list_all_orders` | تاریخچه |
+| `admin:orders:detail:{id}:{source}` | `order_detail` | جزئیات سفارش |
+| `admin:orders:status:{id}:{status}` | `change_order_status` | تغییر وضعیت |
+| `admin:shops:list:{page}` | `list_shops` | لیست فروشگاه‌ها |
+| `admin:shops:add` | `start_add_shop` | افزودن فروشگاه |
+| `admin:shops:edit:{id}` | `edit_shop` | ویرایش فروشگاه |
+| `admin:shops:toggle:{id}` | `toggle_shop` | فعال/غیرفعال |
+| `admin:shops:delete:{id}` | `delete_shop_confirm` | تأیید حذف |
+| `admin:shops:delete_final:{id}` | `delete_shop_final` | حذف نهایی |
+| `admin:broadcast:start` | `start_broadcast` | پیام همگانی |
+| `admin:seller:approve:{shop_id}` | `handle_admin_approve` | تایید فروشنده |
+| `admin:seller:reject:{shop_id}` | `handle_admin_reject` | رد فروشنده |
+
+### ۱۲.۶. Command‌های ربات
+
+**همه کاربران (پیش‌فرض):**
+
+| دستور | Handler | توضیح |
+|-------|---------|-------|
+| `/start` | `start_command` | شروع + منوی هوشمند (پشتیبانی از `shop_X`, `product_X`, `category_X`) |
+| `/help` | `help_command` | راهنمای نقش‌محور |
+| `/menu` | `menu_command` | مشاهده دسته‌بندی‌ها (fallback به `last_shop_id`) |
+| `/search` | `search_command` | جستجوی محصول |
+| `/cart` | `cart_command` | مشاهده سبد خرید |
+| `/my_orders` | `my_orders_command` | تاریخچه سفارش‌ها |
+| `/support` | `support_command` | پشتیبانی |
+| `/cancel` | `cancel_conversation` | لغو مکالمه فعلی |
+
+**اضافی برای فروشنده‌ها:**
+
+| دستور | توضیح |
+|-------|--------|
+| `/myshop` | مدیریت فروشگاه من |
+| `/neworders` | سفارش‌های جدید |
+| `/my_panel` | پنل فروشنده + تنظیمات پرداخت + تغییر رمز |
+| `/reset_password` | بازیابی رمز عبور (رمز موقت ۸ رقمی) |
+
+**اضافی برای ادمین‌ها:**
+
+| دستور | توضیح |
+|-------|--------|
+| `/admin` | پنل مدیریت |
+| `/orders` | سفارش‌های در حال پیگیری |
+| `/pending_shops` | فروشگاه‌های در انتظار تایید |
+| `/stats` | آمار کلی |
+
+### ۱۲.۷. سطح‌بندی BotCommandScope
+
+```python
+set_default_menu(bot)          # BotCommandScopeDefault — همه
+set_seller_menu(bot, chat_id)  # BotCommandScopeChat — فقط فروشنده
+set_admin_menu(bot, chat_id)   # BotCommandScopeChat — فقط ادمین
+delete_seller_menu(bot, chat_id)  # حذف دستورات فروشنده
+```
+
+- پیاده‌سازی در `handlers/bot_commands.py`
+- `set_default_menu` + `set_admin_menu` در استارتاپ (`_post_init`)
+- `set_seller_menu` بعد از تایید نهایی فروشنده
+- همه فروشنده‌های فعال در استارتاپ بازگردانی می‌شوند
 
 ---
 
 ## ۱۳. زیرساخت و استقرار
 
 ### ۱۳.۱. VPS
-- **آدرس**: `185.204.168.57` (خارج ایران)
-- **نقش**: میزبانی همه سرویس‌ها
+
+| مشخصه | مقدار |
+|-------|-------|
+| آدرس | `185.204.168.57` (خارج ایران) |
+| کاربر | `ubuntu` |
+| استک | Docker Compose |
 
 ### ۱۳.۲. Docker Compose
+
 ```yaml
 services:
-  postgres:    # PostgreSQL 16 Alpine
-  bot:         # Python 3.11 Telegram Bot
-  website:     # Next.js Standalone
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+  bot:
+    build: ./telegram_order_bot
+    depends_on: [postgres]
+  website:
+    build: ./telegram_order_website
+    ports: ["3000:3000"]
+    depends_on: [postgres]
 ```
 
-### ۱۳.۳. کانتینرها
-| کانتینر | Port | وابستگی |
-|----------|------|----------|
-| `foroshgram_postgres` | ۵۴۳۲ | — |
-| `foroshgram_website` | ۳۰۰۰ | postgres (healthy) |
-| `foroshgram_bot` | — | postgres (healthy) |
+### ۱۳.۳. Deployment
 
-### ۱۳.۴. Deployment Scripts
 - `deploy-to-vps.sh` — استقرار مستقیم با bash
 - `deploy-via-ssh.py` — استقرار خودکار با SSH + Docker
 - `fix-deployment.py` — رفع مشکلات استقرار
 - `fix-nginx.py` — رفع مشکلات Nginx
 
+### ۱۳.۴. Backup & Restore (جديد)
+
+| فایل | توضیح |
+|------|-------|
+| `scripts/backup.sh` | بک‌آپ روزانه/هفتگی/ماهانه PostgreSQL با retention + sync به S3 (rclone) |
+| `scripts/restore.sh` | بازیابی بک‌آپ با drop/create + اعمال init-scripts |
+| `scripts/setup-rclone.sh` | راه‌اندازی rclone برای S3/MinIO/DO Spaces/B2/Wasabi |
+| `scripts/Dockerfile.backup` | ایمیج بک‌آپ (Alpine + pg_dump + rclone + cron) |
+
+**زمان‌بندی:**
+- روزانه: ساعت ۰۳:۰۰ (حفظ ۷ روز)
+- هفتگی: یکشنبه‌ها (حفظ ۴ هفته)
+- ماهانه: اول هر ماه (حفظ ۱۲ ماه)
+
+**استقرار در Docker Compose:**
+```yaml
+backup:
+  build:
+    context: .
+    dockerfile: scripts/Dockerfile.backup
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./scripts:/scripts:ro
+    - ./backups:/backups
+    - ./init-scripts:/init-scripts:ro
+    - ./rclone.conf:/config/rclone.conf:ro
+  restart: unless-stopped
+```
+
+**تنظیم rclone (یک‌بار روی VPS):**
+```bash
+chmod +x scripts/setup-rclone.sh
+./scripts/setup-rclone.sh
+```
+
 ### ۱۳.۵. Nginx
+
 - `nginx.conf` — کانفیگ کامل با SSL
 - `nginx-no-ssl.conf` — کانفیگ بدون SSL (توسعه)
 
-### ۱۳.۶. Init Scripts
-- `init-scripts/` — اسکریپت‌های اولیه دیتابیس
-
-### ۱۳.۷. متغیرهای محیطی
+### ۱۳.۵. متغیرهای محیطی
 
 **.env ربات (telegram_order_bot/.env):**
-```
-BOT_TOKEN=...
-ADMIN_IDS=123456789,987654321
-DATABASE_URL=postgresql+asyncpg://...
+```ini
+BOT_TOKEN=8871159970:...
+ADMIN_IDS=8497713691
+DATABASE_URL=postgresql+asyncpg://foroshgram:...@postgres/foroshgram
 NOTIFICATION_CHANNEL_ID=-100...
-ZARINPAL_MERCHANT_ID=...
-ZARINPAL_SANDBOX=true
-ZARINPAL_CALLBACK_URL=...
 PROXY_URL=http://user:pass@host:port
 ```
 
 **.env سایت (telegram_order_website/.env.production):**
-```
-DATABASE_URL=postgresql://...
+```ini
+DATABASE_URL=postgresql://foroshgram:...@postgres/foroshgram
 JWT_SECRET=...
-ADMIN_IDS=123456789,987654321
-ADMIN_PASSWORD=...
+ADMIN_IDS=8497713691
 ```
 
 ---
 
-## ۱۴. API Reference
-
-### ۱۴.۱. مسیرهای داخلی (Next.js API Routes)
-
-| مسیر | متد | پارامترها | پاسخ موفق | پاسخ خطا |
-|------|------|-----------|-----------|----------|
-| `/api/auth/login` | POST | `{ userId, password? }` | `{ success, role, shopId? }` | `{ success: false, error, requirePassword? }` |
-| `/api/auth/logout` | POST | — | `{ success: true }` | — |
-| `/api/auth/me` | GET | — | `{ userId, role, shopId? }` | 401 |
-| `/api/admin/create-claim-code` | POST | `{ shopId, expiresAt }` | `{ code }` | 403/400 |
-| `/api/admin/orders/[id]/status` | PATCH | `{ status }` | `{ success: true }` | 403/400 |
-| `/api/admin/toggle-shop` | POST | `{ shopId }` | `{ success }` | 403 |
-| `/api/admin/toggle-user-block` | POST | `{ userId }` | `{ success }` | 403 |
-| `/api/seller/orders/[id]/status` | PATCH | `{ status }` | `{ success }` | 403/400 |
-| `/api/seller/shop-info` | GET | — | `{ shop }` | 403 |
-| `/api/seller/toggle-product` | POST | `{ productId }` | `{ success }` | 403 |
-
-### ۱۴.۲. Callback Pattern‌های ربات
-
-| الگوی Callback | هندلر | توضیح |
-|----------------|-------|--------|
-| `nav:main` | main_menu_callback | بازگشت به منوی اصلی |
-| `cat:list` | show_categories | نمایش دسته‌بندی‌ها |
-| `cat:open:{id}:{page}` | show_products | محصولات یک دسته |
-| `prod:open:{id}:{cat}:{page}` | show_product_detail | جزئیات محصول |
-| `cart:add:{product_id}` | add_to_cart | افزودن به سبد |
-| `cart:view` | view_cart | نمایش سبد خرید |
-| `cart:inc:{id}` / `cart:dec:{id}` | change_quantity | تغییر تعداد |
-| `cart:remove:{id}` | remove_from_cart | حذف از سبد |
-| `cart:clear` | clear_cart | خالی کردن سبد |
-| `cart:clear:confirm` | clear_cart_confirm | تأیید خالی کردن |
-| `order:start` | start_checkout | شروع ثبت سفارش |
-| `order:confirm` | confirm_order | ثبت نهایی |
-| `order:history` | order_history | تاریخچه سفارش‌ها |
-| `order:detail:{id}` | order_detail_customer | جزئیات سفارش مشتری |
-| `pay:online` / `pay:cord` | ask_payment_method | انتخاب روش پرداخت |
-| `pay:verify:{id}:{authority}` | verify_payment_callback | تأیید پرداخت |
-| `pay:cancel:{id}` | cancel_order_payment | لغو سفارش |
-| `order:change_payment` | change_payment_method | تغییر روش پرداخت |
-| `order:cancel` | cancel_order | انصراف از ثبت |
-| `seller_reg:start` | seller_registration_start | شروع ثبت‌نام فروشنده |
-| `seller_reg:cancel` | cancel_registration | لغو ثبت‌نام |
-| `admin:panel` | admin_panel_callback | پنل ادمین |
-| `admin:stats` | admin_stats | آمار |
-| `admin:products:list:{page}` | list_products | لیست محصولات |
-| `admin:products:add` | start_add_product | افزودن محصول |
-| `admin:products:edit:{id}` | open_product_edit | ویرایش محصول |
-| `admin:products:toggle:{id}` | toggle_product | تغییر وضعیت محصول |
-| `admin:products:delete:{id}` | delete_product_confirm | تأیید حذف محصول |
-| `admin:products:delete_final:{id}` | delete_product_final | حذف نهایی محصول |
-| `admin:products:field:{id}:{field}` | start_edit_field | ویرایش فیلد محصول |
-| `admin:products:photo:{id}` | start_change_photo | تغییر عکس محصول |
-| `admin:categories` | list_categories | لیست دسته‌بندی‌ها |
-| `admin:categories:add` | start_add_category | افزودن دسته |
-| `admin:categories:delete:{id}` | delete_category_confirm | تأیید حذف دسته |
-| `admin:categories:delete_final:{id}` | delete_category_final | حذف نهایی دسته |
-| `admin:orders:pending:{page}` | list_pending_orders | سفارش‌های جاری |
-| `admin:orders:history:{page}` | list_all_orders | تاریخچه سفارش‌ها |
-| `admin:orders:detail:{id}:{source}` | order_detail | جزئیات سفارش ادمین |
-| `admin:orders:status:{id}:{status}` | change_order_status | تغییر وضعیت سفارش |
-| `admin:shops:list:{page}` | list_shops | لیست فروشگاه‌ها |
-| `admin:shops:add` | start_add_shop | افزودن فروشگاه |
-| `admin:shops:edit:{id}` | edit_shop | ویرایش فروشگاه |
-| `admin:shops:toggle:{id}` | toggle_shop | تغییر وضعیت فروشگاه |
-| `admin:shops:delete:{id}` | delete_shop_confirm | تأیید حذف فروشگاه |
-| `admin:shops:delete_final:{id}` | delete_shop_final | حذف نهایی فروشگاه |
-| `admin:broadcast:start` | start_broadcast | شروع پیام همگانی |
-| `admin:seller:approve:{shop_id}` | handle_admin_approve | تایید فروشنده |
-| `admin:seller:reject:{shop_id}` | handle_admin_reject | رد فروشنده |
-| `support:open` | support | پشتیبانی |
-| `seller:change_password` | change_password_start | تغییر رمز فروشنده |
-| `seller:cancel_password` | cancel_change_password | لغو تغییر رمز |
-| `noop` | noop_callback | دکمه صرفاً نمایشی |
-
-### ۱۴.۳. Command‌های ربات
-
-| دستور | توضیح |
-|-------|--------|
-| `/start` | شروع + منوی اصلی (پشتیبانی از `start=shop_X`) |
-| `/menu` | مشاهده دسته‌بندی‌ها |
-| `/cart` | مشاهده سبد خرید |
-| `/my_orders` | تاریخچه سفارش‌ها |
-| `/support` | پشتیبانی |
-| `/my_panel` | پنل فروشنده |
-| `/admin` | پنل ادمین/فروشنده |
-| `/orders` | سفارش‌های در حال پیگیری (ادمین) |
-| `/orders_history` | تاریخچه سفارش‌ها (ادمین) |
-| `/cancel` | لغو مکالمه فعلی |
-
----
-
-## ۱۵. تغییرات اخیر و نقشه راه
+## ۱۴. تغییرات و نقشه راه
 
 ### ✅ پیاده‌سازی شده
-- [x] لاگین نقش‌محور با رمز (ادمین + فروشنده) در سایت
-- [x] ثبت‌نام فروشنده با رمز عبور در ربات (ویزارد ۴ مرحله‌ای)
-- [x] دستور `/my_panel` در ربات (پنل فروشنده + تغییر رمز)
-- [x] Middleware محافظت مسیرهای `/admin/*` و `/seller/*`
-- [x] Header session-aware (لاگین/لاگاوت)
-- [x] سایدبار ادمین + فروشنده در سایت
-- [x] Web Crypto API برای هش SHA-256 (حل باگ Turbopack)
-- [x] سیستم سبد خرید کامل با افزایش/کاهش/حذف
-- [x] ثبت سفارش با دو روش پرداخت (آنلاین + درب منزل)
-- [x] مدیریت محصولات (افزودن، ویرایش، حذف، تغییر عکس)
+
+#### هسته
+- [x] شروع هوشمند `/start` (shop/product/category لینک + بدون پارامتر)
+- [x] دسته‌بندی‌ها و محصولات با صفحه‌بندی و مرتب‌سازی
+- [x] سبد خرید کامل (افزودن/کم/زیاد/حذف/خالی کردن)
+- [x] ثبت سفارش ConversationHandler 5+ مرحله
+- [x] پرداخت کارت‌به‌کارت (رسید + تأیید/رد فروشنده + retry)
+- [x] رزرو اتمیک موجودی (UPDATE شرطی + GREATEST)
+- [x] سرویس متمرکز سفارش (`create_order_from_cart` + `transition_order`)
+- [x] تاریخچه وضعیت (OrderHistory جدول جداگانه)
+
+#### پنل ادمین
+- [x] مدیریت کامل محصولات (افزودن، ویرایش، حذف، تغییر عکس)
 - [x] مدیریت دسته‌بندی‌ها (افزودن، حذف با آبشار)
-- [x] مدیریت سفارش‌ها با تغییر وضعیت و تاریخچه
-- [x] مدیریت فروشگاه‌ها (فعال/غیرفعال، حذف با آبشار)
-- [x] پیام همگانی (Broadcast) به همه کاربران
-- [x] تایید/رد فروشنده توسط ادمین از طریق دکمه
-- [x] رزرو اتمیک موجودی (جلوگیری از overselling)
-- [x] پاکسازی خودکار سفارش‌های پرداخت‌نشده (کرون‌جاب)
-- [x] فوروارد پیام‌های پشتیبانی به کانال ادمین
-- [x] Docker Compose برای استقرار
-- [x] Nginx Reverse Proxy (با و بدون SSL)
-- [x] Deployment Scripts (bash + Python)
+- [x] مدیریت سفارش‌ها (جزئیات + تغییر وضعیت داینامیک)
+- [x] مدیریت فروشگاه‌ها (فعال/غیرفعال + حذف)
+- [x] پیام همگانی (Broadcast)
+- [x] تایید/رد فروشنده توسط ادمین
+- [x] داشبورد آمار (ادمین کل + فروشنده)
+
+#### پنل فروشنده
+- [x] ثبت‌نام ۸ مرحله‌ای
+- [x] تغییر رمز عبور + بازیابی (`/reset_password`)
+- [x] تنظیمات پرداخت (شماره کارت، نام صاحب کارت)
+- [x] تنظیم بنر فروشگاه
+- [x] مدیریت کد تخفیف (ساخت درصدی/مبلغی)
+- [x] داشبورد فروشنده (آمار فروش)
+
+#### ویژگی‌های پیشرفته
+- [x] EventBus + NotificationService
+- [x] یادآور موجودی کم (< ۵)
+- [x] علاقه‌مندی‌ها (Wishlist)
+- [x] جستجوی تعاملی
+- [x] سبد خرید رها شده (یادآوری ۱۲ ساعت)
+- [x] خرید مجدد (Reorder)
+- [x] گالری چندعکسی (send_media_group)
+- [x] اعلان موجود شدن (Restock Notification)
+- [x] کد تخفیف (اعمال در checkout)
+- [x] خرید سریع (اطلاعات ذخیره شده)
+- [x] فروشگاه‌های اخیر (۵ تای آخر)
+- [x] Progress Bar سفارش
+- [x] بنر فروشگاه
+- [x] لینک مستقیم دسته‌بندی
+- [x] صفحه عمومی محصول در وبسایت (SSR + Open Graph)
+- [x] افزودن محصول با فوروارد کانال
+
+#### امنیت و زیرساخت
+- [x] لاگین نقش‌محور (ادمین/فروشنده/مشتری)
+- [x] رمز bcrypt (جایگزین SHA-256)
+- [x] Rate limit لاگین (۵ تلاش → ۱۵ دقیقه قفل)
+- [x] Middleware محافظت مسیرهای `/admin/*` و `/seller/*`
+- [x] منوی سه سطحی BotCommandScope
+- [x] Docker Compose + Nginx
+- [x] Prometheus + Grafana metrics
+- [x] صفحات خطای سفارشی (۴۰۴/۵۰۰)
+- [x] SEO پایه (robots.txt, sitemap.xml)
+- [x] رمزنگاری اطلاعات بانکی (AES-256-GCM)
+- [x] Rate limiter توزیع‌شده (Redis-backed)
+- [x] Re-check وضعیت فروشگاه بعد از JWT (requireSeller)
+- [x] CSRF protection (HMAC double-submit cookie)
+- [x] Escape HTML ورودی کاربر (جلوگیری از injection)
+- [x] De-duplication رسید پرداخت (SHA-256 hash + UNIQUE)
+- [x] اجبار تغییر رمز بعد reset (must_change_password)
+- [x] بک‌آپ خودکار PostgreSQL (daily/weekly/monthly + S3 آماده)
+
+### 🔧 رفع باگ‌ها و بهبودهای اعمال شده
+
+- [x] **رفع dead feature اعلان موجود شدن**: `_check_and_notify_restock` از هیچ‌جایی صدا زده نمی‌شد — به `save_edit_field` (admin/products.py) اضافه شد
+- [x] **رفع RestockSubscription re-subscribe**: بعد از notify، کاربر نمی‌توانست دوباره subscribe کند — now re-activates با `notified=False`
+- [x] **رفع `render_view`**: پارامتر `parse_mode` نداشت → لیست کد تخفیف با TypeError کرش می‌کرد
+- [x] **رفع `confirm_card_payment`**: دیسکونت به `create_order_from_cart` پاس داده نمی‌شد
+- [x] **رفع `cancel_order_and_release_stock`**: event emit نمی‌کرد — حالا `Event.ORDER_CANCELLED` + `bot` parameter
+- [x] **رفع `handle_convert_to_cod`**: `transition_order` بدون `bot` صدا زده می‌شد
+- [x] **رفع کد مرده `max_discount_amount`**: فیلد در `DiscountCode` مدل وجود نداشت — حذف شد
+- [x] **رفع `MAX(0, x)` → `GREATEST(0, x)`**: PostgreSQL تابع `MAX` scalar روی دو عدد نمی‌شناسد
+- [x] **رفع `ORDER_STATUS.CANCELLED`**: با دو L (cancelled) — انگلیسی بریتانیایی
+- [x] **رفع `.value` روی OrderStatus**: کلاس str ساده است نه Enum
+- [x] **رفع `edit_message_text` روی عکس**: `render_view` fallback به `send_message`
+- [x] **رفع انصراف در مرحله پرداخت → بن‌بست**: `order:pay_cancel` و `order:start` به `fallbacks` مکالمه اضافه شد
+- [x] **رفع ارور بعد از رد رسید و آپلود مجدد**: `retry_card_receipt` سفارش `CANCELLED`/`rejected` رو revive می‌کنه + رزرو مجدد موجودی
+- [x] **رفع ⭐ افزودن به علاقه‌مندی**: `toggle_wishlist` unpack با `*_` برای callback 5 بخشی فیکس شد
+- [x] **رفع ❤️ مشاهده علاقه‌مندی‌ها**: `selectinload(WishlistItem.product)` + حلقه داخل session (رفع lazy-load بعد از بسته شدن session)
+- [x] **رفع ✅ تایید پرداخت (KeyError)**: `OrderItem.product` relationship به مدل اضافه شد
+- [x] **رفع 🎉 تبریک اولین فروش → بن‌بست**: دکمه «🗂 پنل فروشنده» به دو مکان ارسال اضافه شد
+- [x] **رفع `cancellation_reason` ترانکیت**: ستون `VARCHAR(100)` (بود ۲۰ — `release_reserved_stock` ۲۲ کاراکتر)
+- [x] **رفع `release_reserved_stock`**: حذف پارامتر `session`
+- [x] **رفع همه پیام‌های بن‌بست‌ساز**: `_NAV_KB` با ۳ دکمه (ادامه خرید، سبد خرید، شروع) به همه پیام‌های پایانی 
 
 ### 🔄 در حال انجام
-- [ ] صفحه پرداخت زرین‌پال یکپارچه در سایت
-- [ ] Callback URL پرداخت در سایت (فعلاً فقط در ربات)
+
+- [x] زمان‌بندی کرون برای `scripts/backup.sh` — فعال در container
 - [ ] DNS + SSL نهایی
+- [ ] صفحه عمومی فروشگاه `/shop/[id]`
+- [x] تست‌های خودکار مسیرهای پولی — `tests/test_flow.py` اضافه شد (۷ سناریو)
+- [ ] تکمیل redemption Claim Code
 
 ### 📅 برنامه آینده
-- [ ] سیستم کد تخفیف
+
 - [ ] گزارش‌گیری پیشرفته (اکسل/CSV)
-- [ ] اعلان‌های push به فروشنده برای سفارش جدید
+- [ ] اعلان push برای سفارش جدید (فعلاً فقط در چت خصوصی)
 - [ ] مدیریت چند فروشگاه برای یک فروشنده
 - [ ] سیستم امتیاز و بازخورد مشتری
-- [ ] صفحه فروشگاه عمومی در سایت (`/shop/[id]`)
-- [ ] جستجوی پیشرفته محصولات
-- [ ] پشتیبان‌گیری خودکار دیتابیس
-- [ ] ثبت‌نام فروشنده از طریق کد دعوت (Claim Code)
-- [ ] پنل مدیریت محتوای سایت (site_content در دیتابیس)
+- [ ] ثبت‌نام فروشنده از طریق کد دعوت (Claim Code — VIP بدون تایید دستی)
+- [ ] پنل مدیریت محتوای سایت (`site_content` در دیتابیس)
 - [ ] تست‌های خودکار (Unit + Integration)
 - [ ] CI/CD Pipeline
+- [ ] لاگین با OTP تلگرام
+- [ ] سبد خرید چند فروشگاهی
+- [ ] اپلیکیشن موبایل (React Native)
 
 ---
 
-## پیوست: ساختار دایرکتوری
+## ۱۶. تحلیل و نمره‌دهی (Audit Report)
+
+> تاریخ: ۱۴ ژوئیه ۲۰۲۶ — ارزیابی کلی پروژه Foroshgram
+
+### نمره کلی: ۷ از ۱۰
+
+به‌عنوان یک MVP تک‌نفره برای پلتفرم چندمستأجری.
+
+| بخش | نمره | توضیح |
+|-----|------|-------|
+| معماری و جداسازی کد | ۸.۵ | لایه‌بندی handlers/services/utils تمیزه، EventBus واقعاً درست پیاده شده |
+| منطق تراکنشی (رزرو موجودی) | ۷ | ایده درسته (UPDATE شرطی) ولی چند نقطه ضعف زیر داره |
+| امنیت | ۶ | پایه خوبه (bcrypt، JWT edge-safe، rate limit لاگین) ولی چند سوراخ واقعی هست |
+| آماده‌بودن برای Production | ۵ | همینجا بزرگ‌ترین گپ پروژه‌ست |
+| کامل بودن فیچرها | ۸.۵ | خیلی جلوتر از یه بات فروشگاهی معمولیه (wishlist, restock, abandoned cart, reorder) |
+| مستندسازی (خود همین فایل) | ۹ | نادره که یه پروژه solo این‌قدر مستند بشه |
+
+### نقاط قوت واقعی
+
+- `create_order_from_cart` به‌عنوان تنها مسیر ساخت سفارش — این تصمیم معماری درستیه. خیلی از پروژه‌های مشابه چون این مسیر رو یکی نمی‌کنن، دچار race condition و double-order می‌شن.
+- رزرو اتمیک با `UPDATE ... WHERE stock - reserved_stock >= qty` — درسته، این دقیقاً همون الگویی‌ه که باید استفاده بشه به‌جای lock در سطح اپلیکیشن.
+- لیست باگ‌های رفع‌شده (GREATEST به‌جای MAX، Enum بودن غلط OrderStatus، lazy-load بعد از بسته شدن session) نشون می‌ده داری واقعاً edge caseها رو شکار می‌کنی، نه فقط happy-path رو تست می‌کنی.
+
+### ریسک‌های واقعی — به ترتیب اولویت
+
+1. **بک‌آپ دیتابیس** — قبلاً فعال شد ✅ (scripts/backup.sh + container)
+2. **total_price نوعش Float** — تومان بدون اعشار، ولی محاسبات تخفیف (total × value / 100) می‌تونن imprecision تولید کنن → تغییر به Integer یا Numeric
+3. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
+4. **Deadlock در قفل چند محصولی** — ترتیب lock باید ثابت باشه (مثلاً بر اساس product_id صعودی)
+5. **شماره کارت plaintext** — قبلاً رفع شد ✅ (AES-256-GCM)
+6. **تست خودکار** — فایل test_flow.py اضافه شد، نیاز به تکمیل fixtureها
+7. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
+
+### ایده: verification نیمه‌خودکار رسید پرداخت
+
+> بزرگ‌ترین bottleneck معماری: تایید دستی رسید توسط هر فروشنده یعنی این پلتفرم هیچ‌وقت واقعاً scale نمی‌شه.
+
+لایه verification نیمه‌خودکار با vision model:
+- وقتی مشتری عکس رسید می‌فرسته، قبل از رسیدن به فروشنده، عکس به مدل vision (مثلاً AvalAI) داده بشه
+- استخراج مبلغ و آخرین ۴ رقم کارت مقصد + مطابقت با مبلغ سفارش + شماره کارت فروشنده
+- اگه match → تایید خودکار یا badge «✅ مطابقت خودکار»
+- اگه mismatch → فقط صف تایید دستی
+- هم fraud کمتر (رسید تکراری/جعلی با هش عکس) هم فروشنده از گیر ۲۴ ساعته آزاد
+
+### جزئیات فنی: منطق تراکنشی (رزرو موجودی)
+
+**ضعف ۱ — عدم ترتیب ثابت قفل → Deadlock:**
+اگه ترتیب قفل‌گیری بر اساس ترتیب آیتم‌های سبد باشه (نه `product_id` مرتب‌شده)، دو مشتری هم‌زمان با ترتیب متفاوت = deadlock. فیکس: قبل از لوپ، لیست رو بر اساس `product_id` صعودی sort کن.
+
+**ضعف ۲ — دو round-trip اضافی:**
+`SELECT FOR UPDATE` جدا + `UPDATE شرطی` جدا = ۲ بار به DB برای هر آیتم. با `UPDATE ... WHERE ... RETURNING` می‌شه همه رو یکی کرد.
+
+**ضعف ۳ — ناسازگاری زمانی مستندات:**
+بخش ۵.۶ می‌گه ۱۲۰ دقیقه timeout، بخش ۱۰.۱ می‌گه ۳۰ دقیقه cron cleanup. باید کد واقعی چک بشه.
+
+**ضعف ۴ — Race بین cron cleanup و تایید فروشنده:**
+بدون `SELECT ... FOR UPDATE` روی ردیف Order، سفارش هم‌زمان هم PAID بشه هم CANCELLED. فیکس: `transition_order` هم قفل row-level بزنه.
+
+**ضعف ۵ — نبود idempotency روی دکمه ثبت نهایی:**
+دو بار کلیک سریع = دو سفارش از یک سبد. نیاز به debounce یا غیرفعال‌کردن دکمه.
+
+**ضعف ۶ — نشتی موجودی رزرو‌شده برای COD:**
+کرون فقط PENDING_PAYMENT (کارت) رو پاک می‌کنه. سفارش COD معلق = reserved_stock برای همیشه رزرو.
+
+**ضعف ۷ — نبود Constraint سطح DB:**
+`available_stock` فقط یه `@property` پایتونیه. نیاز به `CHECK (reserved_stock >= 0 AND reserved_stock <= stock)`.
+
+### جزئیات فنی: امنیت (۶/۱۰)
+
+سوراخ‌های واقعی:
+
+1. **شماره کارت plaintext** → ✅ رفع شد (AES-256-GCM)
+2. **Rate limiter in-memory** → ✅ رفع شد (Redis-backed)
+3. **عدم re-check وضعیت shop بعد از JWT** → ✅ رفع شد (requireSeller re-check)
+4. **بدون CSRF protection** → ✅ رفع شد (HMAC double-submit)
+5. **Rیسک Injection در پیام‌ها** → ✅ رفع شد (escape_html)
+6. **بدون de-duplication رسید** → ✅ رفع شد (SHA-256 hash + UNIQUE constraint)
+7. **رمز موقت ۸ رقمی** → ✅ رفع شد (must_change_password + rate limit)
+8. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
+
+### جزئیات فنی: آماده‌بودن برای Production (۵/۱۰)
+
+1. **بک‌آپ خودکار** → ✅ فعال شد (container + cron + rclone آماده)
+2. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
+3. **تست خودکار مسیرهای پولی** → ⚠️ فایل test_flow.py اضافه شد، نیاز به fixture tuning
+4. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
+5. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
+6. **Persistence مکالمه‌ها** — مشخص نیست PTB Persistence تنظیم شده
+7. **Restart policy** → ✅ از قبل `restart: unless-stopped` روی همه سرویسها
+
+### سه آیتم مهم‌تر از هر فیچر جدید
+
+تست مسیرهای پولی، DNS+SSL، و بک‌آپ — این سه‌تا دقیقاً چیزیه که بین «پروژه شخصی روی VPS» و «پلتفرمی که می‌تونی روش فروشنده واقعی سوار کنی» فرق می‌ذاره.
+
+---
+
+## ۱۷. پیوست: ساختار دایرکتوری
 
 ```
 Telegramorderbot/
-├── PROJECT.md
+├── PROJECT.md                        # این فایل
 ├── docker-compose.yml
-├── nginx.conf
-├── nginx-no-ssl.conf
-├── deploy-to-vps.sh
-├── deploy-via-ssh.py
-├── fix-deployment.py
-├── fix-nginx.py
+├── nginx.conf / nginx-no-ssl.conf
+├── deploy-to-vps.sh / deploy-via-ssh.py
+├── fix-deployment.py / fix-nginx.py
 ├── init-scripts/
 │   └── ...
 ├── telegram_order_bot/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── .env
-│   ├── main.py                  # نقطه ورود
-│   ├── config.py                # تنظیمات
+│   ├── main.py                       # نقطه ورود + build handlers
+│   ├── config.py                     # تنظیمات محیطی
 │   ├── database/
-│   │   ├── __init__.py
-│   │   ├── db.py                # اتصال SQLAlchemy
-│   │   └── models.py            # همه مدل‌ها
+│   │   ├── db.py                     # async_session + engine
+│   │   ├── models.py                 # همه مدل‌ها (16 جدول)
+│   │   └── migrate_*.py              # مهاجرت‌ها
 │   ├── handlers/
-│   │   ├── __init__.py
-│   │   ├── start.py             # /start + منوی اصلی
-│   │   ├── menu.py              # دسته‌بندی‌ها + محصولات
-│   │   ├── cart.py              # سبد خرید
-│   │   ├── order.py             # ثبت سفارش + تاریخچه
-│   │   ├── seller_registration.py # ثبت‌نام فروشنده
-│   │   ├── seller_panel.py      # پنل فروشنده
-│   │   ├── admin_approval.py    # تایید/رد توسط ادمین
-│   │   ├── support.py           # پشتیبانی
-│   │   ├── common.py            # توابع مشترک
+│   │   ├── start.py                  # /start هوشمند + لینک مستقیم
+│   │   ├── menu.py                   # دسته‌بندی + محصولات + گالری
+│   │   ├── cart.py                   # سبد خرید
+│   │   ├── order.py                  # ثبت سفارش + تاریخچه + پرداخت + تخفیف
+│   │   ├── conversations.py          # پیام خریدار-فروشنده (اینباکس)
+│   │   ├── bot_commands.py           # BotCommandScope سه سطحی
+│   │   ├── seller_registration.py    # ویزارد ۸ مرحله‌ای
+│   │   ├── seller_panel.py           # پنل فروشنده + تنظیمات
+│   │   ├── discount.py               # کد تخفیف
+│   │   ├── wishlist.py               # علاقه‌مندی‌ها
+│   │   ├── search.py                 # جستجوی تعاملی
+│   │   ├── forward_products.py       # افزودن با فوروارد
+│   │   ├── support.py                # پشتیبانی (ConversationHandler)
+│   │   ├── help.py                   # /help نقش‌محور
+│   │   ├── common.py                 # توابع مشترک
+│   │   ├── admin_approval.py         # تایید/رد فروشنده از نوتیفیکیشن درون‌خطی
 │   │   └── admin/
-│   │       ├── __init__.py
-│   │       ├── panel.py         # پنل ادمین
-│   │       ├── products.py      # مدیریت محصولات
-│   │       ├── categories.py    # مدیریت دسته‌بندی
-│   │       ├── orders.py        # مدیریت سفارش‌ها
-│   │       ├── shops.py         # مدیریت فروشگاه‌ها
-│   │       └── broadcast.py     # پیام همگانی
+│   │       ├── panel.py              # پنل ادمین
+│   │       ├── products.py           # مدیریت محصولات
+│   │       ├── categories.py         # مدیریت دسته‌بندی
+│   │       ├── orders.py             # مدیریت سفارش‌ها
+│   │       ├── shops.py              # مدیریت فروشگاه‌ها
+│   │       └── broadcast.py          # پیام همگانی
 │   ├── services/
-│   │   ├── __init__.py
-│   │   └── payment.py           # زرین‌پال + مدیریت موجودی
+│   │   ├── payment.py                # رزرو/آزادسازی/نهایی‌سازی
+│   │   ├── order_service.py          # create_order_from_cart + transition_order
+│   │   ├── events.py                 # EventBus + Event enum
+│   │   ├── event_listeners.py        # Listenerهای رویداد
+│   │   ├── notification_service.py   # NotificationService
+│   │   ├── monitoring.py             # Metrics + Sentry + Prometheus
+│   │   ├── restock.py                # Restock notification
+│   │   └── abandoned_cart.py         # یادآوری سبد رها شده
 │   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── helpers.py           # توابع کمکی
-│   │   ├── tg_helpers.py        # توابع کمکی تلگرام
-│   │   ├── order_validator.py   # اعتبارسنجی وضعیت
-│   │   └── tenant.py            # مدیریت چندمستأجری
-│   └── tests/
-│       ├── __init__.py
-│       └── test_flow.py         # تست‌های جریان
+│   │   ├── helpers.py                # format_price, to_jalali, is_super_admin
+│   │   ├── tg_helpers.py             # render_view, get_current_shop_id, escape_html
+│   │   ├── crypto.py                 # AES-256-GCM رمزنگاری اطلاعات بانکی
+│   │   ├── order_validator.py        # can_transition + ALLOWED_TRANSITIONS
+│   │   ├── payment_config.py         # تنظیمات پرداخت per-shop
+│   │   └── tenant.py                 # چندمستأجری
+│   ├── tests/
+│   │   └── test_flow.py              # تست‌های جریان کامل (۷ سناریو)
 └── telegram_order_website/
     ├── Dockerfile
     ├── next.config.ts
     ├── package.json
     ├── .env.production
     └── src/
-        ├── middleware.ts
+        ├── middleware.ts              # محافظت مسیرها
         ├── app/
         │   ├── layout.tsx
-        │   ├── page.tsx                   # لندینگ
-        │   ├── login/page.tsx             # لاگین
-        │   ├── admin/
+        │   ├── page.tsx              # لندینگ
+        │   ├── login/page.tsx
+        │   ├── product/[id]/page.tsx # صفحه عمومی محصول
+        │   ├── 33482531.txt          # فایل اینماد
+        │   ├── not-found.tsx / error.tsx
+        │   ├── admin/                # پنل ادمین
         │   │   ├── layout.tsx
-        │   │   ├── AdminLayoutClient.tsx
-        │   │   ├── page.tsx               # داشبورد ادمین
+        │   │   ├── page.tsx          # داشبورد
         │   │   ├── shops/page.tsx
         │   │   ├── products/page.tsx
         │   │   ├── categories/page.tsx
-        │   │   ├── orders/page.tsx
-        │   │   ├── orders/[id]/page.tsx
+        │   │   ├── orders/page.tsx + [id]/page.tsx
         │   │   ├── users/page.tsx
         │   │   └── claim-codes/page.tsx
-        │   ├── seller/
+        │   ├── seller/               # پنل فروشنده
         │   │   ├── layout.tsx
-        │   │   ├── SellerLayoutClient.tsx
-        │   │   ├── page.tsx               # داشبورد فروشنده
+        │   │   ├── page.tsx          # داشبورد
         │   │   ├── products/page.tsx
-        │   │   ├── orders/page.tsx
-        │   │   └── orders/[id]/page.tsx
-        │   └── api/
-        │       ├── auth/login/route.ts
-        │       ├── auth/logout/route.ts
-        │       ├── auth/me/route.ts
-        │       ├── admin/create-claim-code/route.ts
+        │   │   └── orders/page.tsx + [id]/page.tsx
+        │   └── api/                  # API Routes
+        │       ├── auth/login|logout|me/route.ts
+        │       ├── admin/create-claim-code|toggle-shop|toggle-user-block/route.ts
         │       ├── admin/orders/[id]/status/route.ts
-        │       ├── admin/toggle-shop/route.ts
-        │       ├── admin/toggle-user-block/route.ts
-        │       ├── seller/shop-info/route.ts
+        │       ├── seller/shop-info|toggle-product/route.ts
         │       ├── seller/orders/[id]/status/route.ts
-        │       └── seller/toggle-product/route.ts
+        │       └── product-image/[id]/route.ts       # عکس محصول
         ├── components/
-        │   ├── layout/
-        │   │   ├── Header.tsx
-        │   │   ├── Footer.tsx
-        │   │   └── ProtectedLayout.tsx
-        │   └── shared/
-        │       └── Card.tsx
+        │   ├── layout/ (Header, Footer, ProtectedLayout)
+        │   └── shared/ (Card, ...)
         ├── lib/
-        │   ├── auth.ts           # JWT + سشن
-        │   ├── db.ts             # کوئری‌های PostgreSQL
-        │   └── utils.ts          # توابع کمکی
+        │   ├── auth.ts               # JWT + سشن + requireSeller/requireAdmin
+        │   ├── crypto.ts             # AES-256-GCM (Node.js native)
+        │   ├── csrf.ts               # HMAC-SHA256 double-submit
+        │   ├── db.ts                 # pg Pool + query helpers
+        │   ├── rate-limiter.ts       # Redis-backed + in-memory fallback
+        │   └── utils.ts
         └── types/
             └── index.ts
+├── scripts/
+│   ├── backup.sh                 # بک‌آپ خودکار PostgreSQL
+│   ├── restore.sh                # بازیابی بک‌آپ
+│   ├── setup-rclone.sh           # راه‌اندازی rclone
+│   ├── Dockerfile.backup         # ایمیج کانتینر بک‌آپ
+│   ├── db-backup.sh              # نسخه قدیمی بک‌آپ
+│   ├── migrate_passwords.py      # SHA-256 → bcrypt مهاجرت
+│   └── seed_admin.py             # افزودن ادمین اولیه
+├── deploy-to-vps.sh / deploy-via-ssh.py
+├── fix-deployment.py / fix-nginx.py
+├── deploy_bot_sftp.py            # (مختل) دیپلوی SFTP
+├── deploy_bot_v2.py / deploy_bot_v3.py
+├── deploy_chan.py / deploy_paramiko.py
+├── upload_*.py                   # آپلود chunk شده فایل‌ها
+└── .env                          # متغیرهای محیطی (رد شده در git)
 ```

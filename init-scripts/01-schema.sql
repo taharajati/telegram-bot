@@ -11,7 +11,15 @@ CREATE TABLE IF NOT EXISTS shops (
     username VARCHAR(100) UNIQUE,
     is_active BOOLEAN DEFAULT TRUE,
     status VARCHAR(20) DEFAULT 'draft',
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    zarinpal_merchant_id VARCHAR(36),
+    shipping_cost INTEGER DEFAULT 0,
+    free_shipping_above INTEGER,
+    banner_image VARCHAR(500),
+    channel_link VARCHAR(200),
+    card_number TEXT,       -- AES-256-GCM ciphertext (base64, ~60 chars for 16-digit)
+    card_holder_name TEXT,  -- AES-256-GCM ciphertext (base64, ~172 chars for 100-char name)
+    sheba_number TEXT       -- AES-256-GCM ciphertext (base64, ~72 chars for 26-char IBAN)
 );
 
 -- ─── Shop Owners (صاحبان فروشگاه) ───
@@ -23,10 +31,21 @@ CREATE TABLE IF NOT EXISTS shop_owners (
     username VARCHAR(100),
     password_hash VARCHAR(128),
     password_salt VARCHAR(32),
+    must_change_password BOOLEAN DEFAULT FALSE,
     registered_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_shop_owners_user_id ON shop_owners(user_id);
 CREATE INDEX IF NOT EXISTS idx_shop_owners_shop_id ON shop_owners(shop_id);
+
+-- ─── Admins (ادمین‌های کل) ───
+CREATE TABLE IF NOT EXISTS admins (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL UNIQUE,
+    password_hash VARCHAR(128) NOT NULL,
+    must_change_password BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_admins_user_id ON admins(user_id);
 
 -- ─── Claim Codes (کد دعوت) ───
 CREATE TABLE IF NOT EXISTS claim_codes (
@@ -69,11 +88,14 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE INDEX IF NOT EXISTS idx_products_shop_id ON products(shop_id);
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+-- Composite index for category queries within a shop
+CREATE INDEX IF NOT EXISTS idx_products_shop_category ON products(shop_id, category_id);
 
 -- ─── Users (کاربران / مشتریان) ───
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGINT PRIMARY KEY,
     current_shop_id INTEGER REFERENCES shops(id),
+    last_shop_id INTEGER REFERENCES shops(id),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     username VARCHAR(100),
@@ -109,16 +131,22 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_method VARCHAR(20),
     payment_ref VARCHAR(100),
     payment_status VARCHAR(20),
+    payment_receipt_file_id VARCHAR(255),
+    payment_receipt_at TIMESTAMP,
     receiver_name VARCHAR(150),
     shipping_address VARCHAR(500) NOT NULL,
     phone VARCHAR(30) NOT NULL,
     status_history TEXT DEFAULT '[]',
+    cancellation_reason VARCHAR(20),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_orders_shop_id ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS idx_orders_tracking_code ON orders(tracking_code);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+-- Composite indexes for multi-tenant query performance
+CREATE INDEX IF NOT EXISTS idx_orders_shop_status ON orders(shop_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_shop_created ON orders(shop_id, created_at DESC);
 
 -- ─── Order Items (اقلام سفارش) ───
 CREATE TABLE IF NOT EXISTS order_items (
@@ -176,4 +204,29 @@ CREATE TABLE IF NOT EXISTS page_sections (
 );
 
 CREATE INDEX IF NOT EXISTS idx_page_sections_page ON page_sections(page, is_visible);
+
+-- ─── Messaging (پیام خریدار-فروشنده) ───
+CREATE TABLE IF NOT EXISTS conversations (
+    id SERIAL PRIMARY KEY,
+    buyer_id BIGINT NOT NULL,
+    shop_id INTEGER REFERENCES shops(id),
+    order_id INTEGER REFERENCES orders(id),
+    status VARCHAR(20) DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_conv_buyer ON conversations(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_conv_shop ON conversations(shop_id);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_role VARCHAR(10) NOT NULL,  -- buyer | seller
+    content TEXT NOT NULL,
+    has_attachment BOOLEAN DEFAULT FALSE,
+    attachment_file_id VARCHAR(255),
+    read_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
 
