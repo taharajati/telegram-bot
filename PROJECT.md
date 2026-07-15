@@ -1,6 +1,6 @@
 # پروژه فروشگرام (Foroshgram) — Telegram Order Bot
 
-> **نسخه:** 2.3 | **تاریخ:** ۱۴۰۵-۰۴-۲۳ (2026-07-14)  
+> **نسخه:** 2.4 | **تاریخ:** ۱۴۰۵-۰۵-۲۱ (2026-08-12)  
 > **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)  
 > **پلتفرم سفارش آنلاین چندمستأجری تلگرام**
 
@@ -66,7 +66,7 @@
 - **خرید سریع (Fast Checkout)**: اطلاعات ذخیره شده از خرید قبلی
 - **فروشگاه‌های اخیر**: لیست ۵ فروشگاه آخر بازدید شده
 - **گالری چندعکسی**: آلبوم تلگرام (send_media_group) برای محصولات با چند عکس
-- **پشتیبانی (Support)**: ConversationHandler مجزا
+- **پشتیبانی (Support)**: سیستم پیام دوطرفه خریدار-فروشنده با Conversation/Message مدل
 - **افزودن محصول با فوروارد**: فروشنده پیام کانال را فوروارد می‌کند
 - **پیام خریدار-فروشنده (Conversations)**: مشتری از داخل جزئیات سفارش پیام بده، فروشنده اینباکس مجزا دارد
 - **تایید/رد مستقیم از نوتیفیکیشن**: ادمین بدون رفتن به پنل از دکمه‌های inline می‌تواند فروشنده را تایید/رد کند
@@ -138,7 +138,7 @@
 | **Wishlist** | علاقه‌مندی‌ها | `handlers/wishlist.py` |
 | **Search** | جستجوی تعاملی | `handlers/search.py` |
 | **Forward Products** | افزودن محصول با فوروارد | `handlers/forward_products.py` |
-| **Support** | پشتیبانی (ConversationHandler) | `handlers/support.py` |
+| **Support** | پشتیبانی دوطرفه خریدار-فروشنده + ادمین | `handlers/support.py` |
 | **Help** | راهنمای نقش‌محور | `handlers/help.py` |
 | **Common** | توابع مشترک بین handlers | `handlers/common.py` |
 | **Conversations** | پیام خریدار-فروشنده (اینباکس) | `handlers/conversations.py` |
@@ -652,12 +652,15 @@ order:start → (اگر fast-checkout) ASK_NAME
 - بازگشت به CONFIRM با مبلغ جدید
 - در صورت خطا: پیام خطا + دکمه `❌ انصراف`
 
-### ۵.۱۳. پشتیبانی
+### ۵.۱۳. پشتیبانی دوطرفه (خریدار ↔ فروشنده)
 
-- `support:open` → ConversationHandler مجزا
-- پیام متنی کاربر فوروارد می‌شود به کانال نوتیفیکیشن
-- شامل: نام، یوزرنیم، آیدی، متن پیام
-- دکمه `🔙 بازگشت`
+- `support:open` → مکالمه با پشتیبانی (ادمین‌ها)
+- `support:seller:{shop_id}` → ورود به مکالمه مستقیم با فروشنده. یک `Conversation` (بدون `order_id`) ایجاد می‌شود.
+- پیام مشتری در جدول `Message` ذخیره می‌شود و فروشنده از طریق اینباکس (`seller:inbox`) آن را می‌بیند و پاسخ می‌دهد.
+- فروشنده از `msg:open:{conv_id}` مکالمه را باز می‌کند و با `msg:reply:{conv_id}` شروع به تایپ می‌کند.
+- پس از پیام فروشنده، مشتری نوتیفیکیشن دریافت می‌کند با دکمه `📨 مشاهده مکالمه`.
+- دکمه `🔙 بازگشت به فروشگاه` در تمام مراحل حفظ می‌شود.
+- پیام‌های متنی ساده (بدون پیوست تصویری فعلاً).
 
 ---
 
@@ -1048,12 +1051,21 @@ transition_order(PAID)
 | فایل | توضیح |
 |------|-------|
 | `handlers/conversations.py` | ConversationHandler مجزا — مشتری از `order:conversation:{id}` شروع می‌کند |
-| فروشنده اینباکس در پنل `seller:inbox` دارد | |
+| فروشنده اینباکس در پنل `seller:inbox` دارد |
 | `Conversation` | جدول: `id`, `buyer_id`, `shop_id`, `order_id?`, `status` (open/closed) |
 | `Message` | جدول: `id`, `conversation_id`, `sender_role` (buyer/seller), `content`, `has_attachment`, `attachment_file_id`, `read_at` |
 | `/cancel` | لغو مکالمه فعلی |
 
-جریان: خریدار from `order:detail` → `conv:open:{id}` → ارسال متن/عکس → فروشنده in `seller:conversations` می‌بیند → پاسخ می‌دهد.
+جریان خریدار:
+- از `order:detail` → `conv:open:{id}` → ارسال متن → فروشنده در `seller:inbox` می‌بیند → پاسخ می‌دهد.
+
+جریان پشتیبانی فروشگاه (`support:seller`):
+1. مشتری دکمه `💬 پیام به فروشنده` را در منوی فروشگاه می‌زند
+2. `seller_support_start` یک `Conversation` جدید (بدون `order_id`) ایجاد یا دریافت می‌کند
+3. مشتری پیام خود را تایپ می‌کند → `seller_support_receive` ذخیره در `Message`
+4. فروشنده در `seller:inbox` پیام را می‌بیند → `msg:open:{conv_id}` باز می‌کند → `msg:reply:{conv_id}` شروع به تایپ می‌کند
+5. `send_message` (در conversations.py) ذخیره می‌کند و مشتری نوتیفیکیشن می‌گیرد
+6. دکمه `🔙 بازگشت به فروشگاه` در تمام مراحل حفظ می‌شود
 
 ### ۱۲.۳. Callback Pattern‌های ربات — مشتری
 
@@ -1093,7 +1105,9 @@ transition_order(PAID)
 | `restock:unsubscribe:{pid}` | `unsubscribe_restock` | لغو سابسکرایب |
 | `shop:recent` | `show_recent_shops` | فروشگاه‌های اخیر |
 | `shop:open:{id}` | `open_shop_from_recent` | باز کردن فروشگاه |
-| `support:open` | `support` | پشتیبانی |
+| `support:open` | `support` → `support_start` | پشتیبانی — ورود به مکالمه با ادمین‌ها |
+| `support:seller:{shop_id}` | `seller_support_start` | پشتیبانی فروشگاه — شروع مکالمه با فروشنده |
+| `support_seller_cancel` | `seller_support_cancel` | لغو مکالمه پشتیبانی فروشنده |
 | `noop` | `noop_callback` | دکمه صرفاً نمایشی |
 | `order:conversation:{id}` | `open_conversation_buyer` | شروع مکالمه با فروشنده |
 | `conv:back` | `back_to_order_detail` | بازگشت به جزئیات سفارش |
@@ -1113,8 +1127,14 @@ transition_order(PAID)
 | `discount:list` | `_show_discount_menu` | لیست کد تخفیف |
 | `discount:create` | `apply_discount_start` | ساخت کد جدید |
 | `discount:toggle:{id}` | `toggle_discount` | فعال/غیرفعال |
-| `seller:inbox` | `seller_conversations_list` | لیست مکالمات خریداران |
-| `seller:conv:open:{conv_id}` | `open_conversation_seller` | باز کردن مکالمه |
+| `seller:panel` | `seller_panel_command` | پنل یکپارچه فروشنده (message-based) |
+| `seller:panel_back` | `panel_back` | بازگشت به پنل فروشنده |
+| `seller:orders:pending` | `seller_orders_pending` | سفارش‌های در انتظار |
+| `seller:orders:history` | `seller_orders_history` | تاریخچه سفارش‌ها |
+| `seller:inbox` | `seller_inbox` | لیست مکالمات خریداران (اینباکس) |
+| `msg:open:{conv_id}` | `seller_open_conv` | باز کردن مکالمه (seller side) |
+| `msg:reply:{conv_id}` | `start_send_message` | شروع ارسال پیام به مشتری |
+| `send_message:{conv_id}` | `send_message` | ارسال پیام (text handler) |
 | `seller:conv:back` | `back_to_inbox` | بازگشت به اینباکس |
 
 ### ۱۲.۵. Callback Pattern‌های ربات — ادمین
@@ -1132,6 +1152,7 @@ transition_order(PAID)
 | `admin:products:delete_final:{id}` | `delete_product_final` | حذف نهایی |
 | `admin:products:field:{id}:{field}` | `start_edit_field` | ویرایش فیلد |
 | `admin:products:photo:{id}` | `start_change_photo` | تغییر عکس |
+| `admin:products:add_forward` | `start_add_forward` | افزودن محصول با فوروارد |
 | `admin:categories` | `list_categories` | لیست دسته‌ها |
 | `admin:categories:add` | `start_add_category` | افزودن دسته |
 | `admin:categories:delete:{id}` | `delete_category_confirm` | تأیید حذف |
@@ -1341,6 +1362,13 @@ ADMIN_IDS=8497713691
 - [x] صفحه عمومی محصول در وبسایت (SSR + Open Graph)
 - [x] افزودن محصول با فوروارد کانال
 
+#### پیام‌رسانی و پشتیبانی
+- [x] پیام دوطرفه خریدار-فروشنده (Conversations/Message مدل)
+- [x] پشتیبانی فروشگاه از منوی اصلی (`support:seller`)
+- [x] اینباکس فروشنده (`seller:inbox`) با پیام‌های خوانده/خوانده‌نشده
+- [x] پاسخ فروشنده به مشتری (`msg:reply`) + نوتیفیکیشن به مشتری
+- [x] پشتیبانی ادمین (`support:open`) — پیام‌ها به ادمین‌ها فوروارد می‌شود
+
 #### امنیت و زیرساخت
 - [x] لاگین نقش‌محور (ادمین/فروشنده/مشتری)
 - [x] رمز bcrypt (جایگزین SHA-256)
@@ -1362,6 +1390,7 @@ ADMIN_IDS=8497713691
 
 ### 🔧 رفع باگ‌ها و بهبودهای اعمال شده
 
+#### هسته و پرداخت
 - [x] **رفع dead feature اعلان موجود شدن**: `_check_and_notify_restock` از هیچ‌جایی صدا زده نمی‌شد — به `save_edit_field` (admin/products.py) اضافه شد
 - [x] **رفع RestockSubscription re-subscribe**: بعد از notify، کاربر نمی‌توانست دوباره subscribe کند — now re-activates با `notified=False`
 - [x] **رفع `render_view`**: پارامتر `parse_mode` نداشت → لیست کد تخفیف با TypeError کرش می‌کرد
@@ -1381,7 +1410,25 @@ ADMIN_IDS=8497713691
 - [x] **رفع 🎉 تبریک اولین فروش → بن‌بست**: دکمه «🗂 پنل فروشنده» به دو مکان ارسال اضافه شد
 - [x] **رفع `cancellation_reason` ترانکیت**: ستون `VARCHAR(100)` (بود ۲۰ — `release_reserved_stock` ۲۲ کاراکتر)
 - [x] **رفع `release_reserved_stock`**: حذف پارامتر `session`
-- [x] **رفع همه پیام‌های بن‌بست‌ساز**: `_NAV_KB` با ۳ دکمه (ادامه خرید، سبد خرید، شروع) به همه پیام‌های پایانی 
+- [x] **رفع همه پیام‌های بن‌بست‌ساز**: `_NAV_KB` با ۳ دکمه (ادامه خرید، سبد خرید، شروع) به همه پیام‌های پایانی
+
+#### حذف تگ‌های HTML و بازطراحی پیام‌ها
+- [x] **حذف ۳۳۶ تگ HTML** (`<b>`, `</b>`, `<code>`, `</code>`, `<i>`, `</i>`) از ۱۵ فایل هندلر — پیام‌ها با ایموجی + خط جدید ساختاربندی می‌شوند
+- [x] **بازنویسی پیام خوش‌آمدگویی** (`_platform_welcome`): بخش خرید و فروش جداگانه، ساختار تمیز
+- [x] **بازنویسی پیام فروشگاه** (`_shop_menu_text`): توضیح فروشگاه اختیاری با `parts = [] + join`
+- [x] **بازنویسی پیام ثبت‌نام فروشنده** (`seller_welcome_text`): حذف تگ‌ها، لحن طبیعی، ۸ مرحله
+
+#### باگ‌های عملیاتی (آوریل-جولای ۲۰۲۶)
+- [x] **رفع FK violation حذف فروشگاه**: `wishlist` قبل از `products` حذف می‌شود (FK constraint)
+- [x] **رفع ساخت کد تخفیف**: `shop_id` از `ShopOwner` خوانده می‌شود (نه `last_shop_id` قدیمی)
+- [x] **رفع دکمه بازگشت کد تخفیف**: `seller:dashboard` → `seller:panel_back` (هندلر وجود نداشت)
+- [x] **رفع بازگشت پشتیبانی به فروشگاه اشتباه**: `seller:panel_back` → `nav:main` (حفظ `current_shop_id`)
+- [x] **رفع خطا در `seller_open_conv`**: `NameError: select` — import اضافه شد
+- [x] **رفع `sf.select(sf.func.count(...))`**: `from sqlalchemy import select as sf` shadowing → اصلاح به `select(sf.count(...))`
+- [x] **رفع `Message` import در `support.py`**: `from database.models import Message` اضافه شد
+
+#### تست‌ها
+- [x] **تست جامع اسمیک هندلرها** (`tests/test_handlers_smoke.py`): ۳۰ تست که همه callback/message handlerهای ثبت‌شده را صدا می‌زند و مطمئن می‌شوند `Exception` مدیریت‌نشده نمی‌دهند. نتیجه: ✅ ۳۰/۳۰
 
 ### 🔄 در حال انجام
 
@@ -1389,6 +1436,8 @@ ADMIN_IDS=8497713691
 - [ ] DNS + SSL نهایی
 - [ ] صفحه عمومی فروشگاه `/shop/[id]`
 - [x] تست‌های خودکار مسیرهای پولی — `tests/test_flow.py` اضافه شد (۷ سناریو)
+- [x] تست اسمیک هندلرها — `tests/test_handlers_smoke.py` (۳۰/۳۰ ✅)
+- [ ] رفع تخصیص فروشگاه دوم (`@dasttiarfrooshbot`)
 - [ ] تکمیل redemption Claim Code
 
 ### 📅 برنامه آینده
@@ -1437,7 +1486,7 @@ ADMIN_IDS=8497713691
 3. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
 4. **Deadlock در قفل چند محصولی** — ترتیب lock باید ثابت باشه (مثلاً بر اساس product_id صعودی)
 5. **شماره کارت plaintext** — قبلاً رفع شد ✅ (AES-256-GCM)
-6. **تست خودکار** — فایل test_flow.py اضافه شد، نیاز به تکمیل fixtureها
+6. **تست خودکار مسیرهای پولی** → ✅ `tests/test_flow.py` (۷ سناریو) + `tests/test_handlers_smoke.py` (۳۰ تست اسمیک) — همه پاس
 7. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
 
 ### ایده: verification نیمه‌خودکار رسید پرداخت
@@ -1491,7 +1540,7 @@ ADMIN_IDS=8497713691
 
 1. **بک‌آپ خودکار** → ✅ فعال شد (container + cron + rclone آماده)
 2. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
-3. **تست خودکار مسیرهای پولی** → ⚠️ فایل test_flow.py اضافه شد، نیاز به fixture tuning
+3. **تست خودکار همه هندلرها** → ✅ `tests/test_handlers_smoke.py` (۳۰ تست اسمیک، همه پاس) + `tests/test_flow.py` (۷ سناریو)
 4. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
 5. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
 6. **Persistence مکالمه‌ها** — مشخص نیست PTB Persistence تنظیم شده
@@ -1565,7 +1614,8 @@ Telegramorderbot/
 │   │   ├── payment_config.py         # تنظیمات پرداخت per-shop
 │   │   └── tenant.py                 # چندمستأجری
 │   ├── tests/
-│   │   └── test_flow.py              # تست‌های جریان کامل (۷ سناریو)
+│   │   ├── test_flow.py              # تست‌های جریان کامل (۷ سناریو)
+│   │   └── test_handlers_smoke.py    # تست جامع اسمیک هندلرها (۳۰/۳۰)
 └── telegram_order_website/
     ├── Dockerfile
     ├── next.config.ts
