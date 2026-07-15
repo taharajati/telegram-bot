@@ -1411,6 +1411,10 @@ ADMIN_IDS=8497713691
 - [x] **رفع `cancellation_reason` ترانکیت**: ستون `VARCHAR(100)` (بود ۲۰ — `release_reserved_stock` ۲۲ کاراکتر)
 - [x] **رفع `release_reserved_stock`**: حذف پارامتر `session`
 - [x] **رفع همه پیام‌های بن‌بست‌ساز**: `_NAV_KB` با ۳ دکمه (ادامه خرید، سبد خرید، شروع) به همه پیام‌های پایانی
+- [x] **رفع Deadlock در رزرو چند محصولی**: `cart_items = sorted(cart_items, key=lambda i: i.product_id)` در `create_order_from_cart` — ترتیب ثابت قفل
+- [x] **یکی‌سازی `SELECT FOR UPDATE` + `UPDATE`**: `UPDATE ... WHERE ... RETURNING` به‌جای دو query جداگانه برای رزرو اتمیک
+- [x] **قفل row-level روی Order در `transition_order`**: `session.get(Order, order_id, with_for_update=True)` قبل از تغییر وضعیت — جلوگیری از race با cron cleanup
+- [x] **Idempotency روی `order:confirm`**: `_order_in_progress` flag در `context.user_data` از ثبت سفارش مضاعف جلوگیری می‌کند
 
 #### حذف تگ‌های HTML و بازطراحی پیام‌ها
 - [x] **حذف ۳۳۶ تگ HTML** (`<b>`, `</b>`, `<code>`, `</code>`, `<i>`, `</i>`) از ۱۵ فایل هندلر — پیام‌ها با ایموجی + خط جدید ساختاربندی می‌شوند
@@ -1477,6 +1481,9 @@ ADMIN_IDS=8497713691
 
 - `create_order_from_cart` به‌عنوان تنها مسیر ساخت سفارش — این تصمیم معماری درستیه. خیلی از پروژه‌های مشابه چون این مسیر رو یکی نمی‌کنن، دچار race condition و double-order می‌شن.
 - رزرو اتمیک با `UPDATE ... WHERE stock - reserved_stock >= qty` — درسته، این دقیقاً همون الگویی‌ه که باید استفاده بشه به‌جای lock در سطح اپلیکیشن.
+- **Deadlock prevention**: `cart_items.sort(key=lambda i: i.product_id)` قبل از حلقه رزرو — ترتیب قفل ثابت.
+- **Single round-trip reserve**: `UPDATE ... RETURNING` به‌جای دو query جداگانه.
+- **Race-safe state transition**: `transition_order` با `with_for_update=True` روی ردیف Order قفل می‌گیره قبل از تغییر وضعیت.
 - لیست باگ‌های رفع‌شده (GREATEST به‌جای MAX، Enum بودن غلط OrderStatus، lazy-load بعد از بسته شدن session) نشون می‌ده داری واقعاً edge caseها رو شکار می‌کنی، نه فقط happy-path رو تست می‌کنی.
 
 ### ریسک‌های واقعی — به ترتیب اولویت
@@ -1484,7 +1491,7 @@ ADMIN_IDS=8497713691
 1. **بک‌آپ دیتابیس** — قبلاً فعال شد ✅ (scripts/backup.sh + container)
 2. **total_price نوعش Float** — تومان بدون اعشار، ولی محاسبات تخفیف (total × value / 100) می‌تونن imprecision تولید کنن → تغییر به Integer یا Numeric
 3. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
-4. **Deadlock در قفل چند محصولی** — ترتیب lock باید ثابت باشه (مثلاً بر اساس product_id صعودی)
+4. **Deadlock در قفل چند محصولی** — ✅ رفع شد: `cart_items = sorted(cart_items, key=lambda i: i.product_id)` قبل از حلقه رزرو
 5. **شماره کارت plaintext** — قبلاً رفع شد ✅ (AES-256-GCM)
 6. **تست خودکار مسیرهای پولی** → ✅ `tests/test_flow.py` (۷ سناریو) + `tests/test_handlers_smoke.py` (۳۰ تست اسمیک) — همه پاس
 7. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
@@ -1502,20 +1509,20 @@ ADMIN_IDS=8497713691
 
 ### جزئیات فنی: منطق تراکنشی (رزرو موجودی)
 
-**ضعف ۱ — عدم ترتیب ثابت قفل → Deadlock:**
-اگه ترتیب قفل‌گیری بر اساس ترتیب آیتم‌های سبد باشه (نه `product_id` مرتب‌شده)، دو مشتری هم‌زمان با ترتیب متفاوت = deadlock. فیکس: قبل از لوپ، لیست رو بر اساس `product_id` صعودی sort کن.
+**🟢 ضعف ۱ — عدم ترتیب ثابت قفل → Deadlock:**
+**حل شده:** `cart_items = sorted(cart_items, key=lambda i: i.product_id)` در `create_order_from_cart` خط ۷۸ — قبل از حلقه رزرو.
 
-**ضعف ۲ — دو round-trip اضافی:**
-`SELECT FOR UPDATE` جدا + `UPDATE شرطی` جدا = ۲ بار به DB برای هر آیتم. با `UPDATE ... WHERE ... RETURNING` می‌شه همه رو یکی کرد.
+**🟢 ضعف ۲ — دو round-trip اضافی:**
+**حل شده:** یک `UPDATE ... WHERE ... RETURNING` به‌جای `SELECT FOR UPDATE` + `UPDATE` جدا. در `create_order_from_cart` خطوط ۹۴-۱۰۷.
 
 **ضعف ۳ — ناسازگاری زمانی مستندات:**
 بخش ۵.۶ می‌گه ۱۲۰ دقیقه timeout، بخش ۱۰.۱ می‌گه ۳۰ دقیقه cron cleanup. باید کد واقعی چک بشه.
 
-**ضعف ۴ — Race بین cron cleanup و تایید فروشنده:**
-بدون `SELECT ... FOR UPDATE` روی ردیف Order، سفارش هم‌زمان هم PAID بشه هم CANCELLED. فیکس: `transition_order` هم قفل row-level بزنه.
+**🟢 ضعف ۴ — Race بین cron cleanup و تایید فروشنده:**
+**حل شده:** `transition_order` از `session.get(Order, order_id, with_for_update=True)` استفاده می‌کند (خط ۳۰۷) — قفل row-level روی ردیف Order قبل از تغییر وضعیت.
 
-**ضعف ۵ — نبود idempotency روی دکمه ثبت نهایی:**
-دو بار کلیک سریع = دو سفارش از یک سبد. نیاز به debounce یا غیرفعال‌کردن دکمه.
+**🟡 ضعف ۵ — نبود idempotency روی دکمه ثبت نهایی:**
+**جزئاً حل شده:** `_order_in_progress` flag در `context.user_data` از کلیک مضاعف در یک session جلوگیری می‌کند (خطوط ۷۹۱-۷۹۴). ولی in-memory است و بین restartها دوام نمی‌آورد — برای سناریوی واقعی multi-instance کافی نیست.
 
 **ضعف ۶ — نشتی موجودی رزرو‌شده برای COD:**
 کرون فقط PENDING_PAYMENT (کارت) رو پاک می‌کنه. سفارش COD معلق = reserved_stock برای همیشه رزرو.
