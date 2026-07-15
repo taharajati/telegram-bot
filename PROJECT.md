@@ -1414,7 +1414,7 @@ ADMIN_IDS=8497713691
 - [x] **رفع Deadlock در رزرو چند محصولی**: `cart_items = sorted(cart_items, key=lambda i: i.product_id)` در `create_order_from_cart` — ترتیب ثابت قفل
 - [x] **یکی‌سازی `SELECT FOR UPDATE` + `UPDATE`**: `UPDATE ... WHERE ... RETURNING` به‌جای دو query جداگانه برای رزرو اتمیک
 - [x] **قفل row-level روی Order در `transition_order`**: `session.get(Order, order_id, with_for_update=True)` قبل از تغییر وضعیت — جلوگیری از race با cron cleanup
-- [x] **Idempotency روی `order:confirm`**: `_order_in_progress` flag در `context.user_data` از ثبت سفارش مضاعف جلوگیری می‌کند
+- [x] **Idempotency روی `order:confirm`**: `_order_in_progress` flag (in-memory) + `pg_advisory_xact_lock(user_id)` در `create_order_from_cart` (DB-level) — هر دو لایه
 
 #### حذف تگ‌های HTML و بازطراحی پیام‌ها
 - [x] **حذف ۳۳۶ تگ HTML** (`<b>`, `</b>`, `<code>`, `</code>`, `<i>`, `</i>`) از ۱۵ فایل هندلر — پیام‌ها با ایموجی + خط جدید ساختاربندی می‌شوند
@@ -1484,6 +1484,7 @@ ADMIN_IDS=8497713691
 - **Deadlock prevention**: `cart_items.sort(key=lambda i: i.product_id)` قبل از حلقه رزرو — ترتیب قفل ثابت.
 - **Single round-trip reserve**: `UPDATE ... RETURNING` به‌جای دو query جداگانه.
 - **Race-safe state transition**: `transition_order` با `with_for_update=True` روی ردیف Order قفل می‌گیره قبل از تغییر وضعیت.
+- **DB-level idempotency**: `pg_advisory_xact_lock(user_id)` در `create_order_from_cart` — تضمین می‌کنه حتی بعد از ری‌استارت یا با دو نمونه بات، یه کاربر نتونه دو تا سفارش از یه سبد بزنه.
 - لیست باگ‌های رفع‌شده (GREATEST به‌جای MAX، Enum بودن غلط OrderStatus، lazy-load بعد از بسته شدن session) نشون می‌ده داری واقعاً edge caseها رو شکار می‌کنی، نه فقط happy-path رو تست می‌کنی.
 
 ### ریسک‌های واقعی — به ترتیب اولویت
@@ -1522,7 +1523,7 @@ ADMIN_IDS=8497713691
 **حل شده:** `transition_order` از `session.get(Order, order_id, with_for_update=True)` استفاده می‌کند (خط ۳۰۷) — قفل row-level روی ردیف Order قبل از تغییر وضعیت.
 
 **🟡 ضعف ۵ — نبود idempotency روی دکمه ثبت نهایی:**
-**جزئاً حل شده:** `_order_in_progress` flag در `context.user_data` از کلیک مضاعف در یک session جلوگیری می‌کند (خطوط ۷۹۱-۷۹۴). ولی in-memory است و بین restartها دوام نمی‌آورد — برای سناریوی واقعی multi-instance کافی نیست.
+**حل شده (دو لایه):** `_order_in_progress` flag (in-memory) + `pg_advisory_xact_lock(user_id)` (DB-level) — اولی جلوگیری از کلیک مضاعف هم‌زمان، دومی تضمین صحت داده حتی بعد از ری‌استارت یا چند نمونه بات.
 
 **ضعف ۶ — نشتی موجودی رزرو‌شده برای COD:**
 کرون فقط PENDING_PAYMENT (کارت) رو پاک می‌کنه. سفارش COD معلق = reserved_stock برای همیشه رزرو.
