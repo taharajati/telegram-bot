@@ -1377,6 +1377,7 @@ ADMIN_IDS=8497713691
 - [x] منوی سه سطحی BotCommandScope
 - [x] Docker Compose + Nginx
 - [x] Prometheus + Grafana metrics
+- [x] **دیتابیس تستی جدا (`foroshgram_test`)** — تمام تست‌ها (`test_flow.py`, `test_handlers_smoke.py`) روی دیتابیس جداگانه اجرا می‌شوند؛ دیتابیس پروداکشن هرگز تحت تأثیر قرار نمی‌گیرد
 - [x] صفحات خطای سفارشی (۴۰۴/۵۰۰)
 - [x] SEO پایه (robots.txt, sitemap.xml)
 - [x] رمزنگاری اطلاعات بانکی (AES-256-GCM)
@@ -1433,6 +1434,8 @@ ADMIN_IDS=8497713691
 
 #### تست‌ها
 - [x] **تست جامع اسمیک هندلرها** (`tests/test_handlers_smoke.py`): ۳۰ تست که همه callback/message handlerهای ثبت‌شده را صدا می‌زند و مطمئن می‌شوند `Exception` مدیریت‌نشده نمی‌دهند. نتیجه: ✅ ۳۰/۳۰
+- [x] **پاک‌سازی وابسته به ترتیب** در `test_flow.py`: `User` → `Order` → `OrderItem` → `Shop` → `Category` → `Product` (children before parents)
+- [x] **تست‌های جداگانه روی `foroshgram_test`**: هر دو فایل تست قبل از هر import، `DATABASE_URL` را از `TEST_DATABASE_URL` اورراید می‌کنند؛ اگر متغیر ست نشده باشد با اخطار fallback می‌کنند
 
 ### 🔄 در حال انجام
 
