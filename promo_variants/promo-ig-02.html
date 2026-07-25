@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فروشگرام — روشن</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #e8e8f2;
+    --surface:    #ffffff;
+    --surface2:   #f2f2f8;
+    --surface3:   #eaeaf4;
+    --border:     #dcdce8;
+    --border2:    #ccccdc;
+    --text:       #181828;
+    --text2:      #4a4a66;
+    --text3:      #6e6e8a;
+    --accent:     #6c5ce7;
+    --accent2:    #8b7cf7;
+    --green:      #00b884;
+    --greenBg:    rgba(0,184,132,.08);
+    --blue:       #0984e3;
+    --blueBg:     rgba(9,132,227,.06);
+    --orange:     #d46950;
+    --orangeBg:   rgba(212,105,80,.08);
+    --pink:       #e84393;
+    --red:        #d63031;
+    --radius:     32px;
+    --shadow:     0 12px 90px rgba(0,0,0,.18);
+    --glow:       rgba(108,92,231,.06);
+    --custBg:     #e4e4ee;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Vazirmatn', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  
+
+  .phone-wrap { position:relative; width:400px; height:830px; flex-shrink:0; z-index:1; }
+  #scene {
+    position:relative; width:100%; height:100%;
+    background:var(--surface); border-radius: 28px;
+    border:1.5px solid var(--border2);
+    box-shadow:var(--shadow), 0 0 120px var(--glow);
+    overflow:hidden;
+  }
+  .notch {
+    position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+    width:140px; height:26px; background:var(--surface);
+    border-radius:0 0 16px 16px; border:1.5px solid var(--border2); border-top:none;
+    z-index:15; display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .notch .camera { width:8px; height:8px; border-radius:50%; background:radial-gradient(circle at 30% 30%,#2a2a4a,#0a0a1a); }
+  .notch .speaker { width:40px; height:3px; border-radius:2px; background:#1a1a30; }
+  .status-bar {
+    position:absolute; top:24px; left:0; right:0; height:38px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 28px; font-size:12px; font-weight:600; color:var(--text); z-index:10;
+  }
+  .st-icons { display:flex; gap:3px; font-size:11px; }
+  .st-icons svg { width:16px; height:12px; }
+  .chat-header {
+    position:absolute; top:60px; left:0; right:0; height:56px;
+    display:flex; align-items:center; padding:0 14px; gap:10px;
+    background:var(--surface); border-bottom:1px solid var(--border); z-index:10;
+    transition:all .5s cubic-bezier(.16,.88,.28,1);
+  }
+  .chat-header .avatar-frame {
+    width:38px; height:38px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; font-weight:700; flex-shrink:0; position:relative;
+    transition:transform .5s cubic-bezier(.16,.88,.28,1), background .5s;
+  }
+  .chat-header .avatar-frame.pop { animation:avatarPop .5s cubic-bezier(.16,.88,.28,1) both; }
+  @keyframes avatarPop { 0%{transform:scale(0)rotate(-30deg)} 100%{transform:scale(1)rotate(0)} }
+  .chat-header .avatar-frame.purple { background:linear-gradient(135deg,var(--accent),#8b5cf6); }
+  .chat-header .avatar-frame.green  { background:linear-gradient(135deg,var(--green),#00e6a0); }
+  .chat-header .avatar-frame.orange { background:linear-gradient(135deg,var(--orange),#f39c12); }
+  .chat-header .avatar-frame.blue   { background:linear-gradient(135deg,var(--blue),#74b9ff); }
+  .chat-header .avatar-frame.red    { background:linear-gradient(135deg,var(--pink),#e84393); }
+  .chat-header .info { flex:1; line-height:1.3; }
+  .chat-header .info .name { font-size:14px; font-weight:700; transition:all .3s; }
+  .chat-header .info .sub { font-size:11px; color:var(--text3); transition:all .3s; }
+  .chat-header .actions { display:flex; gap:14px; font-size:18px; color:var(--text3); }
+  .messages {
+    position:absolute; top:117px; left:0; right:0; bottom:64px;
+    padding:10px 12px 8px; overflow:hidden;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  /* ── Message animations ── */
+  .msg {
+    max-width:88%; padding:10px 14px; border-radius:14px;
+    font-size:14px; line-height:1.7;
+    position:relative; word-wrap:break-word;
+    will-change:transform,opacity;
+  }
+  .msg.bot, .msg.seller, .msg.system, .msg.cust, .msg.user {
+    animation:msgBounce .6s cubic-bezier(.16,.88,.28,1) both;
+  }
+  .msg.user, .msg.cust {
+    animation-name:msgBounceRight;
+  }
+  @keyframes msgBounce {
+    0%   { opacity:0; transform:translateY(24px) scale(.88); }
+    50%  { opacity:1; transform:translateY(-4px) scale(1.02); }
+    75%  { transform:translateY(2px) scale(.98); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes msgBounceRight {
+    0%   { opacity:0; transform:translateY(24px) translateX(12px) scale(.88); }
+    50%  { opacity:1; transform:translateY(-4px) translateX(-2px) scale(1.02); }
+    75%  { transform:translateY(2px) translateX(1px) scale(.98); }
+    100% { opacity:1; transform:translateY(0) translateX(0) scale(1); }
+  }
+  .msg.bot    { align-self:flex-start; background:var(--surface2); border-bottom-left-radius:4px; }
+  .msg.user   { align-self:flex-end;   background:var(--accent);   border-bottom-right-radius:4px; }
+  .msg.seller { align-self:flex-start; background:var(--surface3); border-bottom-left-radius:4px; }
+  .msg.cust   { align-self:flex-end;   background:var(--custBg);   border-bottom-right-radius:4px; }
+  .msg.system { align-self:center; background:transparent; font-size:12px; color:var(--text3); padding:4px 0; text-align:center; max-width:100%; animation:fadeDrop .4s ease both; }
+  @keyframes fadeDrop { 0%{opacity:0;transform:translateY(-8px)} 100%{opacity:1;transform:translateY(0)} }
+  .msg .label { font-size:10px; color:var(--text3); font-weight:500; margin-bottom:1px; display:block; }
+  .msg .price { color:var(--green); font-weight:600; }
+  .msg .time-tag { font-size:9px; color:var(--text3); margin-top:4px; display:block; text-align:left; direction:ltr; }
+  .msg.user .time-tag { color:rgba(255,255,255,.4); text-align:right; }
+  .msg .check { font-size:11px; color:var(--green); margin-right:4px; }
+
+  /* ── Typing indicator (Telegram style) ── */
+  .typing {
+    align-self:flex-start; display:flex; align-items:center; gap:8px;
+    animation:msgBounce .5s cubic-bezier(.16,.88,.28,1) both;
+  }
+  .typing .t-avatar {
+    width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:12px; flex-shrink:0; background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  }
+  .typing .t-dots {
+    background:var(--surface2); border-radius:14px; padding:12px 18px;
+    display:flex; gap:5px; border-bottom-left-radius:4px;
+  }
+  .typing .t-dots span {
+    width:8px; height:8px; border-radius:50%; background:var(--text2);
+    animation:tTyping 1.4s infinite both;
+  }
+  .typing .t-dots span:nth-child(2) { animation-delay:.2s; }
+  .typing .t-dots span:nth-child(3) { animation-delay:.4s; }
+  @keyframes tTyping {
+    0%,60%,100% { transform:translateY(0); background:var(--text3); }
+    30% { transform:translateY(-10px); background:var(--accent2); }
+  }
+
+  /* ── Button row ── */
+  .btns-row {
+    align-self:flex-start; display:flex; flex-wrap:wrap; gap:6px;
+    animation:btnsIn .5s cubic-bezier(.16,.88,.28,1) both;
+  }
+  .btns-row.btns-end { align-self:flex-end; }
+  @keyframes btnsIn {
+    0% { opacity:0; transform:translateY(16px) scale(.9); }
+    60% { transform:translateY(-2px) scale(1.01); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+  .btn {
+    padding:7px 18px; font-size:12.5px; font-family:'Vazirmatn',sans-serif;
+    border-radius:20px; cursor:pointer; border:1px solid var(--accent);
+    color:var(--accent2); background:transparent; white-space:nowrap;
+    transition:all .15s; position:relative; overflow:hidden;
+  }
+  .btn::after {
+    content:''; position:absolute; inset:0; background:currentColor; opacity:0;
+    transition:opacity .25s;
+  }
+  .btn:active::after { opacity:.12; }
+  .btn:hover { background:rgba(108,92,231,.1); transform:scale(1.02); }
+  .btn:active { transform:scale(.96); }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.primary:hover { background:#7c6cf7; }
+  .btn.green   { background:var(--green); color:#fff; border-color:var(--green); }
+  .btn.green:hover { background:#0ae6b0; }
+  .btn.ghost   { border-color:var(--text3); color:var(--text2); }
+  .btn.ghost:hover { border-color:var(--accent); color:var(--accent2); }
+  .btn.danger  { background:var(--red); color:#fff; border-color:var(--red); }
+  .btn.orange  { background:var(--orange); color:#1a1a2e; border-color:var(--orange); }
+  .btn.small   { font-size:11px; padding:4px 12px; }
+  .btn .ripple {
+    position:absolute; border-radius:50%; background:rgba(255,255,255,.3);
+    transform:scale(0); animation:ripple .6s ease-out; pointer-events:none;
+  }
+  @keyframes ripple { to { transform:scale(4); opacity:0; } }
+
+  .bottom-bar {
+    position:absolute; bottom:0; left:0; right:0; height:64px;
+    display:flex; align-items:center; padding:0 10px; gap:6px;
+    background:var(--surface); border-top:1px solid var(--border);
+    animation:barSlide .6s .3s both cubic-bezier(.16,.88,.28,1);
+  }
+  @keyframes barSlide { 0%{transform:translateY(100%)} 100%{transform:translateY(0)} }
+  .bb-icon {
+    width:36px; height:36px; border-radius:50%; background:var(--surface2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; color:var(--text3); flex-shrink:0; transition:all .2s;
+  }
+  .bb-icon:hover { background:var(--surface3); }
+  .bb-input {
+    flex:1; height:38px; background:var(--surface2); border-radius:20px;
+    border:none; outline:none; padding:0 14px;
+    color:var(--text); font-family:'Vazirmatn',sans-serif; font-size:13px;
+    transition:all .2s;
+  }
+  .bb-input:focus { background:var(--surface3); }
+  .bb-input::placeholder { color:var(--text3); font-size:12px; }
+  .bb-send { width:36px; height:36px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:16px; color:#fff; flex-shrink:0; transition:all .2s; }
+  .bb-send:active { transform:scale(.9); }
+
+  /* ── Intro splash ── */
+  .intro {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:var(--bg); z-index:35;
+    animation:fadeOut 1s forwards; animation-delay:3s;
+  }
+  @keyframes fadeOut{0%{opacity:1}70%{opacity:1}100%{opacity:0;pointer-events:none}}
+  .intro .logo-big {
+    width:96px; height:96px; border-radius:26px;
+    background:linear-gradient(135deg,#6c5ce7,#a29bfe,#fd79a8);
+    display:flex; align-items:center; justify-content:center; font-size:38px;
+    box-shadow:0 0 120px rgba(108,92,231,.25);
+    animation:logoEntrance .8s cubic-bezier(.16,.88,.28,1) both, glowPulse 2s 1s infinite;
+  }
+  @keyframes logoEntrance {
+    0% { opacity:0; transform:scale(.5) rotate(-20deg); }
+    60% { transform:scale(1.1) rotate(3deg); }
+    100% { opacity:1; transform:scale(1) rotate(0); }
+  }
+  @keyframes glowPulse{0%,100%{box-shadow:0 0 40px rgba(108,92,231,.12)}50%{box-shadow:0 0 100px rgba(108,92,231,.4)}}
+  .intro h1 {
+    font-size:34px; font-weight:800; margin-top:24px;
+    background:linear-gradient(135deg,var(--accent2),#fff); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    animation:titleSlide .6s .2s both cubic-bezier(.16,.88,.28,1);
+  }
+  @keyframes titleSlide { 0%{opacity:0;transform:translateY(20px)} 100%{opacity:1;transform:translateY(0)} }
+  .intro p { font-size:14px; color:var(--text2); margin-top:8px; letter-spacing:.5px; animation:titleSlide .6s .35s both cubic-bezier(.16,.88,.28,1); }
+
+  /* ── Control panel ── */
+  .control-panel {
+    position:absolute; bottom:-110px; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    width:400px; z-index:40; pointer-events:none;
+    transition:opacity .3s, transform .3s;
+  }
+  .control-panel.hidden { opacity:0; pointer-events:none; transform:translateX(-50%) translateY(20px); }
+  .control-panel > * { pointer-events:auto; }
+  .cp-timer { font-size:10px; color:var(--text3); font-weight:500; direction:ltr; min-width:40px; text-align:center; }
+
+  .scene-banner {
+    position:absolute; top:40%; left:10%; right:10%; z-index:30;
+    background:rgba(19,19,30,.92); border:1px solid var(--border2); border-radius:16px;
+    padding:24px 16px; text-align:center;
+    animation:bannerIn .5s cubic-bezier(.16,.88,.28,1) both, bannerOut .4s .9s ease both;
+    pointer-events:none;
+    backdrop-filter:blur(12px);
+    box-shadow:0 8px 40px rgba(0,0,0,.4);
+  }
+  @keyframes bannerIn{
+    0%{opacity:0;transform:scale(.7)translateY(-20px)rotateX(10deg)}
+    60%{transform:scale(1.02)translateY(2px)}
+    100%{opacity:1;transform:scale(1)translateY(0)rotateX(0)}
+  }
+  @keyframes bannerOut{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.85)translateY(-10px)}}
+  .scene-banner .b-icon { font-size:38px; margin-bottom:8px; display:block; }
+  .scene-banner .b-name { font-size:18px; font-weight:700; }
+  .cp-main {
+    display:flex; align-items:center; gap:12px;
+    background:var(--surface2); border:1px solid var(--border); border-radius:22px;
+    padding:8px 18px; backdrop-filter:blur(16px); box-shadow:0 4px 30px rgba(0,0,0,.4);
+  }
+  .cp-btn {
+    width:36px; height:36px; border-radius:50%; border:none; background:var(--surface3);
+    color:var(--text); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all .15s; flex-shrink:0;
+  }
+  .cp-btn:hover { background:var(--accent); transform:scale(1.05); }
+  .cp-btn:active { transform:scale(.92); }
+  .cp-btn.play { width:44px; height:44px; background:var(--accent); font-size:20px; box-shadow:0 0 20px rgba(108,92,231,.3); transition:all .2s; }
+  .cp-btn.play:hover { transform:scale(1.08); box-shadow:0 0 30px rgba(108,92,231,.5); }
+  .cp-btn.play:active { transform:scale(.95); }
+  .cp-scene-label { font-size:11px; color:var(--text2); min-width:120px; text-align:center; font-weight:500; }
+  .cp-scene-label strong { color:var(--text); }
+  .cp-progress { width:80px; height:3px; background:var(--surface3); border-radius:4px; overflow:hidden; }
+  .cp-progress .fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:4px; width:0%; transition:width .6s cubic-bezier(.16,.88,.28,1); }
+  .cp-step { display:flex; gap:6px; }
+  .cp-step-dot { width:6px; height:6px; border-radius:50%; background:var(--text3); transition:all .4s cubic-bezier(.16,.88,.28,1); }
+  .cp-step-dot.active { background:var(--accent2); width:18px; border-radius:3px; }
+  .cp-step-dot.done { background:var(--accent); }
+  .cp-cue { font-size:11px; color:var(--text3); background:var(--surface); border:1px dashed var(--border); border-radius:10px; padding:5px 14px; max-width:360px; text-align:center; opacity:.7; }
+  .cp-cue strong { color:var(--accent2); }
+
+  /* ── Rich content blocks ── */
+  .card { background:var(--surface); border-radius:12px; overflow:hidden; margin-top:4px; animation:cardIn .5s cubic-bezier(.16,.88,.28,1) both; }
+  @keyframes cardIn { 0%{opacity:0;transform:translateY(12px)scale(.96)} 100%{opacity:1;transform:translateY(0)scale(1)} }
+  .card .img-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px; height:100px; }
+  .card .img-grid > div { display:flex; align-items:center; justify-content:center; font-size:28px; transition:all .3s; }
+  .card .img-grid > div:hover { transform:scale(1.05); z-index:2; }
+  .card .img-grid > div:nth-child(1){background:linear-gradient(135deg,#1a1a3e,#2a1a5e)}
+  .card .img-grid > div:nth-child(2){background:linear-gradient(135deg,#1a2a3e,#2a3a5e)}
+  .card .img-grid > div:nth-child(3){background:linear-gradient(135deg,#2a1a3e,#3a2a5e)}
+  .card .img-grid > div:nth-child(4){background:linear-gradient(135deg,#1a2a2e,#2a3a4e)}
+  .card .body { padding:8px 12px; }
+  .card .body .n { font-weight:600; font-size:13px; }
+  .card .body .d { color:var(--text2); font-size:11px; }
+
+  .receipt { background:var(--surface); border-radius:12px; padding:12px; border:1px dashed var(--border); animation:cardIn .5s cubic-bezier(.16,.88,.28,1) both; }
+  .receipt .rl { display:flex; justify-content:space-between; font-size:12px; padding:2px 0; animation:slideRow .4s both; }
+  .receipt .rl:nth-child(1){animation-delay:.1s}
+  .receipt .rl:nth-child(2){animation-delay:.2s}
+  .receipt .rl:nth-child(3){animation-delay:.3s}
+  .receipt .rl:nth-child(4){animation-delay:.4s}
+  .receipt .rl.t { border-top:1px solid var(--border); margin-top:6px; padding-top:6px; font-weight:600; color:var(--green); }
+  @keyframes slideRow { 0%{opacity:0;transform:translateX(8px)} 100%{opacity:1;transform:translateX(0)} }
+  .receipt .ll { color:var(--text2); }
+  .receipt .rd { text-align:center; color:var(--text3); font-size:10px; padding:4px 0; letter-spacing:3px; }
+
+  .order-card { background:var(--surface); border-radius:12px; padding:12px; margin-top:4px; border:1px solid var(--border); animation:cardIn .5s cubic-bezier(.16,.88,.28,1) both; }
+  .order-card .oh { display:flex; justify-content:space-between; font-size:11px; color:var(--text3); margin-bottom:6px; }
+  .order-card .or { display:flex; gap:6px; align-items:center; font-size:12px; padding:2px 0; animation:slideRow .3s both; }
+  .order-card .or:nth-child(2){animation-delay:.1s}
+  .order-card .or:nth-child(3){animation-delay:.15s}
+  .order-card .or:nth-child(4){animation-delay:.2s}
+  .order-card .or:nth-child(5){animation-delay:.25s}
+  .order-card .or:nth-child(6){animation-delay:.3s}
+  .order-card .or:nth-child(7){animation-delay:.35s}
+  .order-card .ob { display:inline-block; padding:1px 10px; border-radius:10px; font-size:10px; font-weight:600; }
+  .order-card .ob.pending { background:rgba(253,203,110,.15); color:var(--orange); }
+  .order-card .ob.confirmed { background:rgba(9,132,227,.15); color:var(--blue); }
+  .order-card .ob.shipped { background:rgba(0,210,160,.15); color:var(--green); }
+
+  .dash-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
+  .dash-item {
+    background:var(--surface2); border-radius:10px; padding:10px; text-align:center;
+    animation:dashIn .4s cubic-bezier(.16,.88,.28,1) both;
+  }
+  .dash-item:nth-child(1){animation-delay:.1s}.dash-item:nth-child(2){animation-delay:.15s}
+  .dash-item:nth-child(3){animation-delay:.2s}.dash-item:nth-child(4){animation-delay:.25s}
+  @keyframes dashIn { 0%{opacity:0;transform:scale(.8)translateY(10px)} 100%{opacity:1;transform:scale(1)translateY(0)} }
+  .dash-item .d-num { font-size:22px; font-weight:800; }
+  .dash-item .d-label { font-size:10px; color:var(--text3); margin-top:2px; }
+  .dash-item .d-icon { font-size:20px; margin-bottom:2px; }
+
+  .fg { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
+  .fg .fi {
+    background:var(--surface2); border-radius:10px; padding:8px; display:flex; align-items:center; gap:6px; font-size:11px;
+    animation:dashIn .3s both;
+  }
+  .fg .fi:nth-child(1){animation-delay:0s}.fg .fi:nth-child(2){animation-delay:.05s}
+  .fg .fi:nth-child(3){animation-delay:.1s}.fg .fi:nth-child(4){animation-delay:.15s}
+  .fg .fi:nth-child(5){animation-delay:.2s}.fg .fi:nth-child(6){animation-delay:.25s}
+  .fg .fi:nth-child(7){animation-delay:.3s}.fg .fi:nth-child(8){animation-delay:.35s}
+  .fg .fi:nth-child(9){animation-delay:.4s}.fg .fi:nth-child(10){animation-delay:.45s}
+  .fg .fi:nth-child(11){animation-delay:.5s}.fg .fi:nth-child(12){animation-delay:.55s}
+  .fg .fi:nth-child(13){animation-delay:.6s}.fg .fi:nth-child(14){animation-delay:.65s}
+  .fg .fi .ficon { font-size:18px; }
+
+  .pli {
+    display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--surface); border-radius:10px; margin-top:4px; border:1px solid var(--border);
+    animation:pliIn .45s cubic-bezier(.16,.88,.28,1) both; cursor:pointer;
+    transition:all .2s;
+  }
+  .pli:hover { background:var(--surface2); border-color:var(--border2); transform:translateX(-3px); }
+  .pli:nth-child(2){animation-delay:.1s}.pli:nth-child(3){animation-delay:.2s}
+  @keyframes pliIn { 0%{opacity:0;transform:translateX(-12px)} 100%{opacity:1;transform:translateX(0)} }
+  .pli .p-thumb { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .pli .p-info { flex:1; }
+  .pli .p-info .p-name { font-size:12px; font-weight:600; }
+  .pli .p-info .p-sub { font-size:10px; color:var(--text3); }
+  .pli .p-action { font-size:16px; color:var(--text3); transition:all .2s; }
+  .pli:hover .p-action { color:var(--accent2); }
+
+  .dc {
+    background:var(--surface); border-radius:10px; padding:10px; margin-top:4px; border:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center;
+    animation:pliIn .4s both;
+  }
+  .dc .dc-code { background:var(--surface3); padding:2px 10px; border-radius:6px; font-family:monospace; font-size:13px; direction:ltr; color:var(--accent2); }
+  .dc .dc-info { font-size:11px; color:var(--text2); }
+
+  .link-card { background:var(--surface); border-radius:12px; padding:10px; margin-top:4px; border:1px solid var(--green); display:flex; align-items:center; gap:8px; cursor:pointer; transition:all .2s; animation:cardIn .5s both; }
+  .link-card:hover { background:var(--surface2); transform:scale(1.01); }
+  .link-card .link-icon { width:36px; height:36px; border-radius:50%; background:var(--greenBg); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .link-card .link-text { flex:1; font-size:11px; color:var(--text2); word-break:break-all; }
+  .link-card .link-text strong { color:var(--green); }
+  .stars { font-size:24px; letter-spacing:4px; text-align:center; animation:starPop .4s both; }
+  @keyframes starPop { 0%{opacity:0;transform:scale(2)} 100%{opacity:1;transform:scale(1)} }
+  .code-input { display:inline-block; background:var(--surface3); padding:4px 14px; border-radius:8px; font-family:monospace; font-size:13px; direction:ltr; border:1.5px dashed var(--accent); animation:pulseBorder 2s ease infinite; }
+  @keyframes pulseBorder { 0%,100%{border-color:var(--accent)} 50%{border-color:var(--accent2)} }
+  .pbanner { width:100%; height:80px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:28px; color:var(--text3); background:linear-gradient(135deg,#1a1a3e,#2a1a5e); margin-top:4px; }
+  .badge { display:inline-block; padding:0 8px; border-radius:6px; font-size:10px; font-weight:600; }
+  .badge.active { background:var(--greenBg); color:var(--green); }
+  .badge.wait { background:var(--orangeBg); color:var(--orange); }
+
+  /* ── Unread badge pulse ── */
+  .unread-badge {
+    position:absolute; top:-4px; right:-4px; width:18px; height:18px; border-radius:50%;
+    background:var(--red); color:#fff; font-size:9px; font-weight:700; display:flex;
+    align-items:center; justify-content:center;
+    animation:unreadPulse 2s infinite;
+  }
+  @keyframes unreadPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+
+  @media (max-width:480px){
+    .phone-wrap{width:100vw;height:100vh}#scene{border-radius:0;border:none}
+    .notch{display:none}.control-panel{display:none}.cp-cue{display:none}
+    #bottomBar{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="phone-wrap">
+<div id="scene">
+  <div class="notch"><div class="speaker"></div><div class="camera"></div></div>
+  <div class="intro" id="introOverlay">
+    <div class="logo-big">🛍️</div>
+    <h1>فروشگرام</h1>
+    <p>فروشگاه اختصاصی تو در تلگرام</p>
+  </div>
+  <div class="status-bar"><span class="time" id="clock">12:00</span><div class="st-icons"><svg viewBox="0 0 16 12"><rect x="1" y="2" width="12" height="8" rx="1" stroke="currentColor" fill="none" stroke-width="1.2"/><line x1="14" y1="5" x2="14" y2="8" stroke="currentColor" stroke-width="1"/></svg></div></div>
+  <div class="chat-header" id="chatHeader">
+    <div class="avatar-frame purple" id="avatarEl">ف</div>
+    <div class="info"><div class="name" id="headerName">🛍️ فروشگرام</div><div class="sub" id="headerSub">● آنلاین</div></div>
+    <div class="actions">📞 🔍 ⋮</div>
+  </div>
+  <div class="messages" id="msgArea"></div>
+  <div class="bottom-bar" style="animation:none" id="bottomBar"><div class="bb-icon">➕</div><input class="bb-input" placeholder="پیام..." disabled><div class="bb-send">↑</div></div>
+</div>
+</div>
+<div class="control-panel" id="controlPanel">
+<div class="cp-main">
+  <button class="cp-btn" id="btnPrev" title="صحنه قبل">◀</button>
+  <button class="cp-btn play" id="btnPlay" title="توقف / ادامه">⏸</button>
+  <button class="cp-btn" id="btnNext" title="صحنه بعد">▶</button>
+  <div class="cp-scene-label" id="sceneLabel"></div>
+  <div class="cp-timer" id="timerLabel">0:00</div>
+  <div class="cp-progress"><div class="fill" id="progFill" style="width:0%"></div></div>
+  <div class="cp-step" id="stepDots"></div>
+</div>
+<div class="cp-cue" id="narrationCue">🎙️ <strong>راهنما:</strong></div>
+</div>
+<script>
+(function(){
+  const msgArea=document.getElementById('msgArea'),clock=document.getElementById('clock'),
+        headerName=document.getElementById('headerName'),headerSub=document.getElementById('headerSub'),
+        avatarEl=document.getElementById('avatarEl'),sceneLabel=document.getElementById('sceneLabel'),
+        progFill=document.getElementById('progFill'),stepDots=document.getElementById('stepDots'),
+        cue=document.getElementById('narrationCue'),btnPlay=document.getElementById('btnPlay'),
+        btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),
+        timerLabel=document.getElementById('timerLabel'),bottomBar=document.getElementById('bottomBar');
+  let paused=false,currentScene=0,sceneRunning=false,abortController=null,panelVisible=true,sceneStartTime=0,timerInterval=null;
+  const SCENES=[
+    {name:'درد فروشنده',icon:'😫',narrator:'توضیح بده فروشنده مجبوره روزانه به ده‌ها مشتری تکراری جواب بده — قیمت، موجودی، شماره کارت.'},
+    {name:'معرفی راه‌حل',icon:'🚀',narrator:'بگو فروشگرام می‌اد همه این دردسر رو حل می‌کنه. بدون هزینه، بدون دانش فنی.'},
+    {name:'ثبت‌نام فروشنده',icon:'📝',narrator:'نشون بده ثبت‌نام چقدر سریعه — فروشگاهت رو توی ۳ مرحله راه می‌ندازی.'},
+    {name:'پنل مدیریت کامل',icon:'📊',narrator:'داشبورد با آمار امروز/هفته/ماه، low stock، پرفروش‌ترین‌ها، دسته‌بندی، تخفیف، سفارشات.'},
+    {name:'خرید مشتری',icon:'🛒',narrator:'مشتری لینک فروشگاه رو می‌زنه، دسته‌بندی، سبد خرید، اعمال کد تخفیف، پرداخت.'},
+    {name:'مدیریت سفارش + تحویل',icon:'📬',narrator:'تایید پرداخت → آماده‌سازی → کد رهگیری → تحویل مشتری → امتیاز.'},
+    {name:'امکانات',icon:'✨',narrator:'۱۲ تا قابلیت کلیدی فروشگرام رو مرور کن.'},
+    {name:'شروع کن!',icon:'🚀',narrator:'دعوت به اقدام — همین حالا برو تو ربات ثبت‌نام کن.',final:true}
+  ];
+  SCENES.forEach((_,i)=>{const dot=document.createElement('div');dot.className='cp-step-dot'+(i===0?' active':'');dot.dataset.idx=i;stepDots.appendChild(dot)});
+  function updateUI(i){const s=SCENES[i];sceneLabel.innerHTML=`صحنه ${i+1} از ${SCENES.length} — <strong>${s.icon} ${s.name}</strong>`;progFill.style.width=((i+1)/SCENES.length*100)+'%';cue.innerHTML=`🎙️ <strong>${s.icon} ${s.name}:</strong> ${s.narrator}`;document.querySelectorAll('.cp-step-dot').forEach((d,j)=>{d.className='cp-step-dot'+(j===i?' active':j<i?' done':'')})}
+  function setHeader(n,e,c,s){
+    avatarEl.textContent=e;avatarEl.className='avatar-frame '+c;
+    headerName.textContent=n;headerSub.textContent=s||'● آنلاین';
+    avatarEl.classList.remove('pop');void avatarEl.offsetWidth;avatarEl.classList.add('pop');
+    bottomBar.style.animation='none';void bottomBar.offsetWidth;bottomBar.style.animation='barSlide .6s .3s both cubic-bezier(.16,.88,.28,1)';
+  }
+  function bot(h,d=0){const e=document.createElement('div');e.className='msg bot';e.innerHTML=h+(d<9?`<span class="time-tag">${new Date().getHours().toString().padStart(2,'0')}:${new Date().getMinutes().toString().padStart(2,'0')}</span>`:'');e.style.animationDelay=d+'s';msgArea.appendChild(e);smoothScroll();return e;}
+  function user(h,d=0){const e=document.createElement('div');e.className='msg user';e.innerHTML=h+(d<9?`<span class="time-tag">${new Date().getHours().toString().padStart(2,'0')}:${new Date().getMinutes().toString().padStart(2,'0')} ✓✓</span>`:'');e.style.animationDelay=d+'s';msgArea.appendChild(e);smoothScroll();}
+  function seller(h,d=0){const e=document.createElement('div');e.className='msg seller';e.innerHTML=h+(d<9?`<span class="time-tag">✓✓</span>`:'');e.style.animationDelay=d+'s';msgArea.appendChild(e);smoothScroll();}
+  function cust(h,d=0){const e=document.createElement('div');e.className='msg cust';e.innerHTML=h+(d<9?`<span class="time-tag">✓</span>`:'');e.style.animationDelay=d+'s';msgArea.appendChild(e);smoothScroll();}
+  function typing(d=0,du=1.5){
+    const c=document.createElement('div');c.className='typing';c.style.animationDelay=d+'s';
+    c.innerHTML='<div class="t-avatar">ف</div><div class="t-dots"><span></span><span></span><span></span></div>';
+    msgArea.appendChild(c);smoothScroll();
+    return new Promise(ok=>setTimeout(()=>{c.remove();ok()},(d+du)*1000));
+  }
+  function btns(l,d=0,side='start'){
+    const c=document.createElement('div');c.className='btns-row'+(side==='end'?' btns-end':'');c.style.animationDelay=d+'s';
+    l.forEach(b=>{const e=document.createElement('button');e.className='btn'+(b.primary?' primary':'')+(b.green?' green':'')+(b.ghost?' ghost':'')+(b.danger?' danger':'')+(b.orange?' orange':'')+(b.small?' small':'');e.textContent=b.text;
+    e.addEventListener('click',function(ev){const r=document.createElement('span');r.className='ripple';const rect=this.getBoundingClientRect();r.style.left=(ev.clientX-rect.left)+'px';r.style.top=(ev.clientY-rect.top)+'px';this.appendChild(r);setTimeout(()=>r.remove(),600)});
+    c.appendChild(e)});msgArea.appendChild(c);smoothScroll();
+  }
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  function clearMsgs(){msgArea.innerHTML='';}
+  async function checkPause(){while(paused)await sleep(150);}
+
+  // smooth animated scroll
+  function smoothScroll(){
+    requestAnimationFrame(()=>{
+      msgArea.scrollTo({top:msgArea.scrollHeight,behavior:'smooth'});
+    });
+  }
+
+  async function scenePain(signal){
+    clearMsgs();setHeader('🛍️ فروشگاه من','م','orange','۱۴ پیام نخونده');updateUI(0);
+    cust('<span class="label">مشتری</span>سلام قیمت ساعت هوشمند چنده؟',0);await checkPause();if(signal.aborted)return;await sleep(600);
+    seller('سلام مدل MI Band 8 — ۲,۸۰۰,۰۰۰',.2);await checkPause();if(signal.aborted)return;await sleep(500);
+    cust('<span class="label">مشتری</span>موجوده؟',.1);await checkPause();if(signal.aborted)return;await sleep(400);
+    seller('بله موجود داریم',.1);await checkPause();if(signal.aborted)return;await sleep(500);
+    cust('<span class="label">مشتری</span>آدرس حساب برای پرداخت؟',.3);await checkPause();if(signal.aborted)return;await sleep(500);
+    seller('۶۰۳۷...۷۶۶۲',.2);await checkPause();if(signal.aborted)return;await sleep(500);
+    cust('<span class="label">مشتری</span>قیمت هدفون شیائومی؟',.2);await checkPause();if(signal.aborted)return;await sleep(400);
+    seller('۱,۸۵۰,۰۰۰',.1);await checkPause();if(signal.aborted)return;await sleep(400);
+    cust('<span class="label">مشتری</span>گلکسی S24 دارین موجود؟',.2);await checkPause();if(signal.aborted)return;await sleep(500);
+    seller('😩 همه چیز دستیه... هر روز همین داستان',.3);await sleep(1800);if(signal.aborted)return;
+  }
+  async function sceneSolution(signal){
+    clearMsgs();setHeader('🛍️ فروشگرام','ف','purple','● آنلاین');updateUI(1);
+    bot('سلام! 👋<br><br>خسته شدی از اینکه هر روز به ۱۰ تا مشتری جواب بدی؟<br>من اینجام تا این کارو برات حل کنم.',0);await checkPause();if(signal.aborted)return;await sleep(1400);
+    bot('فروشگرام یه فروشگاه کامل تو تلگرامه<br>بدون هزینه اولیه، بدون دانش فنی<br>فقط چند دقیقه ثبت‌نام و فروشگاهت راه می‌افته 🚀',.3);await checkPause();if(signal.aborted)return;await sleep(1600);
+    btns([{text:'🚀 شروع کنیم!',green:true,primary:true},{text:'بیشتر بدونم',ghost:true}],.3);await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('🚀 شروع کنیم!',.2);await sleep(1000);if(signal.aborted)return;
+  }
+  async function sceneRegistration(signal){
+    clearMsgs();setHeader('🛍️ فروشگرام','ف','purple','● آنلاین');updateUI(2);
+    await typing(.1,1.2);await checkPause();if(signal.aborted)return;
+    bot('خوش اومدی! برای شروع ثبت‌نام:<br><br>📋 <b>نام فروشگاهت چیه؟</b><br><br>مثال: دیجی‌شاپ',0);await checkPause();if(signal.aborted)return;await sleep(1000);
+    user('فروشگاه محصولات دیجیتال',.2);await checkPause();if(signal.aborted)return;await sleep(500);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(700);
+    bot('👍 عالیه!<br><br>📋 <b>شماره تماس فروشگاهت:</b>',0);await checkPause();if(signal.aborted)return;await sleep(600);
+    user('۰۹۱۲۱۲۳۴۵۶۷',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(700);
+    bot('✅ و آخر مرحله — شماره کارتی که مشتریا<br>باید پول رو به اون واریز کنن:',0);await checkPause();if(signal.aborted)return;await sleep(600);
+    user('۶۰۳۷۷۹۱۸۹۹۷۶۶۲۳۴',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,1.2);await checkPause();if(signal.aborted)return;await sleep(1000);
+    bot('✅ <b>ثبت‌نام با موفقیت انجام شد!</b><br><br>🎉 فروشگاهت آماده‌ست!<br><br>🔗 <b>لینک اختصاصی فروشگاهت:</b><br><div class="link-card"><div class="link-icon">🔗</div><div class="link-text"><strong>t.me/Foroshgrambot?start=shop_۱۲۳۴</strong><br>این لینک رو بزار تو کانالت</div></div><br><span class="badge wait">⏳ وضعیت: در انتظار تایید ادمین</span><br><br>بعد از تایید، فروشگاهت فعال میشه و می‌تونی محصولاتت رو مدیریت کنی.',0);await checkPause();if(signal.aborted)return;await sleep(700);
+    btns([{text:'➕ افزودن محصول',green:true},{text:'📊 پنل مدیریت',ghost:true}],.3);await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('📊 پنل مدیریت',.2);await sleep(800);if(signal.aborted)return;
+  }
+  async function sceneSellerPanel(signal){
+    clearMsgs();setHeader('📊 پنل مدیریت فروشگاه','م','purple','مدیر فروشگاه');updateUI(3);
+    bot(`📊 <b>داشبورد فروشگاه</b><br><span class="badge active">فعال</span> فروشگاه محصولات دیجیتال
+      <div class="dash-grid">
+        <div class="dash-item"><div class="d-icon">📦</div><div class="d-num" style="color:var(--accent2)">۱۲</div><div class="d-label">محصولات</div></div>
+        <div class="dash-item"><div class="d-icon">🚚</div><div class="d-num" style="color:var(--blue)">۳</div><div class="d-label">سفارشات فعال</div></div>
+        <div class="dash-item"><div class="d-icon">📈</div><div class="d-num" style="color:var(--orange)">۷۲٪</div><div class="d-label">نرخ تبدیل</div></div>
+        <div class="dash-item"><div class="d-icon">💰</div><div class="d-num" style="color:var(--green)">۱۲.۸میلیون</div><div class="d-label">مجموع فروش</div></div>
+      </div>
+      📆 امروز: ۲ سفارش | 💰 ۱,۸۰۰,۰۰۰<br>📆 این هفته: ۸ سفارش | 💰 ۶,۲۰۰,۰۰۰<br>📆 این ماه: ۲۳ سفارش | 💰 ۱۲,۸۰۰,۰۰۰
+      <div style="margin-top:6px;padding:6px;background:var(--red);color:#fff;border-radius:8px;font-size:11px;animation:pulseBorder 2s ease infinite">⚠️ هشدار موجودی: ساعت MI Band 8 (۲ عدد باقی)</div>`,0);
+    await checkPause();if(signal.aborted)return;await sleep(1200);
+    btns([{text:'📦 محصولات',primary:true},{text:'📁 دسته‌بندی',ghost:true},{text:'🏷️ تخفیف',ghost:true},{text:'📬 سفارشات',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(2000);
+    user('📦 محصولات',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(800);
+    bot(`📦 <b>مدیریت محصولات</b> — ۱۲ عدد
+      <div class="pli"><div class="p-thumb" style="background:linear-gradient(135deg,#1a1a3e,#2a1a5e)">📱</div><div class="p-info"><div class="p-name">گلکسی S24 Ultra</div><div class="p-sub">۴۵,۰۰۰,۰۰۰ تومان • موجودی: ۱۲</div></div><div class="p-action">✏️</div></div>
+      <div class="pli"><div class="p-thumb" style="background:linear-gradient(135deg,#1a2a3e,#2a3a5e)">📱</div><div class="p-info"><div class="p-name">آیفون ۱۵ پرو</div><div class="p-sub">۷۸,۰۰۰,۰۰۰ تومان • موجودی: ۵</div></div><div class="p-action">✏️</div></div>
+      <div class="pli"><div class="p-thumb" style="background:linear-gradient(135deg,#2a1a3e,#3a2a5e)">⌚️</div><div class="p-info"><div class="p-name">ساعت MI Band 8</div><div class="p-sub">۲,۸۰۰,۰۰۰ تومان • <span style="color:var(--red)">موجودی: ۲ ⚠️</span></div></div><div class="p-action">✏️</div></div>`,0);
+    await checkPause();if(signal.aborted)return;await sleep(800);
+    btns([{text:'➕ محصول جدید',green:true,small:true},{text:'🔗 لینک محصول',ghost:true,small:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('📁 دسته‌بندی',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('📁 <b>دسته‌بندی محصولات</b><br><br>📱 موبایل و تبلت — ۵ محصول<br>🎧 هدفون — ۳ محصول<br>⌚️ ساعت هوشمند — ۲ محصول<br>🔌 لوازم جانبی — ۲ محصول',0);
+    await checkPause();if(signal.aborted)return;await sleep(400);
+    btns([{text:'➕ دسته جدید',green:true,small:true},{text:'🏷️ کد تخفیف',ghost:true,small:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('🏷️ کد تخفیف',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('🏷️ <b>کدهای تخفیف فعال</b>',0);await checkPause();if(signal.aborted)return;await sleep(200);
+    bot(`<div class="dc"><div><div class="dc-code">FOROSH20</div><div class="dc-info">🎯 درصدی: ۲۰٪ تخفیف • حداقل سفارش: ۵۰,۰۰۰ تومان • استفاده: ۲۴۰/∞</div></div><span style="color:var(--green);font-size:13px;font-weight:600">فعال</span></div>
+    <div class="dc"><div><div class="dc-code">WELCOME10</div><div class="dc-info">💰 مبلغی: ۱۰,۰۰۰ تومان تخفیف • بدون حداقل • استفاده: ۸۹/۵۰۰</div></div><span style="color:var(--green);font-size:13px;font-weight:600">فعال</span></div>`,.2);
+    await checkPause();if(signal.aborted)return;await sleep(500);
+    btns([{text:'➕ کد جدید',green:true,small:true},{text:'📬 سفارشات',primary:true,small:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('📬 سفارشات',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('📬 <b>مدیریت سفارشات</b><br><br>⏳ در انتظار پرداخت: ۱ عدد<br>⏳ در انتظار بررسی: ۱ عدد<br>📦 در حال آماده‌سازی: ۱ عدد<br>🚚 ارسال شده: ۲ عدد<br>✅ تحویل شده: ۱۵ عدد',0);
+    await checkPause();if(signal.aborted)return;await sleep(400);
+    btns([{text:'📋 جزئیات سفارشات',primary:true},{text:'🔙 پنل اصلی',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('🔙 پنل اصلی',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    btns([{text:'🧾 تنظیمات پرداخت',ghost:true},{text:'💬 پیام مشتریان',ghost:true},{text:'📷 کاور فروشگاه',ghost:true},{text:'🔑 تغییر رمز',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('🧾 تنظیمات پرداخت',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot(`🧾 <b>تنظیمات پرداخت</b><br><br>💳 شماره کارت: ✅ ۶۰۳۷...۷۶۶۲<br>👤 صاحب کارت: ✅ محمد رضایی<br>🏦 شبا: ✅ IR۸۲۰۱۲۰...۳۸۲۹<br>🚚 هزینه ارسال: ۵۰,۰۰۰ تومان<br>🆓 ارسال رایگان بالای ۱,۰۰۰,۰۰۰ تومان`,0);
+    await checkPause();if(signal.aborted)return;await sleep(600);
+    btns([{text:'✏️ شماره کارت',ghost:true,small:true},{text:'✏️ هزینه ارسال',ghost:true,small:true},{text:'🔙 پنل',ghost:true,small:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('🔙 پنل',.2);await checkPause();if(signal.aborted)return;await sleep(300);await typing(.1,.4);await checkPause();if(signal.aborted)return;await sleep(400);
+    btns([{text:'🔗 لینک فروشگاه',ghost:true},{text:'📷 کاور',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1200);
+    user('🔗 لینک فروشگاه',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot(`🏪 <b>لینک فروشگاهت</b><br><br>🔗 t.me/Foroshgrambot?start=shop_۱۲۳۴<br><br>💡 این لینک رو برای مشتریات بفرست یا بزار تو کانالت.<br>هرکی روش کلیک کنه مستقیم میره به فروشگاه تو.`,0);
+    await checkPause();if(signal.aborted)return;await sleep(800);
+    btns([{text:'🔙 پنل اصلی',green:true,small:true}],.3);
+    await sleep(1200);if(signal.aborted)return;
+  }
+  async function sceneCustomerFlow(signal){
+    clearMsgs();setHeader('🛍️ فروشگاه دیجیتال','ف','green','● آنلاین');updateUI(4);
+    bot('سلام! 👋<br><br>به <b>فروشگاه محصولات دیجیتال</b> خوش اومدی!<br><br>دسته‌بندی رو انتخاب کن:',0);
+    await checkPause();if(signal.aborted)return;await sleep(800);
+    btns([{text:'📱 موبایل و تبلت',primary:true},{text:'🎧 هدفون',ghost:true},{text:'⌚️ ساعت',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('📱 موبایل و تبلت',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(800);
+    bot(`📁 <b>موبایل و تبلت</b> — ۸ محصول<br><br>🛒 گلکسی S24 Ultra — <span class="price">۴۵,۰۰۰,۰۰۰</span><br>🛒 آیفون ۱۵ پرو — <span class="price">۷۸,۰۰۰,۰۰۰</span><br>🛒 شیائومی ۱۴ — <span class="price">۲۵,۰۰۰,۰۰۰</span>`,0);
+    await checkPause();if(signal.aborted)return;await sleep(400);
+    btns([{text:'🛒 گلکسی S24 Ultra',primary:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('🛒 گلکسی S24 Ultra',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,1.0);await checkPause();if(signal.aborted)return;await sleep(1000);
+    bot(`<b>گلکسی S24 Ultra</b><br><br>رم ۱۲ / ۲۵۶ گیگ — سامسونگ<br><br>💰 <span class="price">۴۵,۰۰۰,۰۰۰</span> تومان<br>✅ موجود در انبار (۱۲ عدد)
+      <div class="card"><div class="img-grid"><div>📱</div><div>📸</div><div>🔋</div><div>🎨</div></div><div class="body"><div class="n">📸 آلبوم تصاویر</div><div class="d">۵ عکس • چرخش و زوم</div></div></div>
+      🔗 لینک مستقیم محصول:<br><span style="font-size:11px;color:var(--text2)">t.me/Foroshgrambot?start=product_۵۶۷۸</span>`,0);
+    await checkPause();if(signal.aborted)return;await sleep(800);
+    btns([{text:'🛒 افزودن به سبد خرید',green:true},{text:'⭐️ علاقه‌مندی',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('🛒 افزودن به سبد خرید',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('✅ به سبد خرید اضافه شد!',0);await checkPause();if(signal.aborted)return;await sleep(200);
+    bot('🛒 <b>سبد خرید</b><br><br>📱 گلکسی S24 Ultra × ۱ — <span class="price">۴۵,۰۰۰,۰۰۰</span> تومان<br>📱 آیفون ۱۵ پرو × ۱ — <span class="price">۷۸,۰۰۰,۰۰۰</span> تومان<br><br>💳 <b>جمع:</b> <span class="price">۱۲۳,۰۰۰,۰۰۰</span> تومان<br><br>🏷️ کد تخفیف داری؟ وارد کن 👇',.2);
+    await checkPause();if(signal.aborted)return;await sleep(400);
+    bot(`<span class="code-input">FOROSH20</span>`,.2);
+    await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('✅ کد تخفیف اعمال شد!<br><br>🎯 ۲۰٪ تخفیف (تا ۲۴,۶۰۰,۰۰۰ تومان)',.2);
+    await checkPause();if(signal.aborted)return;await sleep(400);
+    btns([{text:'✅ ثبت سفارش',green:true},{text:'✏️ ویرایش سبد خرید',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('✅ ثبت سفارش',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(800);
+    system('📋 اطلاعات تحویل — مرحله ۱ از ۲');await checkPause();if(signal.aborted)return;await sleep(400);
+    bot('👤 <b>نام گیرنده:</b>',0);await checkPause();if(signal.aborted)return;await sleep(500);
+    user('علی رضایی',.2);await checkPause();if(signal.aborted)return;await sleep(300);
+    bot('📞 <b>شماره تماس:</b>',.1);await checkPause();if(signal.aborted)return;await sleep(300);
+    user('۰۹۱۲۱۲۳۴۵۶۷',.2);await checkPause();if(signal.aborted)return;await sleep(300);
+    bot('📍 <b>آدرس:</b>',.1);await checkPause();if(signal.aborted)return;await sleep(300);
+    user('تهران، ولیعصر، پلاک ۱۰۲۴',.2);await checkPause();if(signal.aborted)return;await sleep(300);
+    await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('🧾 <b>خلاصه سفارش</b>',0);await checkPause();if(signal.aborted)return;await sleep(200);
+    bot(`<div class="receipt"><div class="rl"><span class="ll">گلکسی S24 Ultra × ۱</span><span>۴۵,۰۰۰,۰۰۰</span></div><div class="rl"><span class="ll">آیفون ۱۵ پرو × ۱</span><span>۷۸,۰۰۰,۰۰۰</span></div><div class="rl"><span class="ll">🏷️ تخفیف (FOROSH20)</span><span style="color:var(--green)">-۲۴,۶۰۰,۰۰۰</span></div><div class="rl"><span class="ll">🚚 هزینه ارسال</span><span>۵۰,۰۰۰</span></div><div class="rd">━━━</div><div class="rl t"><span class="ll">💰 قابل پرداخت</span><span>۹۸,۴۵۰,۰۰۰</span></div></div><br>💳 روش: کارت به کارت<br>💳 شماره: ۶۰۳۷...۷۶۶۲ (محمد رضایی)<br>🚚 ارسال: پست پیشتاز (۲-۳ روزه)`,.2);
+    await checkPause();if(signal.aborted)return;await sleep(600);
+    btns([{text:'💳 پرداخت کردم ✅',green:true},{text:'✏️ ویرایش',ghost:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('💳 پرداخت کردم ✅',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(800);
+    bot('✅ <b>سفارش ثبت شد!</b><br><br>🧾 شماره: #۲۶۰۷۱۷۴۸۳۶۱۰<br>⏳ وضعیت: <span class="badge wait">در انتظار پرداخت</span><br><br>📬 بعد از تایید فروشنده، به زودی ارسال میشه 🔜',0);
+    await checkPause();if(signal.aborted)return;await sleep(800);
+    btns([{text:'⭐️ افزودن به علاقه‌مندی‌ها',ghost:true}],.3);
+    await sleep(1500);if(signal.aborted)return;
+  }
+  async function sceneSellerDelivery(signal){
+    clearMsgs();setHeader('📊 پنل مدیریت','م','purple','مدیر فروشگاه');updateUI(5);
+    bot('🔔 <b>سفارش جدید!</b>',0);await checkPause();if(signal.aborted)return;await sleep(400);
+    bot(`<div class="order-card"><div class="oh"><span>🧾 #۲۶۰۷۱۷۴۸۳۶۱۰</span><span class="ob pending">⏳ در انتظار پرداخت</span></div><div class="or">👤 علی رضایی — ۰۹۱۲۱۲۳۴۵۶۷</div><div class="or">📍 تهران، ولیعصر، پلاک ۱۰۲۴</div><div class="or">💰 <span class="price">۹۸,۴۵۰,۰۰۰</span> تومان</div><div class="or">📱 گلکسی S24 Ultra • آیفون ۱۵ پرو</div><div class="or">💳 کارت به کارت ✅ (ارسال رسید)</div><div class="or">🏷️ کد تخفیف: FOROSH20 (۲۰٪)</div></div>`,.2);
+    await checkPause();if(signal.aborted)return;await sleep(600);
+    btns([{text:'📋 جزئیات کامل',primary:true},{text:'✅ تایید پرداخت',green:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('✅ تایید پرداخت',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('✅ <b>پرداخت تأیید شد!</b><br><br>🧾 #۲۶۰۷۱۷۴۸۳۶۱۰<br>📌 وضعیت: <span class="badge active">تأیید شده</span><br><br>سفارش به مرحله آماده‌سازی رفت.',0);
+    await checkPause();if(signal.aborted)return;await sleep(500);
+    btns([{text:'📦 در حال آماده‌سازی',primary:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1400);
+    user('📦 در حال آماده‌سازی',.2);await checkPause();if(signal.aborted)return;await sleep(300);
+    bot('📦 <b>سفارش آماده ارسال شد</b> — کد رهگیری پستی رو وارد کن:',0);
+    await checkPause();if(signal.aborted)return;await sleep(500);
+    user('۶۵۱۶۵۱',.2);await checkPause();if(signal.aborted)return;await sleep(300);await typing(.1,.6);await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('🚚 <b>سفارش ارسال شد!</b><br><br>🧾 #۲۶۰۷۱۷۴۸۳۶۱۰<br>📮 کد رهگیری: ۶۵۱۶۵۱<br>🚚 وضعیت: <span class="badge shipped">ارسال شده</span><br><br>به خریدار اطلاع داده شد.',0);
+    await checkPause();if(signal.aborted)return;await sleep(600);
+    system('📬 اعلان به خریدار');await checkPause();if(signal.aborted)return;await sleep(400);
+    bot(`📬 <b>سفارشت ارسال شد!</b> 🚚<br><br>🧾 #۲۶۰۷۱۷۴۸۳۶۱۰<br>📮 کد رهگیری پستی: ۶۵۱۶۵۱<br><br>📌 وقتی به دستت رسید، دکمه زیر رو بزن:`,0);
+    await checkPause();if(signal.aborted)return;await sleep(400);
+    btns([{text:'📦 بسته به دستم رسید ✅',green:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(2000);
+    user('📦 بسته به دستم رسید ✅',.2);await checkPause();if(signal.aborted)return;await sleep(400);await typing(.1,.8);await checkPause();if(signal.aborted)return;await sleep(800);
+    bot('✅ <b>سفارش تحویل شد!</b><br><br>🌟 از خریدت ممنونیم!<br>اگه راضی بودی به فروشگاه امتیاز بده:',0);
+    await checkPause();if(signal.aborted)return;await sleep(300);
+    btns([{text:'⭐⭐⭐⭐⭐',orange:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(1800);
+    user('⭐⭐⭐⭐⭐',.2);await checkPause();if(signal.aborted)return;await sleep(400);
+    bot('⭐️ <b>امتیاز شما ثبت شد!</b><br><br>امتیاز فعلی فروشگاه: <b>۴.۸ از ۵</b> 🌟<br><br>💎 از اینکه فروشگرام رو انتخاب کردی ممنونیم!',0);
+    await sleep(2000);if(signal.aborted)return;
+  }
+  async function sceneFeatures(signal){
+    clearMsgs();setHeader('💎 فروشگرام','ف','purple','پلتفرم فروشگاهی');updateUI(6);
+    bot('💎 <b>فروشگرام چیا داره؟</b><br><br>',0);await checkPause();if(signal.aborted)return;await sleep(300);
+    bot(`<div class="fg"><div class="fi"><span class="ficon">🏪</span> پنل مدیریت فروشگاه</div><div class="fi"><span class="ficon">📊</span> داشبورد آماری (امروز/هفته/ماه)</div><div class="fi"><span class="ficon">📦</span> سیستم موجودی + هشدار کمبود</div><div class="fi"><span class="ficon">🚚</span> مدیریت سفارشات ۸ مرحله‌ای</div><div class="fi"><span class="ficon">🏷️</span> کد تخفیف (درصدی/مبلغی)</div><div class="fi"><span class="ficon">🔗</span> لینک اختصاصی فروشگاه</div><div class="fi"><span class="ficon">📸</span> آلبوم تصاویر محصول</div><div class="fi"><span class="ficon">🎯</span> دسته‌بندی محصولات</div><div class="fi"><span class="ficon">🔍</span> جستجوی پیشرفته</div><div class="fi"><span class="ficon">⭐️</span> علاقه‌مندی‌ها</div><div class="fi"><span class="ficon">💳</span> کارت به کارت + شبا</div><div class="fi"><span class="ficon">📬</span> اعلان لحظه‌ای سفارش</div><div class="fi"><span class="ficon">🏆</span> پرفروش‌ترین‌ها و آنالیز</div><div class="fi"><span class="ficon">📷</span> کاور فروشگاه</div></div>`,.3);
+    await checkPause();if(signal.aborted)return;await sleep(600);
+    bot('و همه اینا داخل یه ربات تلگرام!<br><br>بدون نصب اپ • بدون سایت • بدون دانش فنی',.4);
+    await sleep(2000);if(signal.aborted)return;
+  }
+  async function sceneCTA(signal){
+    clearMsgs();await sleep(200);setHeader('🚀 فروشگرام','ف','purple','همین حالا شروع کن');updateUI(7);
+    await typing(0,1.5);await checkPause();if(signal.aborted)return;await sleep(1500);
+    bot('🚀 <b>همین حالا فروشگاه خودت رو راه بنداز!</b><br><br>✅ فروشگاه اختصاصی تو توی تلگرام<br>✅ مدیریت آسون محصولات و سفارش‌ها<br>✅ پرداخت مستقیم به حساب خودت<br>✅ لینک اختصاصی برای کانالت<br>✅ کاملاً رایگان — بدون هزینه اولیه<br><br>👇 همین الان شروع کن',0);
+    await checkPause();if(signal.aborted)return;await sleep(800);
+    btns([{text:'🚀 شروع در تلگرام!',green:true,primary:true}],.3);
+    await checkPause();if(signal.aborted)return;await sleep(2500);
+    bot('💎 <b>فروشگرام</b> — فروش آسان‌تر در تلگرام<br><br>🤖 <b>@Foroshgrambot</b>',.4);
+    await sleep(3000);if(signal.aborted)return;
+  }
+  const SCENE_FNS=[scenePain,sceneSolution,sceneRegistration,sceneSellerPanel,sceneCustomerFlow,sceneSellerDelivery,sceneFeatures,sceneCTA];
+  async function runScene(idx){
+    if(idx<0||idx>=SCENE_FNS.length)return;
+    sceneRunning=true;currentScene=idx;
+    const s=SCENES[idx];const banner=document.createElement('div');banner.className='scene-banner';banner.innerHTML=`<span class="b-icon">${s.icon}</span><div class="b-name">${s.name}</div>`;document.getElementById('scene').appendChild(banner);setTimeout(()=>banner.remove(),1500);
+    const ab=new AbortController();abortController=ab;
+    updateUI(idx);
+    sceneStartTime=Date.now();if(timerInterval)clearInterval(timerInterval);timerInterval=setInterval(()=>{const e=Math.floor((Date.now()-sceneStartTime)/1000);const m=Math.floor(e/60),sec=e%60;timerLabel.textContent=`${m}:${sec.toString().padStart(2,'0')}`},250);
+    try{await SCENE_FNS[idx](ab.signal)}catch(e){}
+    sceneRunning=false;if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+    paused=true;btnPlay.textContent='▶';btnPlay.style.background='var(--green)';
+  }
+  function stopCurrentScene(){if(abortController){abortController.abort();abortController=null}sceneRunning=false;}
+  function togglePause(){
+    paused=!paused;btnPlay.textContent=paused?'▶':'⏸';btnPlay.style.background=paused?'var(--green)':'var(--accent)';
+    if(!paused&&!sceneRunning&&currentScene<SCENE_FNS.length-1){goToScene(currentScene+1)}
+    else if(!paused&&!sceneRunning&&currentScene===SCENE_FNS.length-1){paused=true;btnPlay.textContent='▶'}
+  }
+  function goToScene(idx){if(idx<0||idx>=SCENE_FNS.length)return;stopCurrentScene();clearMsgs();currentScene=idx;runScene(idx);}
+  btnPlay.addEventListener('click',togglePause);
+  document.getElementById('scene').addEventListener('click',togglePause);
+  btnPrev.addEventListener('click',()=>{if(paused)goToScene(currentScene-1)});
+  btnNext.addEventListener('click',()=>{if(paused)goToScene(currentScene+1)});
+  document.addEventListener('keydown',e=>{
+    if(e.key===' '||e.code==='Space'){e.preventDefault();togglePause()}
+    if(e.key==='ArrowRight'&&paused)goToScene(currentScene+1);
+    if(e.key==='ArrowLeft'&&paused)goToScene(currentScene-1);
+    if(e.key==='h'||e.key==='H'){panelVisible=!panelVisible;document.getElementById('controlPanel').classList.toggle('hidden',!panelVisible);document.getElementById('bottomBar').style.opacity=panelVisible?'1':'0'}
+  });
+  function tick(){const d=new Date();clock.textContent=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
+  tick();setInterval(tick,10000);
+  // Only respond to intro's own fadeOut animation, not bubbled child animations
+  const introEl=document.getElementById('introOverlay');
+  function onIntroEnd(e){if(e.animationName==='fadeOut'){introEl.removeEventListener('animationend',onIntroEnd);runScene(0)}}
+  introEl.addEventListener('animationend',onIntroEnd);
+  updateUI(0);
+})();
+</script>
+</body>
+</html>

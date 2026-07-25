@@ -1,7 +1,7 @@
 # پروژه فروشگرام (Foroshgram) — Telegram Order Bot
 
-> **نسخه:** 2.4 | **تاریخ:** ۱۴۰۵-۰۵-۲۱ (2026-08-12)  
-> **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)  
+> **نسخه:** 2.5 | **تاریخ:** ۱۴۰۵-۰۵-۲۱ (2026-08-12)  \
+> **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)   \
 > **پلتفرم سفارش آنلاین چندمستأجری تلگرام**
 
 ---
@@ -57,6 +57,8 @@
 - **فیلتر و مرتب‌سازی**: ارزان‌ترین، گران‌ترین، جدیدترین + فقط موجود
 - **علاقه‌مندی‌ها (Wishlist)**: افزودن محصولات مورد علاقه
 - **جستجوی تعاملی**: تایپ نام محصول
+- **جستجوی همگانی محصولات** (`/searchall`): سرچ در تمام فروشگاه‌های فعال
+- **جستجوی فروشگاه‌ها** (`/findshop`): پیدا کردن فروشگاه با نام/یوزرنیم
 - **سبد خرید رها شده**: یادآوری خودکار پس از ۱۲ ساعت
 - **خرید مجدد (Reorder)**: بازگرداندن محصولات سفارش قبلی به سبد
 - **کد تخفیف**: فروشنده کد درصدی/مبلغی می‌سازد، مشتری در checkout اعمال می‌کند
@@ -76,6 +78,8 @@
 - **De-duplication رسید پرداخت**: SHA-256 hash + UNIQUE constraint
 - **اجبار تغییر رمز بعد از reset**: must_change_password flag
 - **کمپرس پاسخ‌های طولانی**: کاهش سایز پیام‌های تکراری
+- **سیستم اشتراک فروشگاه**: پلن‌های ماهانه/فصلی/سالانه با خرید کارت‌به‌کارت و تایید ادمین
+- **پیش‌فرض کارت ادمین برای اشتراک**: شماره کارت و نام صاحب در config با default مقداردهی
 
 ---
 
@@ -136,27 +140,30 @@
 | **Seller Panel** | پنل فروشنده + تنظیمات پرداخت | `handlers/seller_panel.py` |
 | **Discount** | ساخت و مدیریت کد تخفیف | `handlers/discount.py` |
 | **Wishlist** | علاقه‌مندی‌ها | `handlers/wishlist.py` |
-| **Search** | جستجوی تعاملی | `handlers/search.py` |
-| **Forward Products** | افزودن محصول با فوروارد | `handlers/forward_products.py` |
-| **Support** | پشتیبانی دوطرفه خریدار-فروشنده + ادمین | `handlers/support.py` |
-| **Help** | راهنمای نقش‌محور | `handlers/help.py` |
-| **Common** | توابع مشترک بین handlers | `handlers/common.py` |
-| **Conversations** | پیام خریدار-فروشنده (اینباکس) | `handlers/conversations.py` |
-| **Admin Approval** | تایید/رد فروشنده از دکمه inline | `handlers/admin_approval.py` |
-| **Admin Panel** | پنل ادمین | `handlers/admin/panel.py` |
-| **Admin Products** | مدیریت محصولات | `handlers/admin/products.py` |
-| **Admin Categories** | مدیریت دسته‌بندی | `handlers/admin/categories.py` |
-| **Admin Orders** | مدیریت سفارش‌ها | `handlers/admin/orders.py` |
-| **Admin Shops** | مدیریت فروشگاه‌ها | `handlers/admin/shops.py` |
-| **Admin Broadcast** | پیام همگانی | `handlers/admin/broadcast.py` |
-| **Crypto (Bot)** | AES-256-GCM رمزنگاری اطلاعات بانکی | `utils/crypto.py` |
-| **Payment Service** | رزرو/آزادسازی/نهایی‌سازی موجودی | `services/payment.py` |
-| **Order Service** | سرویس متمرکز سفارش | `services/order_service.py` |
-| **EventBus** | معماری event-driven | `services/events.py` |
-| **Notification** | سرویس متمرکز نوتیفیکیشن | `services/notification_service.py` |
-| **Restock** | اعلان موجود شدن | `services/restock.py` |
-| **Monitoring** | Metrics + Sentry + Health | `services/monitoring.py` |
-| **Abandoned Cart** | یادآوری سبد رها شده | `services/abandoned_cart.py` |
+|| **Search** | جستجوی تعاملی + همگانی + فروشگاه‌ها | `handlers/search.py` |
+|| **Forward Products** | افزودن محصول با فوروارد | `handlers/forward_products.py` |
+|| **Support** | پشتیبانی دوطرفه خریدار-فروشنده + ادمین | `handlers/support.py` |
+|| **Help** | راهنمای نقش‌محور | `handlers/help.py` |
+|| **Common** | توابع مشترک بین handlers | `handlers/common.py` |
+|| **Conversations** | پیام خریدار-فروشنده (اینباکس) | `handlers/conversations.py` |
+|| **Admin Approval** | تایید/رد فروشنده از دکمه inline | `handlers/admin_approval.py` |
+|| **Admin Panel** | پنل ادمین | `handlers/admin/panel.py` |
+|| **Admin Products** | مدیریت محصولات | `handlers/admin/products.py` |
+|| **Admin Categories** | مدیریت دسته‌بندی | `handlers/admin/categories.py` |
+|| **Admin Orders** | مدیریت سفارش‌ها | `handlers/admin/orders.py` |
+|| **Admin Shops** | مدیریت فروشگاه‌ها | `handlers/admin/shops.py` |
+|| **Admin Broadcast** | پیام همگانی | `handlers/admin/broadcast.py` |
+|| **Subscription** | خرید/تمدید اشتراک + تایید/رد ادمین | `handlers/subscription.py` |
+|| **Subscription Decorator** | دکوریتور `@require_active_subscription` | `handlers/subscription_decorator.py` |
+|| **Crypto (Bot)** | AES-256-GCM رمزنگاری اطلاعات بانکی | `utils/crypto.py` |
+|| **Payment Service** | رزرو/آزادسازی/نهایی‌سازی موجودی | `services/payment.py` |
+|| **Order Service** | سرویس متمرکز سفارش | `services/order_service.py` |
+|| **Subscription Service** | هسته منطق اشتراک (seed, create, verify, reject) | `services/subscription.py` |
+|| **EventBus** | معماری event-driven | `services/events.py` |
+|| **Notification** | سرویس متمرکز نوتیفیکیشن | `services/notification_service.py` |
+|| **Restock** | اعلان موجود شدن | `services/restock.py` |
+|| **Monitoring** | Metrics + Sentry + Health | `services/monitoring.py` |
+|| **Abandoned Cart** | یادآوری سبد رها شده | `services/abandoned_cart.py` |
 
 ### جریان داده‌ای EventBus
 
@@ -317,17 +324,18 @@ def available_stock(self) -> int:
 | payment_status | String(20)? | `pending`, `pending_review`, `paid`, `cancelled` |
 | payment_receipt_file_id | String(255)? | file_id عکس رسید |
 | payment_receipt_text | String(500)? | متن شماره تراکنش |
-| payment_receipt_at | DateTime? | زمان آپلود رسید |
-| payment_receipt_hash | String(64)? | SHA-256 hash رسید برای de-duplication |
-| receiver_name | String(150)? | نام گیرنده |
-| shipping_address | String(500) | آدرس گیرنده |
-| phone | String(30) | شماره تماس گیرنده |
-| discount_code | String(50)? | کد تخفیف اعمال شده |
-| discount_amount | Integer default=0 | مبلغ تخفیف (تومان) |
-| status_history | Text (JSON) | تاریخچه قدیمی (دیگر استفاده نمی‌شود، برای backward compatibility) |
-| cancellation_reason | String(100)? | دلیل لغو |
-| created_at | DateTime | |
-| updated_at | DateTime | |
+|| payment_receipt_at | DateTime? | زمان آپلود رسید |
+|| payment_receipt_hash | String(64)? | SHA-256 hash رسید برای de-duplication |
+|| receiver_name | String(150)? | نام گیرنده |
+|| shipping_address | String(500) | آدرس گیرنده |
+|| phone | String(30) | شماره تماس گیرنده |
+|| discount_code | String(50)? | کد تخفیف اعمال شده |
+|| discount_amount | Integer default=0 | مبلغ تخفیف (تومان) |
+|| customer_notes | String(500)? | توضیحات اختیاری مشتری (رنگ، مشخصات و...) |
+|| status_history | Text (JSON) | تاریخچه قدیمی (دیگر استفاده نمی‌شود، برای backward compatibility) |
+|| cancellation_reason | String(100)? | دلیل لغو |
+|| created_at | DateTime | |
+|| updated_at | DateTime | |
 
 **روابط:**
 - `items: list[OrderItem]` — cascade delete
@@ -449,7 +457,7 @@ def available_stock(self) -> int:
 || two_factor_secret | String(32)? | (آینده) |
 || created_at | DateTime | |
 
-### ۳.۱۷. پیام (Message)
+### ۳.۱۷. پیام (Message) — پشتیبانی
 
 | فیلد | نوع | توضیح |
 |------|------|--------|
@@ -464,9 +472,64 @@ def available_stock(self) -> int:
 
 ---
 
-## ۴. احراز هویت
+### ۳.۱۸. پلن اشتراک (SubscriptionPlan)
 
-### ۴.۱. لاگین نقش‌محور (سایت)
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| name | String(50) | نام پلن (مثلاً "ماهانه", "۳ ماهه", "سالانه") |
+| duration_days | Integer | مدت اعتبار به روز |
+| price | BigInteger | قیمت به تومان |
+| is_active | Boolean default=True | فعال/غیرفعال |
+| created_at | DateTime | تاریخ ایجاد |
+
+**پلن‌های پیش‌فرض (seed شده):**
+- 🥈 ماهانه — ۳۰ روز — ۴۹۹,۰۰۰ تومان
+- 🥇 ۳ ماهه — ۹۰ روز — ۱,۱۹۹,۰۰۰ تومان
+- 💎 ۶ ماهه — ۱۸۰ روز — ۱,۹۹۹,۰۰۰ تومان
+- 👑 سالانه — ۳۶۵ روز — ۳,۴۹۹,۰۰۰ تومان
+
+---
+
+### ۳.۱۹. اشتراک فروشگاه (ShopSubscription)
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| id | Integer PK | |
+| shop_id | Integer FK → shops.id | فروشگاه |
+| plan_id | Integer FK → subscription_plans.id | پلن خریداری شده (nullable برای trial) |
+| start_date | DateTime | شروع اشتراک |
+| end_date | DateTime | پایان اشتراک |
+| approval_status | String(20) | `pending`, `approved`, `rejected`, `trial` |
+| verified_at | DateTime? | زمان تأیید ادمین |
+| verified_by | BigInteger? | ادمین تأییدکننده |
+| rejection_reason | String(500)? | دلیل رد |
+| receipt_file_id | String(255)? | file_id عکس رسید |
+| receipt_caption | String(500)? | متن رسید (شماره تراکنش) |
+| receipt_hash | String(64)? | SHA-256 hash رسید برای de-duplication |
+| created_at | DateTime | تاریخ ثبت |
+
+**Index:** `(shop_id, approval_status)` — ترکیبی برای کوئری‌های فعال/در انتظار
+
+---
+
+### ۳.۲۰. فیلد توضیحات سفارش (Order.customer_notes)
+
+از نسخه ۲.۵، سفارش‌ها دارای فیلد `customer_notes` (VARCHAR 500) هستند:
+
+| فیلد | نوع | توضیح |
+|------|------|--------|
+| customer_notes | String(500)? | توضیحات اختیاری مشتری (رنگ، مشخصات و...) |
+
+**نحوه کار:** 
+- بعد از مرحله آدرس در checkout، user می‌تواند توضیحات اضافی بنویسد (اختیاری)
+- با `-` یا `/skip` می‌تواند رد کند
+- در خلاصه سفارش، اعلان فروشنده و جزئیات ادمین نمایش داده می‌شود
+- ذخیره جداگانه در `CustomerInfo.notes` و `create_order_from_cart`
+
+---
+
+## ۴. احراز هویت
 
 | نقش | شرط | رمز | ریدایرکت |
 |------|------|------|----------|
@@ -596,11 +659,17 @@ order:start → (اگر fast-checkout) ASK_NAME
 5. سفارش `PENDING_PAYMENT` + `attach_card_receipt()` → رسید ذخیره می‌شود
    - `payment_receipt_hash = SHA-256(receipt_text or file_id)` — UNIQUE constraint جلوگیری از رسید تکراری
 6. فروشنده پیام حاوی رسید + دکمه‌های `✅ تایید` / `❌ رد`
+   - پیام فروشنده شامل: نام/تلفن/آدرس/توضیحات خریدار + جزئیات مبلغ + شماره تراکنش
 7. **تأیید**: `transition_order(PAID)` → نهایی‌سازی موجودی → نوتیفیکیشن به مشتری
 8. **رد**: مشتری ۲ گزینه:
    - `pay:receipt_retry:{id}` — آپلود مجدد رسید
    - `pay:cancel:{id}` — لغو کامل (`cancel_order_and_release_stock`)
 9. **عدم اقدام فروشنده تا ۱۵ دقیقه** (بدون رسید) یا **۴۸ ساعت** (بعد از رسید) → کرون‌جاب آزادسازی خودکار (`cleanup_abandoned_payments`)
+
+#### مرحله توضیحات اختیاری (`ASK_NOTES`)
+- بعد از مرحله آدرس، مشتری می‌تواند توضیحات اضافی بنویسد (مثلاً: رنگ مشکی، سایز L)
+- با تایپ `-` یا `/skip` می‌تواند رد کند
+- در خلاصه سفارش و پیام اعلان فروشنده نمایش داده می‌شود
 
 ### ۵.۷. تاریخچه و پیگیری سفارش
 
@@ -626,7 +695,22 @@ order:start → (اگر fast-checkout) ASK_NAME
 - نتایج: هر کدام با دکمه مشاهده مستقیم
 - دکمه `🔙 بازگشت` در پایین
 
-### ۵.۱۰. خرید سریع (Fast Checkout)
+### ۵.۱۰. جستجوی همگانی محصولات (`/searchall`)
+
+- دستور `/searchall <query>` — سرچ در **تمام فروشگاه‌های فعال** سیستم
+- جستجو در `Product.name` و `Product.description` با `ILIKE`
+- محدود به ۳۰ نتیجه
+- دکمه هر محصول مستقیم به جزئیات (`prod:open`)
+
+### ۵.۱۱. جستجوی فروشگاه‌ها (`/findshop`)
+
+- دستور `/findshop <query>` — پیدا کردن فروشگاه با نام یا یوزرنیم
+- جستجو در `Shop.name` و `Shop.username` با `ILIKE`
+- فقط فروشگاه‌های `status=active` و `is_active=True`
+- نمایش تعداد محصولات فعال هر فروشگاه
+- دکمه هر فروشگاه مستقیم به منوی آن (`menu:shop:{shop_id}`)
+
+### ۵.۱۲. خرید سریع (Fast Checkout)
 
 - وقتی کاربر اطلاعات قبلی دارد (`user.saved_name/phone/address`)
 - بعد از ASK_ADDRESS → دکمه `✅ بله، از اطلاعات قبلی استفاده کن`
@@ -792,6 +876,31 @@ order:start → (اگر fast-checkout) ASK_NAME
 - کم‌فروش‌ترین محصول
 - میانگین مبلغ سفارش
 - نرخ تبدیل (تعداد سفارش / تعداد بازدید)
+
+### ۷.۸. سیستم اشتراک فروشگاه (`seller:subscription:show`)
+
+فروشنده باید اشتراک فعال داشته باشد تا بتواند از پنل خود استفاده کند.
+
+#### ۷.۸.۱. مشاهده وضعیت اشتراک
+- `seller:subscription:show` → نمایش وضعیت اشتراک فعلی (تاریخ پایان، نوع پلن)
+- اگر اشتراک فعال نیست → پیام هشدار + دکمه خرید اشتراک جدید
+
+#### ۷.۸.۲. خرید اشتراک
+- انتخاب پلن: ماهانه / ۳ ماهه / ۶ ماهه / سالانه
+- نمایش شماره کارت ادمین (از `config.ADMIN_CARD_NUMBER`)
+- ارسال عکس رسید واریز
+- ایجاد ردیف `ShopSubscription` با `approval_status=pending`
+- نوتیفیکیشن به ادمین برای تایید
+
+#### ۷.۸.۳. تایید ادمین
+- `admin:sub:detail:{id}` → جزئیات درخواست اشتراک
+- `admin:sub:verify:{id}` → تایید: `approval_status=approved` + `verified_at=now` + فعال‌سازی فروشگاه
+- `admin:sub:reject:{id}` → رد: دلیل + `approval_status=rejected`
+
+#### ۷.۸.۴. دکوریتور `@require_active_subscription`
+- همه handlerهای مدیریتی فروشنده (products, categories, orders, settings) با این دکوریتور محافظت می‌شوند
+- اگر اشتراک منقضی شده → پیام هشدار + دکمه خرید اشتراک جدید
+- **مسیرهای استثنا**: خود صفحه اشتراک و پنل پشتیبانی همیشه در دسترس هستند
 
 ---
 
@@ -1343,12 +1452,16 @@ ADMIN_IDS=8497713691
 - [x] تنظیم بنر فروشگاه
 - [x] مدیریت کد تخفیف (ساخت درصدی/مبلغی)
 - [x] داشبورد فروشنده (آمار فروش)
+- [x] **سیستم اشتراک**: پلن‌های ماهانه/فصلی/سالانه، خرید کارت‌به‌کارت، تایید ادمین
+- [x] **دکوریتور `@require_active_subscription`**: محافظت تمام مسیرهای مدیریتی
 
 #### ویژگی‌های پیشرفته
 - [x] EventBus + NotificationService
 - [x] یادآور موجودی کم (< ۵)
 - [x] علاقه‌مندی‌ها (Wishlist)
-- [x] جستجوی تعاملی
+- [x] جستجوی تعاملی (در فروشگاه جاری)
+- [x] **جستجوی همگانی محصولات** (`/searchall`): سرچ در تمام فروشگاه‌ها
+- [x] **جستجوی فروشگاه‌ها** (`/findshop`): پیدا کردن فروشگاه با نام/یوزرنیم
 - [x] سبد خرید رها شده (یادآوری ۱۲ ساعت)
 - [x] خرید مجدد (Reorder)
 - [x] گالری چندعکسی (send_media_group)
@@ -1361,6 +1474,7 @@ ADMIN_IDS=8497713691
 - [x] لینک مستقیم دسته‌بندی
 - [x] صفحه عمومی محصول در وبسایت (SSR + Open Graph)
 - [x] افزودن محصول با فوروارد کانال
+- [x] **فیلد توضیحات سفارش** (`customer_notes`): ورودی اختیاری در checkout
 
 #### پیام‌رسانی و پشتیبانی
 - [x] پیام دوطرفه خریدار-فروشنده (Conversations/Message مدل)
@@ -1431,6 +1545,21 @@ ADMIN_IDS=8497713691
 - [x] **رفع خطا در `seller_open_conv`**: `NameError: select` — import اضافه شد
 - [x] **رفع `sf.select(sf.func.count(...))`**: `from sqlalchemy import select as sf` shadowing → اصلاح به `select(sf.count(...))`
 - [x] **رفع `Message` import در `support.py`**: `from database.models import Message` اضافه شد
+
+#### باگ‌های رفع شده در جولای ۲۰۲۶ (نسخه ۲.۵)
+- [x] **رفع اعمال کد تخفیف برای خریدار**: پارامتر `user_id` به جای `shop_id` در `_validate_and_apply_discount` (قبلاً ۰ تومان می‌شد)
+- [x] **رفع دوبار پرسیدن عکس در افزودن دستی**: عکس اول در بدو ورود `add_photo` ذخیره می‌شود، بعد prompt می‌دهد
+- [x] **افزودن گالری چندعکسی برای محصولات دستی**: مدل `ProductImage` + هندلرهای `gallery_list`, `gallery_add_photo`, `gallery_delete_photo` + دکمه در ویرایش محصول
+- [x] **رفع پنل فروشنده از پیام تبریک**: pattern `seller:(panel|panel_back)` برای دکمه `seller:panel`
+- [x] **حذف کامل روش پرداخت COD**: فقط `card_to_card` باقی ماند، دکمه «تغییر روش پرداخت» حذف شد
+- [x] **رفع تکرار هش رسید**: `attach_card_receipt` اول dedup check روی سفارش‌های *دیگر*، بعد `payment_receipt_hash` ست می‌شود (جلوگیری از UniqueViolationError به خاطر autoflush)
+- [x] **حذف قفل سطح فروشگاه در `confirm_card_payment`**: وابستگی به `reserved_stock` اتمیک باقی ماند — چند کاربر می‌تونن همزمان بخرن تا جایی که موجودی کافیه
+- [x] **فیلد توضیحات سفارش (`customer_notes`)**: ستون `VARCHAR(500)` در `Order`، state `ASK_NOTES` در checkout، نمایش در خلاصه و نوتیف فروشنده
+- [x] **بهبود پیام اعلان فروشنده**: نام، تلفن، آدرس، توضیحات خریدار، جزئیات مبلغ (جمع کالاها/هزینه ارسال/مبلغ قابل پرداخت/شماره تراکنش)
+- [x] **فیکس `\n` لیترال در پیام‌های اشتراک**: تمام `\\n` به newline واقعی تبدیل شدند
+- [x] **پیش‌فرض کارت ادمین برای اشتراک**: `ADMIN_CARD_NUMBER` و `ADMIN_CARD_HOLDER` در `config.py` با default مقداردهی
+- [x] **جستجوی همگانی محصولات** (`/searchall`): سرچ در تمام فروشگاه‌های فعال
+- [x] **جستجوی فروشگاه‌ها** (`/findshop`): پیدا کردن فروشگاه با نام/یوزرنیم
 
 #### تست‌ها
 - [x] **تست جامع اسمیک هندلرها** (`tests/test_handlers_smoke.py`): ۳۰ تست که همه callback/message handlerهای ثبت‌شده را صدا می‌زند و مطمئن می‌شوند `Exception` مدیریت‌نشده نمی‌دهند. نتیجه: ✅ ۳۰/۳۰
