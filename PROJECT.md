@@ -498,18 +498,33 @@ def available_stock(self) -> int:
 | id | Integer PK | |
 | shop_id | Integer FK → shops.id | فروشگاه |
 | plan_id | Integer FK → subscription_plans.id | پلن خریداری شده (nullable برای trial) |
+| is_trial | Boolean default=False | آیا آزمایشی است؟ |
 | start_date | DateTime | شروع اشتراک |
 | end_date | DateTime | پایان اشتراک |
-| approval_status | String(20) | `pending`, `approved`, `rejected`, `trial` |
-| verified_at | DateTime? | زمان تأیید ادمین |
+| approval_status | String(20) | `pending`, `approved`, `rejected` |
+| verified_at | DateTime? | زمان تأیید ادمین (idempotency flag) |
 | verified_by | BigInteger? | ادمین تأییدکننده |
-| rejection_reason | String(500)? | دلیل رد |
+| rejection_reason | String(200)? | دلیل رد |
 | receipt_file_id | String(255)? | file_id عکس رسید |
-| receipt_caption | String(500)? | متن رسید (شماره تراکنش) |
 | receipt_hash | String(64)? | SHA-256 hash رسید برای de-duplication |
-| created_at | DateTime | تاریخ ثبت |
+| superseded_at | DateTime? | زمان بسته شدن (وقتی ردیف جدید ساخته شود) |
+| notes | String(300)? | یادداشت |
+| created_at | DateTime | تاریخ ایجاد |
 
-**Index:** `(shop_id, approval_status)` — ترکیبی برای کوئری‌های فعال/در انتظار
+**CHECK Constraint:** `ck_shop_subs_plan_or_trial`
+```sql
+CHECK ((is_trial = true AND plan_id IS NULL) OR (is_trial = false AND plan_id IS NOT NULL))
+```
+
+**استراتژی Append-only + superseded_at:**
+- هر اقدام (trial, خرید, تمدید) ردیف جدید می‌سازد
+- ردیف قبلی با `superseded_at = now` بسته می‌شود
+- «ردیف فعلی» = `superseded_at IS NULL` + `ORDER BY id DESC LIMIT 1`
+- `is_active` property به‌صورت لحظه‌ای محاسبه می‌شود (عدم ذخیره وضعیت expiry)
+
+**Stack vs Replace:**
+- اگر همان پلن خریداری شود → `end_date` روی ردیف جدید از `end_date` قبلی extend می‌شود (stack)
+- اگر پلن دیگری باشد → از `now()` شروع می‌شود (replace)
 
 ---
 
@@ -898,9 +913,29 @@ order:start → (اگر fast-checkout) ASK_NAME
 - `admin:sub:reject:{id}` → رد: دلیل + `approval_status=rejected`
 
 #### ۷.۸.۴. دکوریتور `@require_active_subscription`
-- همه handlerهای مدیریتی فروشنده (products, categories, orders, settings) با این دکوریتور محافظت می‌شوند
-- اگر اشتراک منقضی شده → پیام هشدار + دکمه خرید اشتراک جدید
-- **مسیرهای استثنا**: خود صفحه اشتراک و پنل پشتیبانی همیشه در دسترس هستند
+
+دوتا دکوریتور وجود داره:
+
+**۱. `@require_active_subscription`** — برای **مسیرهای مشتری** (مرور فروشگاه، سبد خرید، ثبت سفارش جدید)
+- اگه فروشنده `suspended` باشه یا اشتراک فعال نداشته باشه → پیام خطا نشون می‌ده و اجازه ادامه نمی‌ده
+- مسیرهای استثنا: خرید اشتراک، مشاهده سفارش‌های قبلی، پشتیبانی
+
+**۲. `@require_seller_subscription`** — برای **مسیرهای مدیریتی فروشنده** (products, categories, orders, settings)
+- اگه اشتراک منقضی شده → پیام هشدار + دکمه خرید اشتراک جدید
+- مسیرهای استثنا: خود صفحه اشتراک و پنل پشتیبانی همیشه در دسترس هستند
+
+هر دو در `handlers/subscription_decorator.py` تعریف شده‌اند.
+
+---
+
+### ۷.۹. استراتژی انقضای اشتراک (Real-time، بدون کرون)
+
+**قرارداد صریح:** هیچ کرون‌جابی برای انقضای اشتراک وجود ندارد.
+
+- **بررسی لحظه‌ای (Real-time):** `ShopSubscription.is_active` property محاسبه‌شده در لحظه (`end_date > utcnow()` و `approval_status == "approved"` و `superseded_at IS NULL`)
+- **دکوریتور چک می‌کند:** هر بار مسیر مشتری/فروشنده صدا زده می‌شود، `has_active_subscription(shop_id)` بلافاصله در دیتابیس چک می‌شود — بدون فیلد کش‌شده در `Shop`
+- **Sync با `shop.status`:** فقط در `verify_subscription` (تایید ادمین) و `reject_subscription`، `shop.status = "active"/"suspended"` ست می‌شود. انقضای طبیعی اشتراک `shop.status` را تغییر نمی‌دهد (چون real-time چک می‌شود)
+- **مزیت:** هیچ حلقه‌ی جاافتاده، هیچ inconsistency بین `shop.status` و واقعیت اشتراک، مقیاس‌پذیر (خونده فقط در لحظه request)
 
 ---
 
@@ -991,6 +1026,7 @@ values(stock=func.greatest(0, Product.stock - item.quantity),
 async def transition_order(order_id, target_status, actor="admin", bot=None) -> Order:
 ```
 
+- **Row-lock روی Order**: `session.get(Order, order_id, with_for_update=True)` قبل از تغییر وضعیت — جلوگیری از race با cron cleanup
 - اعتبارسنجی: `can_transition(order, target_status, actor)` در `utils/order_validator.py`
 - `ALLOWED_TRANSITIONS` دیکشنری وضعیت‌های مجاز
 - منطق جانبی:
@@ -1005,6 +1041,43 @@ async def transition_order(order_id, target_status, actor="admin", bot=None) -> 
 - `release_reserved_stock`
 - `order.status = CANCELLED`
 - **Emit رویداد**: `Event.ORDER_CANCELLED` (اگر `bot` پاس داده شود)
+
+### ۸.۷. فیکس‌های تراکنشی مهم (یولای ۲۰۲۶)
+
+#### ۱. ترتیب ثابت قفل (Deadlock Prevention)
+در `create_order_from_cart`، آیتم‌های سبد قبل از پردازش بر اساس `product_id` سورت می‌شوند:
+```python
+cart_items = sorted(cart_items, key=lambda i: i.product_id)
+```
+→ تضمین می‌کند همه تراکنش‌ها productها را همیشه به یک ترتیب قفل می‌کنند.
+
+#### ۲. یکی‌سازی SELECT FOR UPDATE + UPDATE
+به‌جای دو کوئری جداگانه (`SELECT ... FOR UPDATE` بعد `UPDATE`)، از `UPDATE ... WHERE ... RETURNING` استفاده می‌شود برای رزرو اتمیک:
+```sql
+UPDATE products 
+SET reserved_stock = reserved_stock + :qty 
+WHERE id = :pid AND (stock - reserved_stock) >= :qty 
+RETURNING stock, reserved_stock
+```
+→ کاهش round-trip و window برای race.
+
+#### ۳. Row-level lock روی Order در transition_order
+```python
+order = await session.get(Order, order_id, with_for_update=True)
+```
+→ جلوی همزمانی `transition_order` + `cleanup_abandoned_payments` (cron) می‌گیرد.
+
+#### ۴. Idempotency دو لایه روی ایجاد سفارش
+- **In-memory**: `_order_in_progress` flag در `context.user_data`
+- **DB-level**: `pg_advisory_xact_lock(user_id)` در `create_order_from_cart`
+→ هر دو لایه جلوگیری از double-submit می‌کنند.
+
+#### ۵. GREATEST به‌جای MAX در SQL
+`MAX(0, x)` در PostgreSQL aggregate است، روی scalar کار نمی‌کند. کد واقعی از `func.greatest(0, ...)` یا محاسبه در پایتون استفاده می‌کند:
+```python
+values(stock=func.greatest(0, Product.stock - item.quantity),
+       reserved_stock=func.greatest(0, Product.reserved_stock - item.quantity))
+```
 
 ---
 
@@ -1619,15 +1692,19 @@ ADMIN_IDS=8497713691
 - **DB-level idempotency**: `pg_advisory_xact_lock(user_id)` در `create_order_from_cart` — تضمین می‌کنه حتی بعد از ری‌استارت یا با دو نمونه بات، یه کاربر نتونه دو تا سفارش از یه سبد بزنه.
 - لیست باگ‌های رفع‌شده (GREATEST به‌جای MAX، Enum بودن غلط OrderStatus، lazy-load بعد از بسته شدن session) نشون می‌ده داری واقعاً edge caseها رو شکار می‌کنی، نه فقط happy-path رو تست می‌کنی.
 
-### ریسک‌های واقعی — به ترتیب اولویت
+### ریسک‌های واقعی — به ترتیب اولویت (بروزرسانی شده ۱۴۰۵-۰۵-۲۱)
 
-1. **بک‌آپ دیتابیس** — قبلاً فعال شد ✅ (scripts/backup.sh + container)
-2. **total_price نوعش Float** — تومان بدون اعشار، ولی محاسبات تخفیف (total × value / 100) می‌تونن imprecision تولید کنن → تغییر به Integer یا Numeric
-3. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
-4. **Deadlock در قفل چند محصولی** — ✅ رفع شد: `cart_items = sorted(cart_items, key=lambda i: i.product_id)` قبل از حلقه رزرو
-5. **شماره کارت plaintext** — قبلاً رفع شد ✅ (AES-256-GCM)
-6. **تست خودکار مسیرهای پولی** → ✅ `tests/test_flow.py` (۷ سناریو) + `tests/test_handlers_smoke.py` (۳۰ تست اسمیک) — همه پاس
-7. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
+1. **total_price نوعش Float** — تومان بدون اعشار، ولی محاسبات تخفیف (total × value / 100) می‌تونن imprecision تولید کنن → تغییر به Integer یا Numeric
+2. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
+3. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
+4. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
+5. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
+6. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
+7. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
+
+> **نکته:** تمام ضعف‌های قبلی در بخش «منطق تراکنشی» (۱ تا ۷) و «امنیت» (۱ تا ۸) در جولای ۲۰۲۶ **حل شده‌اند**. برای جزئیات فیکس‌ها به بخش ۸.۷ مراجعه کنید.
+
+---
 
 ### ایده: verification نیمه‌خودکار رسید پرداخت
 
@@ -1640,51 +1717,7 @@ ADMIN_IDS=8497713691
 - اگه mismatch → فقط صف تایید دستی
 - هم fraud کمتر (رسید تکراری/جعلی با هش عکس) هم فروشنده از گیر ۲۴ ساعته آزاد
 
-### جزئیات فنی: منطق تراکنشی (رزرو موجودی)
-
-**🟢 ضعف ۱ — عدم ترتیب ثابت قفل → Deadlock:**
-**حل شده:** `cart_items = sorted(cart_items, key=lambda i: i.product_id)` در `create_order_from_cart` خط ۷۸ — قبل از حلقه رزرو.
-
-**🟢 ضعف ۲ — دو round-trip اضافی:**
-**حل شده:** یک `UPDATE ... WHERE ... RETURNING` به‌جای `SELECT FOR UPDATE` + `UPDATE` جدا. در `create_order_from_cart` خطوط ۹۴-۱۰۷.
-
-**ضعف ۳ — ناسازگاری زمانی مستندات:**
-بخش ۵.۶ می‌گه ۱۲۰ دقیقه timeout، بخش ۱۰.۱ می‌گه ۳۰ دقیقه cron cleanup. باید کد واقعی چک بشه.
-
-**🟢 ضعف ۴ — Race بین cron cleanup و تایید فروشنده:**
-**حل شده:** `transition_order` از `session.get(Order, order_id, with_for_update=True)` استفاده می‌کند (خط ۳۰۷) — قفل row-level روی ردیف Order قبل از تغییر وضعیت.
-
-**🟡 ضعف ۵ — نبود idempotency روی دکمه ثبت نهایی:**
-**حل شده (دو لایه):** `_order_in_progress` flag (in-memory) + `pg_advisory_xact_lock(user_id)` (DB-level) — اولی جلوگیری از کلیک مضاعف هم‌زمان، دومی تضمین صحت داده حتی بعد از ری‌استارت یا چند نمونه بات.
-
-**ضعف ۶ — نشتی موجودی رزرو‌شده برای COD:**
-کرون فقط PENDING_PAYMENT (کارت) رو پاک می‌کنه. سفارش COD معلق = reserved_stock برای همیشه رزرو.
-
-**ضعف ۷ — نبود Constraint سطح DB:**
-`available_stock` فقط یه `@property` پایتونیه. نیاز به `CHECK (reserved_stock >= 0 AND reserved_stock <= stock)`.
-
-### جزئیات فنی: امنیت (۶/۱۰)
-
-سوراخ‌های واقعی:
-
-1. **شماره کارت plaintext** → ✅ رفع شد (AES-256-GCM)
-2. **Rate limiter in-memory** → ✅ رفع شد (Redis-backed)
-3. **عدم re-check وضعیت shop بعد از JWT** → ✅ رفع شد (requireSeller re-check)
-4. **بدون CSRF protection** → ✅ رفع شد (HMAC double-submit)
-5. **Rیسک Injection در پیام‌ها** → ✅ رفع شد (escape_html)
-6. **بدون de-duplication رسید** → ✅ رفع شد (SHA-256 hash + UNIQUE constraint)
-7. **رمز موقت ۸ رقمی** → ✅ رفع شد (must_change_password + rate limit)
-8. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
-
-### جزئیات فنی: آماده‌بودن برای Production (۵/۱۰)
-
-1. **بک‌آپ خودکار** → ✅ فعال شد (container + cron + rclone آماده)
-2. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
-3. **تست خودکار همه هندلرها** → ✅ `tests/test_handlers_smoke.py` (۳۰ تست اسمیک، همه پاس) + `tests/test_flow.py` (۷ سناریو)
-4. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
-5. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
-6. **Persistence مکالمه‌ها** — مشخص نیست PTB Persistence تنظیم شده
-7. **Restart policy** → ✅ از قبل `restart: unless-stopped` روی همه سرویسها
+---
 
 ### سه آیتم مهم‌تر از هر فیچر جدید
 
