@@ -1694,15 +1694,37 @@ ADMIN_IDS=8497713691
 
 ### ریسک‌های واقعی — به ترتیب اولویت (بروزرسانی شده ۱۴۰۵-۰۵-۲۱)
 
-1. **total_price نوعش Float** — تومان بدون اعشار، ولی محاسبات تخفیف (total × value / 100) می‌تونن imprecision تولید کنن → تغییر به Integer یا Numeric
-2. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن
-3. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
-4. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
-5. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
-6. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
-7. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
+1. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن (جزئیات در ادامه)
+2. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
+3. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
+4. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
+5. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
+6. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
 
-> **نکته:** تمام ضعف‌های قبلی در بخش «منطق تراکنشی» (۱ تا ۷) و «امنیت» (۱ تا ۸) در جولای ۲۰۲۶ **حل شده‌اند**. برای جزئیات فیکس‌ها به بخش ۸.۷ مراجعه کنید.
+> **نکته:** تمام ضعف‌های قبلی در بخش «منطق تراکنشی» (۱ تا ۷) و «امنیت» (۱ تا ۸) در جولای ۲۰۲۶ **حل شده‌اند**. `total_price` اکنون `Integer` است. برای جزئیات فیکس‌ها به بخش ۸.۷ مراجعه کنید.
+
+---
+
+### تحلیل: دوتایی status / payment_status (تنها بدهی فنی جدی باقی‌مانده)
+
+**وضعیت فعلی:** مدل `Order` هر دو فیلد را دارد:
+- `status` — چرخه حیات سفارش: `PENDING_PAYMENT → PAID → CONFIRMED → PREPARING → SHIPPED → DELIVERED` (یا `CANCELLED`)
+- `payment_status` — فقط وضعیت پرداخت: `pending → pending_review → paid → cancelled`
+
+**مشکل:** هر دو روی یک واقعیت واحد (آیا پول پرداخت شده؟) نظارت دارند. مثال‌های باگ:
+- سفارش `PAID` هست ولی `payment_status` هنوز `pending` → inconsistency
+- کرون `cleanup_abandoned_payments` چک `payment_status` می‌کنه نه `status`
+- `transition_order` هر دو رو آپدیت می‌کنه ولی نه همیشه هماهنگ
+
+**گزینه‌های حل (نیاز به تصمیم):**
+
+| گزینه | توضیح | ریسک |
+|-------|-------|------|
+| **A. حذف payment_status** | `status` تنها source of truth باشه. `PENDING_PAYMENT = pending payment`, `PAID = paid`. کرون و transition فقط به `status` نگاه کنن | نیاز به migrate دیتابیس + آپدیت همه چک‌ها |
+| **B. حذف status از Order** | `payment_status` باقی بماند + یک فیلد `fulfillment_status` (preparing/shipped/delivered) اضافه شود — جدا کردن پرداخت از تحویل | تغییرات بیشتر ولی معماری تمیزتر |
+| **C. نگه‌داشتن هر دو** | مستند کنیم که `status` = چرخه حیات کلی و `payment_status` = شاخه پرداخت. کرون فقط `payment_status` چک کنه | کمترین تغییر ولی dual-source-of-truth باقی می‌مونه |
+
+**پیشنهاد من: گزینه A** — ساده‌ترین مسیر. `status` الان منطق اصلی رو حمل می‌کنه، `payment_status` تقریباً redundant هست و فقط در ۲-۳ جا چک می‌شه. حذفش + migrate ساده‌تر از بازنویسی کل state machine هست.
 
 ---
 
