@@ -350,7 +350,7 @@ def available_stock(self) -> int:
 | product_id | Integer FK → products.id (nullable) | محصول در لحظه سفارش — اگر محصول حذف شود، NULL می‌شود |
 | product_name | String(150) | نام محصول (ذخیره شده در لحظه سفارش) |
 | quantity | Integer | تعداد |
-| unit_price | Float | قیمت واحد در لحظه سفارش |
+|| unit_price | Integer | قیمت واحد در لحظه سفارش (تومان، بدون اعشار) |
 
 **روابط:**
 - `product: Product` — رابطه به محصول (برای بررسی موجودی و جزئیات در زمان تایید پرداخت)
@@ -397,15 +397,15 @@ def available_stock(self) -> int:
 |------|------|--------|
 | id | Integer PK | |
 | shop_id | Integer FK → shops.id | فروشگاه |
-| code | String(50) | کد تخفیف (مثلاً SUMMER20) |
-| discount_type | String(20) | `percent` یا `fixed_amount` |
-| discount_value | Float | مقدار تخفیف (درصد یا مبلغ به تومان) |
-| min_order_amount | Float default=0 | حداقل مبلغ سفارش برای اعمال |
-| max_uses | Integer default=0 | حداکثر دفعات استفاده (0 = نامحدود) |
-| used_count | Integer default=0 | دفعات استفاده شده |
-| is_active | Boolean default=True | فعال/غیرفعال |
-| expires_at | DateTime? | تاریخ انقضا |
-| created_at | DateTime | |
+|| code | String(50) | کد تخفیف (مثلاً SUMMER20) |
+|| discount_type | String(20) | `percent` یا `fixed_amount` |
+|| discount_value | Integer | مقدار تخفیف (درصد یا مبلغ به تومان) — **Integer برای دقت** |
+|| min_order_amount | Integer default=0 | حداقل مبلغ سفارش برای اعمال — **Integer** |
+|| max_uses | Integer default=0 | حداکثر دفعات استفاده (0 = نامحدود) |
+|| used_count | Integer default=0 | دفعات استفاده شده |
+|| is_active | Boolean default=True | فعال/غیرفعال |
+|| expires_at | DateTime? | تاریخ انقضا |
+|| created_at | DateTime | |
 
 **Index**: `(shop_id, code)` — ترکیبی
 
@@ -636,7 +636,7 @@ States در `handlers/order.py`:
 | ASK_NAME | 0 | `ask_name` | دریافت نام گیرنده (۲-۱۰۰ کاراکتر) |
 | ASK_PHONE | 1 | `ask_phone` | شماره تماس ۱۱ رقمی (`^09\d{9}$` با تبدیل اعداد فارسی) |
 | ASK_ADDRESS | 2 | `ask_address` | آدرس (حداکثر ۵۰۰ کاراکتر) — اگر `saved_address` موجود باشد → دکمه `✅ بله، از اطلاعات قبلی` |
-| ASK_PAYMENT_METHOD | 3 | `ask_payment_method` | انتخاب روش پرداخت (داینامیک بر اساس تنظیمات فروشنده) — فعلاً فقط `💳 کارت به کارت` |
+| ASK_NOTES | 3 | `ask_notes` | توضیحات اختیاری مشتری (رنگ، سایز، و...) — تایپ `-` یا `/skip` برای رد |
 | CONFIRM | 4 | `_show_order_summary` | خلاصه سفارش با دکمه‌های: `✅ ثبت نهایی`, `🎁 کد تخفیف`, `✏️ ویرایش اطلاعات`, `🔙 بازگشت` |
 | ASK_CARD_RECEIPT | 5 | `handle_card_receipt` | دریافت عکس/متن رسید (برای `card_to_card`) |
 | ASK_DISCOUNT | 6 | `receive_discount` | دریافت کد تخفیف متنی |
@@ -646,19 +646,18 @@ States در `handlers/order.py`:
 ```
 order:start → (اگر fast-checkout) ASK_NAME
   → ASK_PHONE → ASK_ADDRESS
+    → ASK_NOTES
     → [اگر saved info موجود: دکمه "استفاده از اطلاعات قبلی"]
-    → ASK_PAYMENT_METHOD → CONFIRM
+    → CONFIRM
       → 🎁 کد تخفیف → ASK_DISCOUNT → validate → CONFIRM (با تخفیف)
       → ✅ ثبت نهایی → create_order_from_cart()
-        → اگر COD: OrderStatus.PENDING → done
-        → اگر card_to_card: OrderStatus.PENDING_PAYMENT → ASK_CARD_RECEIPT → ارسال عکس رسید → done
+        → card_to_card: OrderStatus.PENDING_PAYMENT → ASK_CARD_RECEIPT → ارسال عکس رسید → done
 ```
 
 **دکمه‌های درون CONFIRM:**
 - `order:confirm` — ثبت نهایی
 - `order:ask_discount` — رفتن به ASK_DISCOUNT
-- `order:change_name` / `phone` / `address` — ویرایش مرحله قبل
-- `order:change_payment` — تغییر روش پرداخت
+- `order:change_name` / `phone` / `address` / `notes` — ویرایش مرحله قبل
 - `order:cancel` — انصراف (ConversationHandler.END)
 
 **Fallbackهای مکالمه (هرجایی قابل استفاده):**
@@ -947,7 +946,7 @@ order:start → (اگر fast-checkout) ASK_NAME
 
 ```python
 async def create_order_from_cart(
-    user_id, shop_id, customer_info, payment_method,
+    user_id, shop_id, customer_info,
     discount_code="", discount_amount=0
 ) -> OrderResult:
 ```
@@ -999,26 +998,23 @@ WHERE id = :pid
 
 ### ۸.۴. نهایی‌سازی موجودی (`finalize_stock_deduction` — در `transition_order`)
 
-وقتی سفارش به `PAID` (برای card_to_card) یا `CONFIRMED` (برای COD) می‌رسد:
+وقتی سفارش به `PAID` (برای card_to_card) می‌رسد:
 
 ```sql
 UPDATE products 
-SET stock = MAX(0, stock - :qty),
-    reserved_stock = MAX(0, reserved_stock - :qty) 
+SET stock = GREATEST(0, stock - :qty),
+    reserved_stock = GREATEST(0, reserved_stock - :qty) 
 WHERE id = :pid
 ```
 
-**توجه**: `stock` (`Product.stock`) ستون است، نه تابع. `MAX(0, stock - qty)` در SQL `stock - qty` را محاسبه می‌کند و PostgreSQL `MAX` aggregate روی دو اسکالر کار نمی‌کند. از `GREATEST` استفاده کنید:
-
-```python
-values(stock=Product.stock - item.quantity, reserved_stock=Product.reserved_stock - item.quantity)
-```
-مقادیر در پایتون محاسبه می‌شوند، `GREATEST` در SQL نیست. اگر `stock` به SQL ارسال شود، مقدار محاسبه شده پایتون ارسال می‌شود — `stock - qty` ممکن است منفی شود. برای ایمنی:
+**توجه**: `stock` (`Product.stock`) ستون است، نه تابع. PostgreSQL `MAX` aggregate روی دو اسکالر کار نمی‌کند. از `GREATEST` استفاده کنید:
 
 ```python
 values(stock=func.greatest(0, Product.stock - item.quantity),
        reserved_stock=func.greatest(0, Product.reserved_stock - item.quantity))
 ```
+
+مقادیر در پایتون محاسبه می‌شوند، `GREATEST` در SQL نیست. اگر `stock` به SQL ارسال شود، مقدار محاسبه شده پایتون ارسال می‌شود — `stock - qty` ممکن است منفی شود. برای ایمنی:
 
 ### ۸.۵. `transition_order` (تغییر وضعیت مرکزی)
 
@@ -1031,9 +1027,8 @@ async def transition_order(order_id, target_status, actor="admin", bot=None) -> 
 - `ALLOWED_TRANSITIONS` دیکشنری وضعیت‌های مجاز
 - منطق جانبی:
   - **PAID** (card_to_card): نهایی‌سازی موجودی + `_check_low_stock_after_reduction`
-  - **CONFIRMED** (COD): نهایی‌سازی موجودی + `_check_low_stock_after_reduction`
   - **CANCELLED**: آزادسازی رزرو
-- **Emit رویداد**: `EventBus.emit` برای ORDER_PAID / ORDER_CONFIRMED / ORDER_CANCELLED
+- **Emit رویداد**: `EventBus.emit` برای ORDER_PAID / ORDER_CANCELLED
 
 ### ۸.۶. `cancel_order_and_release_stock`
 
@@ -1131,16 +1126,15 @@ values(stock=func.greatest(0, Product.stock - item.quantity),
 - `cleanup_abandoned_payments()`:
   - **بدون رسید**: ۱۵ دقیقه پس از ایجاد → CANCELLED و آزادسازی `reserved_stock`
   - **بعد از رسید**: ۴۸ ساعت (فروشنده فرصت کافی دارد)
-  - **COD (PENDING)**: ۳۰ روز → CANCELLED
 - اجرا: هر ۵ دقیقه (`payment._post_init`)
 
 ```python
 async def cleanup_task():
     await payment_svc.cleanup_abandoned_payments()
 ```
+
 - سفارش‌های بدون رسید `created_at < now - 15min` → CANCELLED
 - سفارش‌های با رسید (بیش از ۴۸ ساعت) → CANCELLED
-- COD سفارش‌های `PENDING` قدیمی‌تر از ۳۰ روز → CANCELLED
 - موجودی رزرو شده آزاد می‌شود
 - از `TIMESTAMP WITHOUT TIME ZONE` → `.replace(tzinfo=None)` برای مقایسه
 
@@ -1263,36 +1257,33 @@ transition_order(PAID)
 | `cart:view` | `view_cart` | نمایش سبد خرید |
 | `cart:inc:{id}` | `change_quantity` | افزایش تعداد |
 | `cart:dec:{id}` | `change_quantity` | کاهش تعداد |
-| `cart:remove:{id}` | `remove_from_cart` | حذف از سبد |
-| `cart:clear` | `clear_cart` | خالی کردن سبد |
-| `order:start` | `start_checkout` | شروع ثبت سفارش |
-| `order:confirm` | `confirm_order` | ثبت نهایی |
-| `order:change_payment` | `change_payment_method` | تغییر روش پرداخت |
-| `order:cancel` | `cancel_order` | انصراف |
-| `order:history` | `order_history` | تاریخچه سفارش‌ها |
-| `order:detail:{id}` | `order_detail_customer` | جزئیات سفارش مشتری |
-| `order:reorder:{id}` | `handle_reorder` | خرید مجدد |
-| `order:ask_discount` | `ask_discount` | درخواست کد تخفیف |
-| `pay:card_to_card` | `ask_payment_method` | انتخاب کارت‌به‌کارت |
-| `pay:verify:{id}:{authority}` | `verify_payment_callback` | تأیید پرداخت (قدیمی) |
-| `pay:cancel:{id}` | `cancel_order_payment` | لغو سفارش |
-| `pay:receipt_retry:{id}` | `handle_card_receipt_retry` | آپلود مجدد رسید |
-| `pay:convert_cod:{id}` | `handle_convert_to_cod` | تغییر به درب منزل |
+|| `cart:remove:{id}` | `remove_from_cart` | حذف از سبد |
+|| `cart:clear` | `clear_cart` | خالی کردن سبد |
+|| `order:start` | `start_checkout` | شروع ثبت سفارش |
+|| `order:confirm` | `confirm_order` | ثبت نهایی |
+|| `order:cancel` | `cancel_order` | انصراف |
+|| `order:history` | `order_history` | تاریخچه سفارش‌ها |
+|| `order:detail:{id}` | `order_detail_customer` | جزئیات سفارش مشتری |
+|| `order:reorder:{id}` | `handle_reorder` | خرید مجدد |
+|| `order:ask_discount` | `ask_discount` | درخواست کد تخفیف |
+|| `pay:verify:{id}:{authority}` | `verify_payment_callback` | تأیید پرداخت (قدیمی) |
+|| `pay:cancel:{id}` | `cancel_order_payment` | لغو سفارش |
+|| `pay:receipt_retry:{id}` | `handle_card_receipt_retry` | آپلود مجدد رسید |
 || `wishlist:add:{pid}:{cat}:{page}` | `toggle_wishlist` | افزودن/حذف از علاقه‌مندی‌ها |
 || `wishlist:remove:{pid}:{cat}:{page}` | `toggle_wishlist` | حذف از علاقه‌مندی‌ها |
 || `wishlist:view` | `view_wishlist` | نمایش علاقه‌مندی‌ها |
-| `search:start` | `start_search` | شروع جستجو |
-| `search:result:{pid}` | `search_result_callback` | نتیجه جستجو |
-| `restock:subscribe:{pid}` | `subscribe_restock` | سابسکرایب موجود شدن |
-| `restock:unsubscribe:{pid}` | `unsubscribe_restock` | لغو سابسکرایب |
-| `shop:recent` | `show_recent_shops` | فروشگاه‌های اخیر |
-| `shop:open:{id}` | `open_shop_from_recent` | باز کردن فروشگاه |
-| `support:open` | `support` → `support_start` | پشتیبانی — ورود به مکالمه با ادمین‌ها |
-| `support:seller:{shop_id}` | `seller_support_start` | پشتیبانی فروشگاه — شروع مکالمه با فروشنده |
-| `support_seller_cancel` | `seller_support_cancel` | لغو مکالمه پشتیبانی فروشنده |
-| `noop` | `noop_callback` | دکمه صرفاً نمایشی |
-| `order:conversation:{id}` | `open_conversation_buyer` | شروع مکالمه با فروشنده |
-| `conv:back` | `back_to_order_detail` | بازگشت به جزئیات سفارش |
+|| `search:start` | `start_search` | شروع جستجو |
+|| `search:result:{pid}` | `search_result_callback` | نتیجه جستجو |
+|| `restock:subscribe:{pid}` | `subscribe_restock` | سابسکرایب موجود شدن |
+|| `restock:unsubscribe:{pid}` | `unsubscribe_restock` | لغو سابسکرایب |
+|| `shop:recent` | `show_recent_shops` | فروشگاه‌های اخیر |
+|| `shop:open:{id}` | `open_shop_from_recent` | باز کردن فروشگاه |
+|| `support:open` | `support` → `support_start` | پشتیبانی — ورود به مکالمه با ادمین‌ها |
+|| `support:seller:{shop_id}` | `seller_support_start` | پشتیبانی فروشگاه — شروع مکالمه با فروشنده |
+|| `support_seller_cancel` | `seller_support_cancel` | لغو مکالمه پشتیبانی فروشنده |
+|| `noop` | `noop_callback` | دکمه صرفاً نمایشی |
+|| `order:conversation:{id}` | `open_conversation_buyer` | شروع مکالمه با فروشنده |
+|| `conv:back` | `back_to_order_detail` | بازگشت به جزئیات سفارش |
 
 ### ۱۲.۴. Callback Pattern‌های ربات — فروشنده
 
@@ -1584,7 +1575,6 @@ ADMIN_IDS=8497713691
 - [x] **رفع `render_view`**: پارامتر `parse_mode` نداشت → لیست کد تخفیف با TypeError کرش می‌کرد
 - [x] **رفع `confirm_card_payment`**: دیسکونت به `create_order_from_cart` پاس داده نمی‌شد
 - [x] **رفع `cancel_order_and_release_stock`**: event emit نمی‌کرد — حالا `Event.ORDER_CANCELLED` + `bot` parameter
-- [x] **رفع `handle_convert_to_cod`**: `transition_order` بدون `bot` صدا زده می‌شد
 - [x] **رفع کد مرده `max_discount_amount`**: فیلد در `DiscountCode` مدل وجود نداشت — حذف شد
 - [x] **رفع `MAX(0, x)` → `GREATEST(0, x)`**: PostgreSQL تابع `MAX` scalar روی دو عدد نمی‌شناسد
 - [x] **رفع `ORDER_STATUS.CANCELLED`**: با دو L (cancelled) — انگلیسی بریتانیایی
@@ -1701,7 +1691,7 @@ ADMIN_IDS=8497713691
 5. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
 6. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
 
-> **نکته:** تمام ضعف‌های قبلی در بخش «منطق تراکنشی» (۱ تا ۷) و «امنیت» (۱ تا ۸) در جولای ۲۰۲۶ **حل شده‌اند**. `total_price` اکنون `Integer` است. برای جزئیات فیکس‌ها به بخش ۸.۷ مراجعه کنید.
+> **نکته باقی‌مانده در کد:** `discount_value` و `min_order_amount` در مدل واقعاً `Float` هستند (خطوط ۴۱۰-۴۱۱ `models.py`) — اینها **Integer در مستندات** به عنوان goal علامت خوردند، کد هنوز Float داره. به پروژه اضافه بشه.
 
 ---
 
