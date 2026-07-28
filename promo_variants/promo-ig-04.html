@@ -3,34 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>فروشگرام — نئون سایبر</title>
+<title>فروشگرام — اقیانوس آبی</title>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:         #0a0a05;
-    --surface:    #11110a;
-    --surface2:   #1a1a0e;
-    --surface3:   #252515;
-    --border:     #2a3a10;
-    --border2:    #3a5a18;
-    --text:       #d0ffc0;
-    --text2:      #8ae870;
-    --text3:      #4a8a30;
-    --accent:     #39ff14;
-    --accent2:    #70ff50;
-    --green:      #00ff88;
-    --greenBg:    rgba(0,255,136,.08);
-    --blue:       #00d4ff;
-    --blueBg:     rgba(0,212,255,.08);
-    --orange:     #ffcc00;
-    --orangeBg:   rgba(255,204,0,.08);
-    --pink:       #ff00aa;
-    --red:        #ff0033;
+    --bg:         #e3f2fd;
+    --surface:    #ffffff;
+    --surface2:   #f0f8ff;
+    --surface3:   #ddeeff;
+    --border:     #bbdefb;
+    --border2:    #90caf9;
+    --text:       #0d2538;
+    --text2:      #1e4d6b;
+    --text3:      #4a7a9e;
+    --accent:     #0d47a1;
+    --accent2:    #1565c0;
+    --green:      #00a86b;
+    --greenBg:    rgba(0,168,107,.08);
+    --blue:       #0277bd;
+    --blueBg:     rgba(2,119,189,.06);
+    --orange:     #e65100;
+    --orangeBg:   rgba(230,81,0,.08);
+    --pink:       #c2185b;
+    --red:        #b71c1c;
     --radius:     32px;
-    --shadow:     0 8px 80px rgba(57,255,20,.08);
-    --glow:       rgba(57,255,20,.12);
-    --custBg:     #1a1a0e;
+    --shadow:     0 12px 90px rgba(0,0,0,.14);
+    --glow:       rgba(13,71,161,.06);
+    --custBg:     #c8e6ff;
   }
+
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     font-family: 'Vazirmatn', system-ui, sans-serif;
@@ -49,23 +50,28 @@
   .phone-wrap { position:relative; width:400px; height:830px; flex-shrink:0; z-index:1; }
   #scene {
     position:relative; width:100%; height:100%;
-    background:var(--surface); border-radius: 4px;
+    background:var(--surface); border-radius: 32px;
     border:1.5px solid var(--border2);
     box-shadow:var(--shadow), 0 0 120px var(--glow);
     overflow:hidden;
   }
-  .notch { display:none; }
+  .notch {
+    position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+    width:140px; height:26px; background:var(--surface);
+    border-radius:0 0 16px 16px; border:1.5px solid var(--border2); border-top:none;
+    z-index:15; display:flex; align-items:center; justify-content:center; gap:10px;
+  }
   .notch .camera { width:8px; height:8px; border-radius:50%; background:radial-gradient(circle at 30% 30%,#2a2a4a,#0a0a1a); }
   .notch .speaker { width:40px; height:3px; border-radius:2px; background:#1a1a30; }
   .status-bar {
-    position:absolute; top:10px; left:0; right:0; height:38px;
+    position:absolute; top:24px; left:0; right:0; height:38px;
     display:flex; align-items:center; justify-content:space-between;
     padding:0 28px; font-size:12px; font-weight:600; color:var(--text); z-index:10;
   }
   .st-icons { display:flex; gap:3px; font-size:11px; }
   .st-icons svg { width:16px; height:12px; }
   .chat-header {
-    position:absolute; top:46px; left:0; right:0; height:56px;
+    position:absolute; top:60px; left:0; right:0; height:56px;
     display:flex; align-items:center; padding:0 14px; gap:10px;
     background:var(--surface); border-bottom:1px solid var(--border); z-index:10;
     transition:all .5s cubic-bezier(.16,.88,.28,1);
@@ -88,7 +94,7 @@
   .chat-header .info .sub { font-size:11px; color:var(--text3); transition:all .3s; }
   .chat-header .actions { display:flex; gap:14px; font-size:18px; color:var(--text3); }
   .messages {
-    position:absolute; top:103px; left:0; right:0; bottom:64px;
+    position:absolute; top:117px; left:0; right:0; bottom:64px;
     padding:10px 12px 8px; overflow:hidden;
     display:flex; flex-direction:column; gap:6px;
   }
@@ -225,7 +231,7 @@
   @keyframes fadeOut{0%{opacity:1}70%{opacity:1}100%{opacity:0;pointer-events:none}}
   .intro .logo-big {
     width:96px; height:96px; border-radius:26px;
-    background:linear-gradient(135deg,#39ff14,#00d4ff,#ff00aa);
+    background:linear-gradient(135deg,var(--accent),#8b5cf6,var(--pink));
     display:flex; align-items:center; justify-content:center; font-size:38px;
     box-shadow:0 0 120px rgba(108,92,231,.25);
     animation:logoEntrance .8s cubic-bezier(.16,.88,.28,1) both, glowPulse 2s 1s infinite;
@@ -411,7 +417,7 @@
 
   @media (max-width:480px){
     .phone-wrap{width:100vw;height:100vh}#scene{border-radius:0;border:none}
-    .notch { display:none; }.control-panel{display:none}.cp-cue{display:none}
+    .notch{display:none}.control-panel{display:none}.cp-cue{display:none}
     #bottomBar{display:none}
   }
 </style>

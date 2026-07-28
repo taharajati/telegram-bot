@@ -3,34 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>فروشگرام — رز گلد</title>
+<title>فروشگرام — غروب نارنجی</title>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:         #0f080d;
-    --surface:    #1a1016;
-    --surface2:   #25181f;
-    --surface3:   #301f28;
-    --border:     #402530;
-    --border2:    #553040;
-    --text:       #f5e0e8;
-    --text2:      #d4a0b8;
-    --text3:      #9a6078;
-    --accent:     #e84393;
-    --accent2:    #fd79a8;
-    --green:      #00b894;
-    --greenBg:    rgba(0,184,148,.1);
-    --blue:       #6c5ce7;
-    --blueBg:     rgba(108,92,231,.1);
-    --orange:     #fdcb6e;
-    --orangeBg:   rgba(253,203,110,.1);
-    --pink:       #fd79a8;
-    --red:        #d63031;
+    --bg:         #fff3e0;
+    --surface:    #ffffff;
+    --surface2:   #fff8f0;
+    --surface3:   #ffebd6;
+    --border:     #ffe0b2;
+    --border2:    #ffcc80;
+    --text:       #2d1b0a;
+    --text2:      #5a3d1e;
+    --text3:      #8a6638;
+    --accent:     #e65100;
+    --accent2:    #ff6d00;
+    --green:      #2e7d32;
+    --greenBg:    rgba(46,125,50,.08);
+    --blue:       #1565c0;
+    --blueBg:     rgba(21,101,192,.06);
+    --orange:     #bf360c;
+    --orangeBg:   rgba(191,54,12,.08);
+    --pink:       #ad1457;
+    --red:        #b71c1c;
     --radius:     32px;
-    --shadow:     0 8px 80px rgba(232,67,147,.06);
-    --glow:       rgba(232,67,147,.12);
-    --custBg:     #281822;
+    --shadow:     0 12px 90px rgba(0,0,0,.15);
+    --glow:       rgba(230,81,0,.06);
+    --custBg:     #ffccbc;
   }
+
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     font-family: 'Vazirmatn', system-ui, sans-serif;
@@ -49,7 +50,7 @@
   .phone-wrap { position:relative; width:400px; height:830px; flex-shrink:0; z-index:1; }
   #scene {
     position:relative; width:100%; height:100%;
-    background:var(--surface); border-radius: 36px;
+    background:var(--surface); border-radius: 32px;
     border:1.5px solid var(--border2);
     box-shadow:var(--shadow), 0 0 120px var(--glow);
     overflow:hidden;
@@ -230,7 +231,7 @@
   @keyframes fadeOut{0%{opacity:1}70%{opacity:1}100%{opacity:0;pointer-events:none}}
   .intro .logo-big {
     width:96px; height:96px; border-radius:26px;
-    background:linear-gradient(135deg,#e84393,#fd79a8,#fdcb6e);
+    background:linear-gradient(135deg,var(--accent),#8b5cf6,var(--pink));
     display:flex; align-items:center; justify-content:center; font-size:38px;
     box-shadow:0 0 120px rgba(108,92,231,.25);
     animation:logoEntrance .8s cubic-bezier(.16,.88,.28,1) both, glowPulse 2s 1s infinite;

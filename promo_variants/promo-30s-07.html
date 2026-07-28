@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فروشگرام — زغالی</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a10;--surface:#13131e;--surface2:#1d1d30;--surface3:#282840;--border:#262640;--border2:#363660;--text:#ededf5;--text2:#9a9ab5;--text3:#5c5c78;--accent:#6c5ce7;--accent2:#a29bfe;--green:#00d2a0;--greenBg:rgba(0,210,160,.12);--blue:#0984e3;--blueBg:rgba(9,132,227,.12);--orange:#fdcb6e;--orangeBg:rgba(253,203,110,.12);--pink:#fd79a8;--red:#e74c3c;--radius:40px;--shadow:0 8px 80px rgba(0,0,0,.6);--glow:rgba(108,92,231,.15)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Vazirmatn',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw;display:flex;align-items:center;justify-content:center;user-select:none}
+body::before,body::after{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;pointer-events:none;z-index:0;background:radial-gradient(ellipse at 30% 40%,rgba(187,134,252,.08) 0%,transparent 60%);animation:bgDrift 20s ease infinite}
+body::after{background:radial-gradient(ellipse at 70% 60%,rgba(3,218,198,.05) 0%,transparent 50%);animation:bgDrift 25s ease infinite reverse}
+@keyframes bgDrift{0%{transform:translate(0,0)}50%{transform:translate(3%,-2%)}100%{transform:translate(0,0)}}
+.phone-wrap{position:relative;width:420px;height:780px;flex-shrink:0;z-index:1}
+#scene{position:relative;width:100%;height:100%;background:linear-gradient(160deg,var(--surface) 50%,var(--surface3));border-radius:var(--radius);border:1.5px solid var(--border2);box-shadow:var(--shadow),0 0 120px var(--glow);overflow:hidden}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:28px;background:var(--surface);border-radius:0 0 18px 18px;border:1.5px solid var(--border2);border-top:none;z-index:15;display:flex;align-items:center;justify-content:center;gap:12px}
+.notch .camera{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#2a2a4a,#0a0a1a);border:1px solid #2a2a40}
+.notch .speaker{width:44px;height:3px;border-radius:2px;background:#1a1a30}
+.status-bar{position:absolute;top:26px;left:0;right:0;height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;font-size:12px;font-weight:600;color:var(--text);z-index:10}
+.st-icons{display:flex;gap:4px;font-size:11px;align-items:center}
+.st-icons svg{width:16px;height:12px}
+@keyframes fi{0%{opacity:0;transform:translateY(24px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes fd{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes si{0%{opacity:0;transform:scale(.5)}60%{transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
+@keyframes sl{0%{opacity:0;transform:translateX(36px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes sr{0%{opacity:0;transform:translateX(-36px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+@keyframes pg{0%,100%{box-shadow:0 0 20px rgba(187,134,252,.2)}50%{box-shadow:0 0 60px rgba(187,134,252,.5)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .4s ease,transform .4s ease;transform:scale(.96)}
+.screen.active{opacity:1;pointer-events:auto;transform:scale(1)}
+.screen .content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 18px;gap:2px}
+#s1 .chat-wrap{width:100%;max-width:310px;padding:44px 0 0;position:relative}
+#s1 .chat-wrap .ov{position:absolute;top:6px;left:4px;font-size:36px;animation:float 2s ease infinite}
+#s1 .cb{opacity:0;margin:4px 0;padding:11px 15px;border-radius:14px;font-size:12px;line-height:1.5;animation:fi .35s ease forwards;position:relative}
+#s1 .cb.s{background:var(--surface2);border-bottom-left-radius:3px;align-self:flex-start}
+#s1 .cb.c{background:linear-gradient(135deg,#1e1e30,#282840);border-bottom-right-radius:3px;align-self:flex-end;text-align:right}
+#s1 .cb .lb{font-size:8px;color:var(--text3);margin-bottom:2px;display:block;font-weight:500}
+#s1 .cb .tt{display:block;font-size:7px;color:var(--text3);margin-top:3px}
+#s2 .logo{width:100px;height:100px;border-radius:28px;background:linear-gradient(135deg,#bb86fc,#ce93fd,#e1bee7);display:flex;align-items:center;justify-content:center;font-size:40px;animation:si .7s cubic-bezier(.16,.88,.28,1) both,pg 2s 1s infinite}
+#s2 .ti{font-size:28px;font-weight:800;margin-top:18px;animation:fi .5s .3s both}
+#s2 .ti span{color:var(--accent2)}
+#s2 .sub{font-size:13px;color:var(--text2);margin-top:6px;animation:fi .5s .4s both}
+#s2 .tags{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;justify-content:center;animation:fi .5s .5s both}
+#s2 .tag{background:var(--surface2);border:1px solid var(--border);padding:6px 16px;border-radius:18px;font-size:11px;display:flex;align-items:center;gap:5px}
+#s2 .tag.g{border-color:var(--green);color:var(--green)}
+#s2 .tag.b{border-color:var(--blue);color:var(--blue)}
+#s3 .steps{display:flex;flex-direction:column;gap:12px;width:100%;max-width:260px}
+#s3 .st{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface2);border-radius:12px;border:1px solid var(--border);opacity:0;animation:sl .45s cubic-bezier(.16,.88,.28,1) forwards;position:relative;overflow:hidden;transition:border-color .2s,transform .2s}
+#s3 .st:hover{border-color:var(--accent);transform:translateX(-3px)}
+#s3 .st .num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+#s3 .st .tx{flex:1}
+#s3 .st .tx .lb{font-size:12px;font-weight:600}
+#s3 .st .tx .ds{font-size:10px;color:var(--text2);margin-top:2px;direction:ltr}
+#s3 .st .ic{font-size:24px}
+#s4 .dg{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:300px}
+#s4 .di{background:linear-gradient(145deg,var(--surface2),var(--surface3));border-radius:14px;padding:18px 10px;text-align:center;border:1px solid var(--border);animation:si .4s cubic-bezier(.16,.88,.28,1) both;opacity:0;transition:transform .2s,border-color .2s}
+#s4 .di:hover{transform:translateY(-3px);border-color:var(--accent)}
+#s4 .di .d-icon{font-size:24px;margin-bottom:4px}
+#s4 .di .d-num{font-size:28px;font-weight:800;letter-spacing:.5px}
+#s4 .di .d-label{font-size:10px;color:var(--text2);margin-top:3px}
+#s4 .di .bar{height:3px;width:70%;margin:5px auto 0;border-radius:2px;background:var(--surface3);overflow:hidden}
+#s4 .di .bar .f{height:100%;width:0;border-radius:2px;transition:width 2s ease}
+#s5 .flow{display:flex;flex-direction:column;gap:7px;align-items:center;width:100%}
+#s5 .fi{display:flex;align-items:center;gap:9px;width:92%;max-width:280px;padding:10px 14px;background:var(--surface2);border-radius:11px;border:1px solid var(--border);opacity:0;animation:sr .35s cubic-bezier(.16,.88,.28,1) forwards;transition:border-color .2s}
+#s5 .fi:hover{border-color:var(--accent)}
+#s5 .fi .arr{font-size:14px;color:var(--green);animation:pulse 1s infinite}
+#s5 .fi .fic{font-size:18px;width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#s5 .fi .tx{flex:1;text-align:right}
+#s5 .fi .tx .lb{font-size:11px;font-weight:600}
+#s5 .fi .tx .dc{font-size:9px;color:var(--text2);margin-top:1px}
+#s5 .fi .fic.il{background:var(--greenBg)}#s5 .fi .fic.ic{background:var(--blueBg)}#s5 .fi .fic.ip{background:var(--orangeBg)}#s5 .fi .fic.icr{background:rgba(108,92,231,.12)}#s5 .fi .fic.iy{background:rgba(232,67,147,.12)}#s5 .fi .fic.id{background:var(--greenBg)}
+#s6 .tl{display:flex;flex-direction:column;gap:5px;width:100%;max-width:280px}
+#s6 .ti{display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--surface2);border-radius:9px;border:1px solid var(--border);opacity:0;animation:sl .3s cubic-bezier(.16,.88,.28,1) forwards}
+#s6 .ti .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;position:relative}
+#s6 .ti .dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;opacity:.25;z-index:-1}
+#s6 .ti .dot.do{background:var(--orange)}#s6 .ti .dot.do::after{background:var(--orange)}
+#s6 .ti .dot.dp{background:var(--blue)}#s6 .ti .dot.dp::after{background:var(--blue)}
+#s6 .ti .dot.dr{background:var(--accent)}#s6 .ti .dot.dr::after{background:var(--accent)}
+#s6 .ti .dot.ds{background:var(--accent2)}#s6 .ti .dot.ds::after{background:var(--accent2)}
+#s6 .ti .dot.dd{background:var(--green)}#s6 .ti .dot.dd::after{background:var(--green)}
+#s6 .ti .cn{width:2px;height:14px;background:var(--border);margin:0 3px}
+#s6 .ti .tx{flex:1}
+#s6 .ti .tx .st{font-size:10px;font-weight:600}
+#s6 .ti .tx .sc{font-size:8px;color:var(--text2);margin-top:1px}
+#s7 .gg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;width:100%;max-width:320px}
+#s7 .gc{background:linear-gradient(145deg,var(--surface2),transparent);border-radius:11px;padding:12px 5px;text-align:center;border:1px solid var(--border);animation:si .25s cubic-bezier(.16,.88,.28,1) both;opacity:0;transition:transform .2s,border-color .2s}
+#s7 .gc:hover{border-color:var(--accent);transform:scale(1.02)}
+#s7 .gc .gf{font-size:18px;margin-bottom:2px}
+#s7 .gc .gl{font-size:8px;font-weight:500}
+#s7 .gc .gd{font-size:6.5px;color:var(--text3);line-height:1.2;margin-top:1px}
+#s8 .cta{display:flex;flex-direction:column;align-items:center;padding:0 20px}
+#s8 .cta-logo{width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#bb86fc,#ce93fd,#e1bee7);display:flex;align-items:center;justify-content:center;font-size:34px;animation:si .6s cubic-bezier(.16,.88,.28,1) both}
+#s8 .cta-title{font-size:24px;font-weight:800;margin-top:14px;animation:fi .5s .3s both}
+#s8 .cta-links{display:flex;flex-direction:column;gap:8px;margin-top:20px;width:100%;max-width:230px;animation:fi .5s .5s both}
+#s8 .cta-btn{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;text-decoration:none;color:var(--text);font-size:12px;font-weight:600;transition:all .2s;border:1px solid var(--border)}
+#s8 .cta-btn:hover{transform:translateX(-3px)}
+#s8 .cta-btn.p{background:linear-gradient(135deg,var(--accent),#8b5cf6);border-color:var(--accent)}
+#s8 .cta-btn .ci{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px}
+#s8 .cta-btn.p .ci{background:rgba(255,255,255,.15)}
+#s8 .cta-sub{font-size:10px;color:var(--text3);margin-top:14px;letter-spacing:2px;animation:fi .5s .7s both}
+.prog-bar{position:absolute;bottom:-1px;left:0;right:0;height:4px;border-radius:0 0 var(--radius) var(--radius);background:var(--surface3);overflow:hidden;z-index:20}
+.prog-bar .fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .15s linear}
+.scr-indicator{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:100;padding:8px 18px;background:rgba(19,19,30,.85);border-radius:20px;backdrop-filter:blur(12px);border:1px solid var(--border);transition:opacity .3s}
+.scr-indicator .dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:all .4s}
+.scr-indicator .dot.a{background:var(--accent2);width:22px;border-radius:4px}
+.ctrl-hint{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text3);z-index:100;opacity:.5;display:flex;gap:10px;align-items:center;background:rgba(19,19,30,.6);padding:4px 14px;border-radius:10px;backdrop-filter:blur(6px);transition:opacity .5s}
+.ctrl-hint kbd{background:var(--surface3);padding:1px 7px;border-radius:3px;font-size:7px;font-family:'Vazirmatn',sans-serif;color:var(--text2);border:1px solid var(--border);direction:ltr;display:inline-block}
+.hidden{opacity:0!important;pointer-events:none}
+@media(max-width:480px){
+.phone-wrap{width:100vw;height:100vh}
+#scene{border-radius:0;border:none}
+.notch{display:none}
+.scr-indicator{display:none}
+.ctrl-hint{display:none}
+.screen .content{padding:18px 10px}
+.screen .content #s1 .chat-wrap{max-width:100%;padding:30px 4px 0}
+#s1 .cb{font-size:10px;padding:8px 12px;margin:3px 0}
+#s1 .cb .lb{font-size:7px}
+#s1 .cb .tt{font-size:6px}
+#s2 .logo{width:70px;height:70px;font-size:28px}
+#s2 .ti{font-size:20px;margin-top:12px}
+#s2 .sub{font-size:11px}
+#s2 .tags{margin-top:14px}
+#s2 .tag{padding:4px 12px;font-size:9px}
+#s3 .steps{max-width:100%}
+#s3 .st{padding:10px 12px}
+#s3 .st .num{width:30px;height:30px;font-size:13px}
+#s3 .st .tx .lb{font-size:10px}
+#s3 .st .tx .ds{font-size:8px}
+#s3 .st .ic{font-size:20px}
+#s4 .dg{max-width:100%;gap:7px}
+#s4 .di{padding:12px 6px}
+#s4 .di .d-icon{font-size:20px}
+#s4 .di .d-num{font-size:22px}
+#s4 .di .d-label{font-size:9px}
+#s5 .flow{max-width:100%}
+#s5 .fi{max-width:100%;padding:8px 10px}
+#s5 .fi .fic{width:30px;height:30px;font-size:14px}
+#s5 .fi .tx .lb{font-size:10px}
+#s5 .fi .tx .dc{font-size:8px}
+#s5 .fi .arr{font-size:12px}
+#s6 .tl{max-width:100%}
+#s6 .ti{padding:7px 10px}
+#s6 .ti .tx .st{font-size:9px}
+#s6 .ti .tx .sc{font-size:7px}
+#s7 .gg{max-width:100%;gap:5px}
+#s7 .gc{padding:8px 3px}
+#s7 .gc .gf{font-size:14px}
+#s7 .gc .gl{font-size:7px}
+#s7 .gc .gd{font-size:6px}
+#s8 .cta-logo{width:60px;height:60px;font-size:26px}
+#s8 .cta-title{font-size:20px}
+#s8 .cta-links{max-width:100%;gap:6px}
+#s8 .cta-btn{padding:10px 14px;font-size:11px}
+#s8 .cta-btn .ci{width:30px;height:30px;font-size:14px}
+#s8 .cta-sub{font-size:9px}
+}
+</style>
+</head>
+<body>
+
+<div class="phone-wrap">
+<div id="scene">
+  <div class="notch"><div class="speaker"></div><div class="camera"></div></div>
+  <div class="status-bar"><span class="time">12:00</span><div class="st-icons"><svg viewBox="0 0 16 12"><rect x="1" y="2" width="12" height="8" rx="1" stroke="currentColor" fill="none" stroke-width="1.2"/><line x1="14" y1="5" x2="14" y2="8" stroke="currentColor" stroke-width="1"/></svg></div></div>
+  <div class="prog-bar"><div class="fill" id="progFill"></div></div>
+
+  <div class="screen" id="s1">
+    <div class="content">
+      <div class="chat-wrap">
+        <div class="ov">😩</div>
+        <div class="cb s" style="animation-delay:.1s"><span class="lb">فروشنده</span>سلام قیمت ساعت هوشمند چنده؟</div>
+        <div class="cb c" style="animation-delay:.25s"><span class="lb">مشتری</span>موجوده؟</div>
+        <div class="cb s" style="animation-delay:.4s">سلام — ۲,۸۰۰,۰۰۰<span class="tt">✓✓</span></div>
+        <div class="cb c" style="animation-delay:.55s"><span class="lb">مشتری</span>آدرس حساب واسه پرداخت؟</div>
+        <div class="cb s" style="animation-delay:.7s">۶۰۳۷...۷۶۶۲<span class="tt">✓✓</span></div>
+        <div class="cb c" style="animation-delay:.85s"><span class="lb">مشتری</span>قیمت هدفون چنده؟</div>
+        <div class="cb s" style="animation-delay:1s">۱,۸۵۰,۰۰۰<span class="tt">✓</span></div>
+        <div class="cb c" style="animation-delay:1.15s"><span class="lb">مشتری</span>گلکسی S24 دارین؟</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s2">
+    <div class="content">
+      <div class="logo">🛍️</div>
+      <div class="ti">فروش<span>گرام</span></div>
+      <div class="sub">فروشگاه اختصاصی تو در تلگرام</div>
+      <div class="tags">
+        <div class="tag g">✅ رایگان</div>
+        <div class="tag b">⚡️ فوری</div>
+        <div class="tag g">🚀 ۳ دقیقه‌ای</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s3">
+    <div class="content">
+      <div class="steps">
+        <div class="st" style="animation-delay:.08s"><div class="num">۱</div><div class="tx"><div class="lb">اسم فروشگاهت</div><div class="ds">فروشگاه محصولات دیجیتال</div></div><div class="ic">🏪</div></div>
+        <div class="st" style="animation-delay:.2s"><div class="num">۲</div><div class="tx"><div class="lb">شماره تماس</div><div class="ds">۰۹۱۲ ۱۲۳ ۴۵۶۷</div></div><div class="ic">📞</div></div>
+        <div class="st" style="animation-delay:.32s"><div class="num">۳</div><div class="tx"><div class="lb">شماره کارت</div><div class="ds">۶۰۳۷ ۷۹۱۸ ۹۹۷۶ ۶۲۳۴</div></div><div class="ic">💳</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s4">
+    <div class="content">
+      <div class="dg">
+        <div class="di" style="animation-delay:.08s"><div class="d-icon">📦</div><div class="d-num" style="color:var(--accent2)" data-count="12">0</div><div class="d-label">محصولات</div><div class="bar"><div class="f" style="background:var(--accent2)"></div></div></div>
+        <div class="di" style="animation-delay:.16s"><div class="d-icon">🚚</div><div class="d-num" style="color:var(--blue)" data-count="3">0</div><div class="d-label">سفارشات فعال</div><div class="bar"><div class="f" style="background:var(--blue)"></div></div></div>
+        <div class="di" style="animation-delay:.24s"><div class="d-icon">📈</div><div class="d-num" style="color:var(--green)" data-count="72">0%</div><div class="d-label">نرخ تبدیل</div><div class="bar"><div class="f" style="background:var(--green)"></div></div></div>
+        <div class="di" style="animation-delay:.32s"><div class="d-icon">💰</div><div class="d-num" style="color:var(--orange)" data-count="12800000">۰</div><div class="d-label">مجموع فروش</div><div class="bar"><div class="f" style="background:var(--orange)"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s5">
+    <div class="content">
+      <div class="flow">
+        <div class="fi" style="animation-delay:.08s"><div class="fic il">🔗</div><div class="tx"><div class="lb">لینک فروشگاه</div><div class="dc">t.me/Foroshgrambot?start=shop_1234</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.2s"><div class="fic ic">📱</div><div class="tx"><div class="lb">دسته‌بندی</div><div class="dc">موبایل و تبلت</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.32s"><div class="fic ip">📸</div><div class="tx"><div class="lb">جزئیات محصول + آلبوم</div><div class="dc">گلکسی S24 Ultra — ۴۵,۰۰۰,۰۰۰</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.44s"><div class="fic icr">🛒</div><div class="tx"><div class="lb">سبد خرید + کد تخفیف</div><div class="dc">💰 FOROSH20 — ۲۰٪ تخفیف</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.56s"><div class="fic iy">💳</div><div class="tx"><div class="lb">پرداخت کارت به کارت</div><div class="dc">مستقیم به حساب فروشنده</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.68s"><div class="fic id">✅</div><div class="tx"><div class="lb">تأیید + ارسال</div><div class="dc">کد رهگیری: ۶۵۱۶۵۱</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s6">
+    <div class="content">
+      <div class="tl">
+        <div class="ti" style="animation-delay:.08s"><div class="dot do"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--orange)">⏳ در انتظار پرداخت</div><div class="sc">مبلغ: ۹۸,۴۵۰,۰۰۰ تومان</div></div></div>
+        <div class="ti" style="animation-delay:.18s"><div class="dot dp"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--blue)">✅ پرداخت تأیید شد</div><div class="sc">فروشنده رسید رو چک کرد</div></div></div>
+        <div class="ti" style="animation-delay:.28s"><div class="dot dr"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--accent)">📦 آماده‌سازی و بسته‌بندی</div><div class="sc">فروشنده سفارش رو آماده کرد</div></div></div>
+        <div class="ti" style="animation-delay:.38s"><div class="dot ds"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--accent2)">🚚 ارسال با کد رهگیری</div><div class="sc">کد: ۶۵۱۶۵۱ | پست پیشتاز</div></div></div>
+        <div class="ti" style="animation-delay:.48s"><div class="dot dd"></div><div style="width:2px"></div><div class="tx"><div class="st" style="color:var(--green)">📦 تحویل داده شد ✅</div><div class="sc">⭐ امتیاز: ۴.۸/۵</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s7">
+    <div class="content">
+      <div class="gg">
+        <div class="gc" style="animation-delay:.02s"><div class="gf">🏪</div><div class="gl">پنل فروشنده</div><div class="gd">مدیریت کامل</div></div>
+        <div class="gc" style="animation-delay:.05s"><div class="gf">📊</div><div class="gl">داشبورد</div><div class="gd">آمار فروش</div></div>
+        <div class="gc" style="animation-delay:.08s"><div class="gf">📦</div><div class="gl">انبارداری</div><div class="gd">هشدار موجودی</div></div>
+        <div class="gc" style="animation-delay:.11s"><div class="gf">🚚</div><div class="gl">سفارشات</div><div class="gd">۸ مرحله‌ای</div></div>
+        <div class="gc" style="animation-delay:.14s"><div class="gf">🏷️</div><div class="gl">کد تخفیف</div><div class="gd">درصدی و مبلغی</div></div>
+        <div class="gc" style="animation-delay:.17s"><div class="gf">🔗</div><div class="gl">لینک اختصاصی</div><div class="gd">اشتراک آسان</div></div>
+        <div class="gc" style="animation-delay:.2s"><div class="gf">📸</div><div class="gl">آلبوم تصاویر</div><div class="gd">۵ عکس محصول</div></div>
+        <div class="gc" style="animation-delay:.23s"><div class="gf">🎯</div><div class="gl">دسته‌بندی</div><div class="gd">چند سطحی</div></div>
+        <div class="gc" style="animation-delay:.26s"><div class="gf">⭐</div><div class="gl">امتیاز مشتری</div><div class="gd">۴.۸/۵</div></div>
+        <div class="gc" style="animation-delay:.29s"><div class="gf">💳</div><div class="gl">پرداخت شبا</div><div class="gd">مستقیم شما</div></div>
+        <div class="gc" style="animation-delay:.32s"><div class="gf">📬</div><div class="gl">اعلان لحظه‌ای</div><div class="gd">تلگرامی</div></div>
+        <div class="gc" style="animation-delay:.35s"><div class="gf">📷</div><div class="gl">کاور فروشگاه</div><div class="gd">اختصاصی</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s8">
+    <div class="content">
+      <div class="cta">
+        <div class="cta-logo">🛍️</div>
+        <div class="cta-title">فروشگرام</div>
+        <div class="cta-links">
+          <a class="cta-btn p" href="https://t.me/Foroshgrambot" target="_blank"><div class="ci">🚀</div>شروع در تلگرام</a>
+        </div>
+        <div class="cta-sub">🤖 @Foroshgrambot</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="scr-indicator" id="scrIndicator"></div>
+<div class="ctrl-hint" id="ctrlHint"><span><kbd>Space</kbd> توقف/ادامه</span><span><kbd>H</kbd> مخفی</span></div>
+
+<script>
+(function(){
+  var S=[{id:'s1',dur:4000},{id:'s2',dur:4000},{id:'s3',dur:4000},{id:'s4',dur:4000},{id:'s5',dur:5000},{id:'s6',dur:4000},{id:'s7',dur:3000},{id:'s8',dur:2000}];
+  var TOTAL=S.reduce(function(s,c){return s+c.dur},0);
+  var idx=0,paused=false,time=0,iv=null;
+  var pf=document.getElementById('progFill');
+  var ss=S.map(function(s){return document.getElementById(s.id)});
+  var ind=document.getElementById('scrIndicator');
+  var hint=document.getElementById('ctrlHint');
+  var dots=[];
+  S.forEach(function(_,i){var d=document.createElement('div');d.className='dot'+(i===0?' a':'');ind.appendChild(d);dots.push(d)});
+  function sceneStart(n){var s=0;for(var i=0;i<n;i++)s+=S[i].dur;return s}
+  function show(n){
+    if(n===idx)return;
+    idx=n;
+    ss.forEach(function(el,i){
+      if(i===idx){el.classList.add('active');void el.offsetWidth}
+      else el.classList.remove('active');
+    });
+    dots.forEach(function(d,i){d.classList.toggle('a',i===idx)});
+    if(idx===3)setTimeout(function(){
+      document.querySelectorAll('#s4 .d-num').forEach(function(el){
+        if(!el.dataset.count)return;
+        var t=parseFloat(el.dataset.count),c=0,step=t/40;
+        var si=setInterval(function(){
+          c=Math.min(t,c+step);
+          if(t>1e6)el.textContent=(c/1e6).toFixed(1)+'M';
+          else if(t===72)el.textContent=Math.floor(c)+'%';
+          else el.textContent=Math.floor(c);
+          if(c>=t)clearInterval(si);
+        },30);
+      });
+      document.querySelectorAll('#s4 .bar .f').forEach(function(el){
+        el.style.width=Math.floor(30+Math.random()*50)+'%';
+      });
+    },100);
+  }
+  function start(){
+    time=0;idx=0;paused=false;
+    ss.forEach(function(el){el.classList.remove('active');void el.offsetWidth});
+    ss[0].classList.add('active');
+    dots.forEach(function(d,i){d.classList.toggle('a',i===0)});
+    if(iv)clearInterval(iv);
+    iv=setInterval(tick,100);
+  }
+  function tick(){
+    if(!paused)time+=100;
+    pf.style.width=Math.min(100,time/TOTAL*100)+'%';
+    var acc=0;
+    for(var i=0;i<S.length;i++){
+      acc+=S[i].dur;
+      if(time<=acc){
+        if(idx!==i)show(i);
+        break;
+      }
+    }
+    if(time>=TOTAL){clearInterval(iv);iv=null;pf.style.width='100%'}
+  }
+  function tap(){
+    if(!iv){start();return}
+    var end=sceneStart(idx)+S[idx].dur;
+    if(paused){
+      if(time>=end&&idx<S.length-1){time=sceneStart(idx+1);paused=false}
+      else paused=false
+    }else{
+      if(time>=end&&idx<S.length-1){time=sceneStart(idx+1)}
+      else paused=true
+    }
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.code==='Space'){e.preventDefault();tap()}
+    if(e.key==='h'||e.key==='H'){hint.classList.toggle('hidden');ind.classList.toggle('hidden')}
+    if(e.key==='ArrowRight'&&idx<S.length-1){paused=true;time=sceneStart(idx+1)}
+    if(e.key==='ArrowLeft'&&idx>0){paused=true;time=sceneStart(idx-1)}
+  });
+  document.addEventListener('click',tap);
+  document.addEventListener('touchstart',tap,{passive:true});
+  start();
+})();
+</script>
+</body>
+</html:root {
+    --bg:         #121212;
+    --surface:    #1e1e1e;
+    --surface2:   #2e2e2e;
+    --surface3:   #464646;
+    --border:     #333333;
+    --border2:    #515151;
+    --text:       #eeeeee;
+    --text2:      #b0b0b0;
+    --text3:      #7a7a7a;
+    --accent:     #bb86fc;
+    --accent2:    #ce93fd;
+    --green:      #03dac6;
+    --greenBg:    rgba(3,218,198,0.10);
+    --blue:       #64b5f6;
+    --blueBg:     rgba(100,181,246,0.10);
+    --orange:     #ffb74d;
+    --orangeBg:   rgba(255,183,77,0.10);
+    --pink:       #f06292;
+    --red:        #ef5350;
+    --radius:     40px;
+    --shadow:     0 8px 80px rgba(18,18,18,.6);
+    --glow:       rgba(187,134,252,0.15);
+  }
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Vazirmatn',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw;display:flex;align-items:center;justify-content:center;user-select:none}
+body::before,body::after{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;pointer-events:none;z-index:0;background:radial-gradient(ellipse at 30% 40%,rgba(187,134,252,.08) 0%,transparent 60%);animation:bgDrift 20s ease infinite}
+body::after{background:radial-gradient(ellipse at 70% 60%,rgba(3,218,198,.05) 0%,transparent 50%);animation:bgDrift 25s ease infinite reverse}
+@keyframes bgDrift{0%{transform:translate(0,0)}50%{transform:translate(3%,-2%)}100%{transform:translate(0,0)}}
+.phone-wrap{position:relative;width:420px;height:780px;flex-shrink:0;z-index:1}
+#scene{position:relative;width:100%;height:100%;background:linear-gradient(160deg,var(--surface) 50%,var(--surface3));border-radius:var(--radius);border:1.5px solid var(--border2);box-shadow:var(--shadow),0 0 120px var(--glow);overflow:hidden}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:28px;background:var(--surface);border-radius:0 0 18px 18px;border:1.5px solid var(--border2);border-top:none;z-index:15;display:flex;align-items:center;justify-content:center;gap:12px}
+.notch .camera{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#2a2a4a,#0a0a1a);border:1px solid #2a2a40}
+.notch .speaker{width:44px;height:3px;border-radius:2px;background:#1a1a30}
+.status-bar{position:absolute;top:26px;left:0;right:0;height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;font-size:12px;font-weight:600;color:var(--text);z-index:10}
+.st-icons{display:flex;gap:4px;font-size:11px;align-items:center}
+.st-icons svg{width:16px;height:12px}
+@keyframes fi{0%{opacity:0;transform:translateY(24px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes fd{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes si{0%{opacity:0;transform:scale(.5)}60%{transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
+@keyframes sl{0%{opacity:0;transform:translateX(36px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes sr{0%{opacity:0;transform:translateX(-36px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+@keyframes pg{0%,100%{box-shadow:0 0 20px rgba(187,134,252,.2)}50%{box-shadow:0 0 60px rgba(187,134,252,.5)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .4s ease,transform .4s ease;transform:scale(.96)}
+.screen.active{opacity:1;pointer-events:auto;transform:scale(1)}
+.screen .content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 18px;gap:2px}
+#s1 .chat-wrap{width:100%;max-width:310px;padding:44px 0 0;position:relative}
+#s1 .chat-wrap .ov{position:absolute;top:6px;left:4px;font-size:36px;animation:float 2s ease infinite}
+#s1 .cb{opacity:0;margin:4px 0;padding:11px 15px;border-radius:14px;font-size:12px;line-height:1.5;animation:fi .35s ease forwards;position:relative}
+#s1 .cb.s{background:var(--surface2);border-bottom-left-radius:3px;align-self:flex-start}
+#s1 .cb.c{background:linear-gradient(135deg,#1e1e30,#282840);border-bottom-right-radius:3px;align-self:flex-end;text-align:right}
+#s1 .cb .lb{font-size:8px;color:var(--text3);margin-bottom:2px;display:block;font-weight:500}
+#s1 .cb .tt{display:block;font-size:7px;color:var(--text3);margin-top:3px}
+#s2 .logo{width:100px;height:100px;border-radius:28px;background:linear-gradient(135deg,#bb86fc,#ce93fd,#e1bee7);display:flex;align-items:center;justify-content:center;font-size:40px;animation:si .7s cubic-bezier(.16,.88,.28,1) both,pg 2s 1s infinite}
+#s2 .ti{font-size:28px;font-weight:800;margin-top:18px;animation:fi .5s .3s both}
+#s2 .ti span{color:var(--accent2)}
+#s2 .sub{font-size:13px;color:var(--text2);margin-top:6px;animation:fi .5s .4s both}
+#s2 .tags{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;justify-content:center;animation:fi .5s .5s both}
+#s2 .tag{background:var(--surface2);border:1px solid var(--border);padding:6px 16px;border-radius:18px;font-size:11px;display:flex;align-items:center;gap:5px}
+#s2 .tag.g{border-color:var(--green);color:var(--green)}
+#s2 .tag.b{border-color:var(--blue);color:var(--blue)}
+#s3 .steps{display:flex;flex-direction:column;gap:12px;width:100%;max-width:260px}
+#s3 .st{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface2);border-radius:12px;border:1px solid var(--border);opacity:0;animation:sl .45s cubic-bezier(.16,.88,.28,1) forwards;position:relative;overflow:hidden;transition:border-color .2s,transform .2s}
+#s3 .st:hover{border-color:var(--accent);transform:translateX(-3px)}
+#s3 .st .num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+#s3 .st .tx{flex:1}
+#s3 .st .tx .lb{font-size:12px;font-weight:600}
+#s3 .st .tx .ds{font-size:10px;color:var(--text2);margin-top:2px;direction:ltr}
+#s3 .st .ic{font-size:24px}
+#s4 .dg{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:300px}
+#s4 .di{background:linear-gradient(145deg,var(--surface2),var(--surface3));border-radius:14px;padding:18px 10px;text-align:center;border:1px solid var(--border);animation:si .4s cubic-bezier(.16,.88,.28,1) both;opacity:0;transition:transform .2s,border-color .2s}
+#s4 .di:hover{transform:translateY(-3px);border-color:var(--accent)}
+#s4 .di .d-icon{font-size:24px;margin-bottom:4px}
+#s4 .di .d-num{font-size:28px;font-weight:800;letter-spacing:.5px}
+#s4 .di .d-label{font-size:10px;color:var(--text2);margin-top:3px}
+#s4 .di .bar{height:3px;width:70%;margin:5px auto 0;border-radius:2px;background:var(--surface3);overflow:hidden}
+#s4 .di .bar .f{height:100%;width:0;border-radius:2px;transition:width 2s ease}
+#s5 .flow{display:flex;flex-direction:column;gap:7px;align-items:center;width:100%}
+#s5 .fi{display:flex;align-items:center;gap:9px;width:92%;max-width:280px;padding:10px 14px;background:var(--surface2);border-radius:11px;border:1px solid var(--border);opacity:0;animation:sr .35s cubic-bezier(.16,.88,.28,1) forwards;transition:border-color .2s}
+#s5 .fi:hover{border-color:var(--accent)}
+#s5 .fi .arr{font-size:14px;color:var(--green);animation:pulse 1s infinite}
+#s5 .fi .fic{font-size:18px;width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#s5 .fi .tx{flex:1;text-align:right}
+#s5 .fi .tx .lb{font-size:11px;font-weight:600}
+#s5 .fi .tx .dc{font-size:9px;color:var(--text2);margin-top:1px}
+#s5 .fi .fic.il{background:var(--greenBg)}#s5 .fi .fic.ic{background:var(--blueBg)}#s5 .fi .fic.ip{background:var(--orangeBg)}#s5 .fi .fic.icr{background:rgba(108,92,231,.12)}#s5 .fi .fic.iy{background:rgba(232,67,147,.12)}#s5 .fi .fic.id{background:var(--greenBg)}
+#s6 .tl{display:flex;flex-direction:column;gap:5px;width:100%;max-width:280px}
+#s6 .ti{display:flex;align-items:center;gap:9px;padding:9px 12px;background:var(--surface2);border-radius:9px;border:1px solid var(--border);opacity:0;animation:sl .3s cubic-bezier(.16,.88,.28,1) forwards}
+#s6 .ti .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;position:relative}
+#s6 .ti .dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;opacity:.25;z-index:-1}
+#s6 .ti .dot.do{background:var(--orange)}#s6 .ti .dot.do::after{background:var(--orange)}
+#s6 .ti .dot.dp{background:var(--blue)}#s6 .ti .dot.dp::after{background:var(--blue)}
+#s6 .ti .dot.dr{background:var(--accent)}#s6 .ti .dot.dr::after{background:var(--accent)}
+#s6 .ti .dot.ds{background:var(--accent2)}#s6 .ti .dot.ds::after{background:var(--accent2)}
+#s6 .ti .dot.dd{background:var(--green)}#s6 .ti .dot.dd::after{background:var(--green)}
+#s6 .ti .cn{width:2px;height:14px;background:var(--border);margin:0 3px}
+#s6 .ti .tx{flex:1}
+#s6 .ti .tx .st{font-size:10px;font-weight:600}
+#s6 .ti .tx .sc{font-size:8px;color:var(--text2);margin-top:1px}
+#s7 .gg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;width:100%;max-width:320px}
+#s7 .gc{background:linear-gradient(145deg,var(--surface2),transparent);border-radius:11px;padding:12px 5px;text-align:center;border:1px solid var(--border);animation:si .25s cubic-bezier(.16,.88,.28,1) both;opacity:0;transition:transform .2s,border-color .2s}
+#s7 .gc:hover{border-color:var(--accent);transform:scale(1.02)}
+#s7 .gc .gf{font-size:18px;margin-bottom:2px}
+#s7 .gc .gl{font-size:8px;font-weight:500}
+#s7 .gc .gd{font-size:6.5px;color:var(--text3);line-height:1.2;margin-top:1px}
+#s8 .cta{display:flex;flex-direction:column;align-items:center;padding:0 20px}
+#s8 .cta-logo{width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#bb86fc,#ce93fd,#e1bee7);display:flex;align-items:center;justify-content:center;font-size:34px;animation:si .6s cubic-bezier(.16,.88,.28,1) both}
+#s8 .cta-title{font-size:24px;font-weight:800;margin-top:14px;animation:fi .5s .3s both}
+#s8 .cta-links{display:flex;flex-direction:column;gap:8px;margin-top:20px;width:100%;max-width:230px;animation:fi .5s .5s both}
+#s8 .cta-btn{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;text-decoration:none;color:var(--text);font-size:12px;font-weight:600;transition:all .2s;border:1px solid var(--border)}
+#s8 .cta-btn:hover{transform:translateX(-3px)}
+#s8 .cta-btn.p{background:linear-gradient(135deg,var(--accent),#8b5cf6);border-color:var(--accent)}
+#s8 .cta-btn .ci{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px}
+#s8 .cta-btn.p .ci{background:rgba(255,255,255,.15)}
+#s8 .cta-sub{font-size:10px;color:var(--text3);margin-top:14px;letter-spacing:2px;animation:fi .5s .7s both}
+.prog-bar{position:absolute;bottom:-1px;left:0;right:0;height:4px;border-radius:0 0 var(--radius) var(--radius);background:var(--surface3);overflow:hidden;z-index:20}
+.prog-bar .fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .15s linear}
+.scr-indicator{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:100;padding:8px 18px;background:rgba(19,19,30,.85);border-radius:20px;backdrop-filter:blur(12px);border:1px solid var(--border);transition:opacity .3s}
+.scr-indicator .dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:all .4s}
+.scr-indicator .dot.a{background:var(--accent2);width:22px;border-radius:4px}
+.ctrl-hint{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text3);z-index:100;opacity:.5;display:flex;gap:10px;align-items:center;background:rgba(19,19,30,.6);padding:4px 14px;border-radius:10px;backdrop-filter:blur(6px);transition:opacity .5s}
+.ctrl-hint kbd{background:var(--surface3);padding:1px 7px;border-radius:3px;font-size:7px;font-family:'Vazirmatn',sans-serif;color:var(--text2);border:1px solid var(--border);direction:ltr;display:inline-block}
+.hidden{opacity:0!important;pointer-events:none}
+@media(max-width:480px){
+.phone-wrap{width:100vw;height:100vh}
+#scene{border-radius:0;border:none}
+.notch{display:none}
+.scr-indicator{display:none}
+.ctrl-hint{display:none}
+.screen .content{padding:18px 10px}
+.screen .content #s1 .chat-wrap{max-width:100%;padding:30px 4px 0}
+#s1 .cb{font-size:10px;padding:8px 12px;margin:3px 0}
+#s1 .cb .lb{font-size:7px}
+#s1 .cb .tt{font-size:6px}
+#s2 .logo{width:70px;height:70px;font-size:28px}
+#s2 .ti{font-size:20px;margin-top:12px}
+#s2 .sub{font-size:11px}
+#s2 .tags{margin-top:14px}
+#s2 .tag{padding:4px 12px;font-size:9px}
+#s3 .steps{max-width:100%}
+#s3 .st{padding:10px 12px}
+#s3 .st .num{width:30px;height:30px;font-size:13px}
+#s3 .st .tx .lb{font-size:10px}
+#s3 .st .tx .ds{font-size:8px}
+#s3 .st .ic{font-size:20px}
+#s4 .dg{max-width:100%;gap:7px}
+#s4 .di{padding:12px 6px}
+#s4 .di .d-icon{font-size:20px}
+#s4 .di .d-num{font-size:22px}
+#s4 .di .d-label{font-size:9px}
+#s5 .flow{max-width:100%}
+#s5 .fi{max-width:100%;padding:8px 10px}
+#s5 .fi .fic{width:30px;height:30px;font-size:14px}
+#s5 .fi .tx .lb{font-size:10px}
+#s5 .fi .tx .dc{font-size:8px}
+#s5 .fi .arr{font-size:12px}
+#s6 .tl{max-width:100%}
+#s6 .ti{padding:7px 10px}
+#s6 .ti .tx .st{font-size:9px}
+#s6 .ti .tx .sc{font-size:7px}
+#s7 .gg{max-width:100%;gap:5px}
+#s7 .gc{padding:8px 3px}
+#s7 .gc .gf{font-size:14px}
+#s7 .gc .gl{font-size:7px}
+#s7 .gc .gd{font-size:6px}
+#s8 .cta-logo{width:60px;height:60px;font-size:26px}
+#s8 .cta-title{font-size:20px}
+#s8 .cta-links{max-width:100%;gap:6px}
+#s8 .cta-btn{padding:10px 14px;font-size:11px}
+#s8 .cta-btn .ci{width:30px;height:30px;font-size:14px}
+#s8 .cta-sub{font-size:9px}
+}
+</style>
+</head>
+<body>
+
+<div class="phone-wrap">
+<div id="scene">
+  <div class="notch"><div class="speaker"></div><div class="camera"></div></div>
+  <div class="status-bar"><span class="time">12:00</span><div class="st-icons"><svg viewBox="0 0 16 12"><rect x="1" y="2" width="12" height="8" rx="1" stroke="currentColor" fill="none" stroke-width="1.2"/><line x1="14" y1="5" x2="14" y2="8" stroke="currentColor" stroke-width="1"/></svg></div></div>
+  <div class="prog-bar"><div class="fill" id="progFill"></div></div>
+
+  <div class="screen" id="s1">
+    <div class="content">
+      <div class="chat-wrap">
+        <div class="ov">😩</div>
+        <div class="cb s" style="animation-delay:.1s"><span class="lb">فروشنده</span>سلام قیمت ساعت هوشمند چنده؟</div>
+        <div class="cb c" style="animation-delay:.25s"><span class="lb">مشتری</span>موجوده؟</div>
+        <div class="cb s" style="animation-delay:.4s">سلام — ۲,۸۰۰,۰۰۰<span class="tt">✓✓</span></div>
+        <div class="cb c" style="animation-delay:.55s"><span class="lb">مشتری</span>آدرس حساب واسه پرداخت؟</div>
+        <div class="cb s" style="animation-delay:.7s">۶۰۳۷...۷۶۶۲<span class="tt">✓✓</span></div>
+        <div class="cb c" style="animation-delay:.85s"><span class="lb">مشتری</span>قیمت هدفون چنده؟</div>
+        <div class="cb s" style="animation-delay:1s">۱,۸۵۰,۰۰۰<span class="tt">✓</span></div>
+        <div class="cb c" style="animation-delay:1.15s"><span class="lb">مشتری</span>گلکسی S24 دارین؟</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s2">
+    <div class="content">
+      <div class="logo">🛍️</div>
+      <div class="ti">فروش<span>گرام</span></div>
+      <div class="sub">فروشگاه اختصاصی تو در تلگرام</div>
+      <div class="tags">
+        <div class="tag g">✅ رایگان</div>
+        <div class="tag b">⚡️ فوری</div>
+        <div class="tag g">🚀 ۳ دقیقه‌ای</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s3">
+    <div class="content">
+      <div class="steps">
+        <div class="st" style="animation-delay:.08s"><div class="num">۱</div><div class="tx"><div class="lb">اسم فروشگاهت</div><div class="ds">فروشگاه محصولات دیجیتال</div></div><div class="ic">🏪</div></div>
+        <div class="st" style="animation-delay:.2s"><div class="num">۲</div><div class="tx"><div class="lb">شماره تماس</div><div class="ds">۰۹۱۲ ۱۲۳ ۴۵۶۷</div></div><div class="ic">📞</div></div>
+        <div class="st" style="animation-delay:.32s"><div class="num">۳</div><div class="tx"><div class="lb">شماره کارت</div><div class="ds">۶۰۳۷ ۷۹۱۸ ۹۹۷۶ ۶۲۳۴</div></div><div class="ic">💳</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s4">
+    <div class="content">
+      <div class="dg">
+        <div class="di" style="animation-delay:.08s"><div class="d-icon">📦</div><div class="d-num" style="color:var(--accent2)" data-count="12">0</div><div class="d-label">محصولات</div><div class="bar"><div class="f" style="background:var(--accent2)"></div></div></div>
+        <div class="di" style="animation-delay:.16s"><div class="d-icon">🚚</div><div class="d-num" style="color:var(--blue)" data-count="3">0</div><div class="d-label">سفارشات فعال</div><div class="bar"><div class="f" style="background:var(--blue)"></div></div></div>
+        <div class="di" style="animation-delay:.24s"><div class="d-icon">📈</div><div class="d-num" style="color:var(--green)" data-count="72">0%</div><div class="d-label">نرخ تبدیل</div><div class="bar"><div class="f" style="background:var(--green)"></div></div></div>
+        <div class="di" style="animation-delay:.32s"><div class="d-icon">💰</div><div class="d-num" style="color:var(--orange)" data-count="12800000">۰</div><div class="d-label">مجموع فروش</div><div class="bar"><div class="f" style="background:var(--orange)"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s5">
+    <div class="content">
+      <div class="flow">
+        <div class="fi" style="animation-delay:.08s"><div class="fic il">🔗</div><div class="tx"><div class="lb">لینک فروشگاه</div><div class="dc">t.me/Foroshgrambot?start=shop_1234</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.2s"><div class="fic ic">📱</div><div class="tx"><div class="lb">دسته‌بندی</div><div class="dc">موبایل و تبلت</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.32s"><div class="fic ip">📸</div><div class="tx"><div class="lb">جزئیات محصول + آلبوم</div><div class="dc">گلکسی S24 Ultra — ۴۵,۰۰۰,۰۰۰</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.44s"><div class="fic icr">🛒</div><div class="tx"><div class="lb">سبد خرید + کد تخفیف</div><div class="dc">💰 FOROSH20 — ۲۰٪ تخفیف</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.56s"><div class="fic iy">💳</div><div class="tx"><div class="lb">پرداخت کارت به کارت</div><div class="dc">مستقیم به حساب فروشنده</div></div><div class="arr">→</div></div>
+        <div class="fi" style="animation-delay:.68s"><div class="fic id">✅</div><div class="tx"><div class="lb">تأیید + ارسال</div><div class="dc">کد رهگیری: ۶۵۱۶۵۱</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s6">
+    <div class="content">
+      <div class="tl">
+        <div class="ti" style="animation-delay:.08s"><div class="dot do"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--orange)">⏳ در انتظار پرداخت</div><div class="sc">مبلغ: ۹۸,۴۵۰,۰۰۰ تومان</div></div></div>
+        <div class="ti" style="animation-delay:.18s"><div class="dot dp"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--blue)">✅ پرداخت تأیید شد</div><div class="sc">فروشنده رسید رو چک کرد</div></div></div>
+        <div class="ti" style="animation-delay:.28s"><div class="dot dr"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--accent)">📦 آماده‌سازی و بسته‌بندی</div><div class="sc">فروشنده سفارش رو آماده کرد</div></div></div>
+        <div class="ti" style="animation-delay:.38s"><div class="dot ds"></div><div class="cn"></div><div class="tx"><div class="st" style="color:var(--accent2)">🚚 ارسال با کد رهگیری</div><div class="sc">کد: ۶۵۱۶۵۱ | پست پیشتاز</div></div></div>
+        <div class="ti" style="animation-delay:.48s"><div class="dot dd"></div><div style="width:2px"></div><div class="tx"><div class="st" style="color:var(--green)">📦 تحویل داده شد ✅</div><div class="sc">⭐ امتیاز: ۴.۸/۵</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s7">
+    <div class="content">
+      <div class="gg">
+        <div class="gc" style="animation-delay:.02s"><div class="gf">🏪</div><div class="gl">پنل فروشنده</div><div class="gd">مدیریت کامل</div></div>
+        <div class="gc" style="animation-delay:.05s"><div class="gf">📊</div><div class="gl">داشبورد</div><div class="gd">آمار فروش</div></div>
+        <div class="gc" style="animation-delay:.08s"><div class="gf">📦</div><div class="gl">انبارداری</div><div class="gd">هشدار موجودی</div></div>
+        <div class="gc" style="animation-delay:.11s"><div class="gf">🚚</div><div class="gl">سفارشات</div><div class="gd">۸ مرحله‌ای</div></div>
+        <div class="gc" style="animation-delay:.14s"><div class="gf">🏷️</div><div class="gl">کد تخفیف</div><div class="gd">درصدی و مبلغی</div></div>
+        <div class="gc" style="animation-delay:.17s"><div class="gf">🔗</div><div class="gl">لینک اختصاصی</div><div class="gd">اشتراک آسان</div></div>
+        <div class="gc" style="animation-delay:.2s"><div class="gf">📸</div><div class="gl">آلبوم تصاویر</div><div class="gd">۵ عکس محصول</div></div>
+        <div class="gc" style="animation-delay:.23s"><div class="gf">🎯</div><div class="gl">دسته‌بندی</div><div class="gd">چند سطحی</div></div>
+        <div class="gc" style="animation-delay:.26s"><div class="gf">⭐</div><div class="gl">امتیاز مشتری</div><div class="gd">۴.۸/۵</div></div>
+        <div class="gc" style="animation-delay:.29s"><div class="gf">💳</div><div class="gl">پرداخت شبا</div><div class="gd">مستقیم شما</div></div>
+        <div class="gc" style="animation-delay:.32s"><div class="gf">📬</div><div class="gl">اعلان لحظه‌ای</div><div class="gd">تلگرامی</div></div>
+        <div class="gc" style="animation-delay:.35s"><div class="gf">📷</div><div class="gl">کاور فروشگاه</div><div class="gd">اختصاصی</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s8">
+    <div class="content">
+      <div class="cta">
+        <div class="cta-logo">🛍️</div>
+        <div class="cta-title">فروشگرام</div>
+        <div class="cta-links">
+          <a class="cta-btn p" href="https://t.me/Foroshgrambot" target="_blank"><div class="ci">🚀</div>شروع در تلگرام</a>
+        </div>
+        <div class="cta-sub">🤖 @Foroshgrambot</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="scr-indicator" id="scrIndicator"></div>
+<div class="ctrl-hint" id="ctrlHint"><span><kbd>Space</kbd> توقف/ادامه</span><span><kbd>H</kbd> مخفی</span></div>
+
+<script>
+(function(){
+  var S=[{id:'s1',dur:4000},{id:'s2',dur:4000},{id:'s3',dur:4000},{id:'s4',dur:4000},{id:'s5',dur:5000},{id:'s6',dur:4000},{id:'s7',dur:3000},{id:'s8',dur:2000}];
+  var TOTAL=S.reduce(function(s,c){return s+c.dur},0);
+  var idx=0,paused=false,time=0,iv=null;
+  var pf=document.getElementById('progFill');
+  var ss=S.map(function(s){return document.getElementById(s.id)});
+  var ind=document.getElementById('scrIndicator');
+  var hint=document.getElementById('ctrlHint');
+  var dots=[];
+  S.forEach(function(_,i){var d=document.createElement('div');d.className='dot'+(i===0?' a':'');ind.appendChild(d);dots.push(d)});
+  function sceneStart(n){var s=0;for(var i=0;i<n;i++)s+=S[i].dur;return s}
+  function show(n){
+    if(n===idx)return;
+    idx=n;
+    ss.forEach(function(el,i){
+      if(i===idx){el.classList.add('active');void el.offsetWidth}
+      else el.classList.remove('active');
+    });
+    dots.forEach(function(d,i){d.classList.toggle('a',i===idx)});
+    if(idx===3)setTimeout(function(){
+      document.querySelectorAll('#s4 .d-num').forEach(function(el){
+        if(!el.dataset.count)return;
+        var t=parseFloat(el.dataset.count),c=0,step=t/40;
+        var si=setInterval(function(){
+          c=Math.min(t,c+step);
+          if(t>1e6)el.textContent=(c/1e6).toFixed(1)+'M';
+          else if(t===72)el.textContent=Math.floor(c)+'%';
+          else el.textContent=Math.floor(c);
+          if(c>=t)clearInterval(si);
+        },30);
+      });
+      document.querySelectorAll('#s4 .bar .f').forEach(function(el){
+        el.style.width=Math.floor(30+Math.random()*50)+'%';
+      });
+    },100);
+  }
+  function start(){
+    time=0;idx=0;paused=false;
+    ss.forEach(function(el){el.classList.remove('active');void el.offsetWidth});
+    ss[0].classList.add('active');
+    dots.forEach(function(d,i){d.classList.toggle('a',i===0)});
+    if(iv)clearInterval(iv);
+    iv=setInterval(tick,100);
+  }
+  function tick(){
+    if(!paused)time+=100;
+    pf.style.width=Math.min(100,time/TOTAL*100)+'%';
+    var acc=0;
+    for(var i=0;i<S.length;i++){
+      acc+=S[i].dur;
+      if(time<=acc){
+        if(idx!==i)show(i);
+        break;
+      }
+    }
+    if(time>=TOTAL){clearInterval(iv);iv=null;pf.style.width='100%'}
+  }
+  function tap(){
+    if(!iv){start();return}
+    var end=sceneStart(idx)+S[idx].dur;
+    if(paused){
+      if(time>=end&&idx<S.length-1){time=sceneStart(idx+1);paused=false}
+      else paused=false
+    }else{
+      if(time>=end&&idx<S.length-1){time=sceneStart(idx+1)}
+      else paused=true
+    }
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.code==='Space'){e.preventDefault();tap()}
+    if(e.key==='h'||e.key==='H'){hint.classList.toggle('hidden');ind.classList.toggle('hidden')}
+    if(e.key==='ArrowRight'&&idx<S.length-1){paused=true;time=sceneStart(idx+1)}
+    if(e.key==='ArrowLeft'&&idx>0){paused=true;time=sceneStart(idx-1)}
+  });
+  document.addEventListener('click',tap);
+  document.addEventListener('touchstart',tap,{passive:true});
+  start();
+})();
+</script>
+</body>
+</html>

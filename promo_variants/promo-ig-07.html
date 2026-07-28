@@ -3,34 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>فروشگرام — اقیانوس</title>
+<title>فروشگرام — زغالی</title>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:         #020d1a;
-    --surface:    #061a2e;
-    --surface2:   #0a2642;
-    --surface3:   #0e3256;
-    --border:     #12406a;
-    --border2:    #165080;
-    --text:       #e0f0ff;
-    --text2:      #80c0e0;
-    --text3:      #4080a0;
-    --accent:     #00b4d8;
-    --accent2:    #48cae4;
-    --green:      #00e6a0;
-    --greenBg:    rgba(0,230,160,.08);
-    --blue:       #0096c7;
-    --blueBg:     rgba(0,150,199,.08);
-    --orange:     #ffb703;
-    --orangeBg:   rgba(255,183,3,.08);
-    --pink:       #ff6b6b;
-    --red:        #e63946;
+    --bg:         #121212;
+    --surface:    #1e1e1e;
+    --surface2:   #2a2a2a;
+    --surface3:   #353535;
+    --border:     #333333;
+    --border2:    #454545;
+    --text:       #eeeeee;
+    --text2:      #b0b0b0;
+    --text3:      #7a7a7a;
+    --accent:     #bb86fc;
+    --accent2:    #ce93fd;
+    --green:      #03dac6;
+    --greenBg:    rgba(3,218,198,.12);
+    --blue:       #64b5f6;
+    --blueBg:     rgba(100,181,246,.10);
+    --orange:     #ffb74d;
+    --orangeBg:   rgba(255,183,77,.12);
+    --pink:       #f06292;
+    --red:        #ef5350;
     --radius:     32px;
-    --shadow:     0 8px 80px rgba(0,180,216,.05);
-    --glow:       rgba(0,180,216,.1);
-    --custBg:     #0e2440;
+    --shadow:     0 8px 80px rgba(0,0,0,.7);
+    --glow:       rgba(187,134,252,.12);
+    --custBg:     #292929;
   }
+
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     font-family: 'Vazirmatn', system-ui, sans-serif;
@@ -230,7 +231,7 @@
   @keyframes fadeOut{0%{opacity:1}70%{opacity:1}100%{opacity:0;pointer-events:none}}
   .intro .logo-big {
     width:96px; height:96px; border-radius:26px;
-    background:linear-gradient(135deg,#00b4d8,#48cae4,#00e6a0);
+    background:linear-gradient(135deg,var(--accent),#8b5cf6,var(--pink));
     display:flex; align-items:center; justify-content:center; font-size:38px;
     box-shadow:0 0 120px rgba(108,92,231,.25);
     animation:logoEntrance .8s cubic-bezier(.16,.88,.28,1) both, glowPulse 2s 1s infinite;
