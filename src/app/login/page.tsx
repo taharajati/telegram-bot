@@ -1,37 +1,45 @@
-// ─── Foroshgram Login — clean, focused ───
+// ─── Foroshgram Login — username + password ───
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Lock, ShieldCheck, User, Store, ArrowLeft } from 'lucide-react';
+import { Lock, User, ArrowLeft, Store, ShieldCheck, Bot } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [telegramId, setTelegramId] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [needsPassword, setNeedsPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!telegramId.trim()) { setError('شناسه تلگرام را وارد کنید.'); return; }
+    if (!username.trim() || !password) {
+      setError('نام کاربری و رمز عبور را وارد کنید.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: telegramId, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json();
       if (data.success) {
         toast.success('خوش آمدید!');
-        window.location.href = data.role === 'admin' ? '/admin' : data.role === 'seller' ? '/seller' : '/';
+        if (data.role === 'admin') {
+          window.location.href = '/admin';
+        } else if (data.role === 'seller') {
+          window.location.href = '/seller';
+        } else {
+          window.location.href = '/';
+        }
       } else {
-        if (data.requirePassword) setNeedsPassword(true);
-        setError(data.error || 'خطا در ورود');
+        setError(data.error || 'نام کاربری یا رمز عبور اشتباه است');
       }
     } catch {
       setError('خطا در ارتباط با سرور');
@@ -45,11 +53,11 @@ export default function LoginPage() {
       {/* branding */}
       <div className="mb-10 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--radius-xl)] bg-blue-500 text-white shadow-lg shadow-blue-500/15">
-          <Send className="h-7 w-7" />
+          <Bot className="h-7 w-7" />
         </div>
         <h1 className="text-2xl font-black">ورود به فروشگرام</h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          شناسه تلگرام خود را وارد کنید
+          نام کاربری و رمز عبور خود را وارد کنید
         </p>
       </div>
 
@@ -61,34 +69,49 @@ export default function LoginPage() {
         )}
 
         <div className="mb-4">
-          <label className="mb-1.5 block text-sm font-semibold">شناسه تلگرام (Telegram ID)</label>
-          <input
-            type="text" inputMode="numeric"
-            value={telegramId} onChange={(e) => setTelegramId(e.target.value)}
-            className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            placeholder="مثال: 123456789"
-            dir="ltr"
-          />
+          <label className="mb-1.5 block text-sm font-semibold">نام کاربری</label>
+          <div className="relative">
+            <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-white py-3 pr-10 pl-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="مثال: my_shop"
+              dir="ltr"
+              autoComplete="username"
+            />
+          </div>
         </div>
 
-        {needsPassword && (
-          <div className="mb-4 animate-appear">
-            <label className="mb-1.5 block text-sm font-semibold">رمز عبور</label>
+        <div className="mb-6">
+          <label className="mb-1.5 block text-sm font-semibold">رمز عبور</label>
+          <div className="relative">
+            <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input
               type="password"
-              value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-[var(--radius)] border border-[var(--border)] bg-white py-3 pr-10 pl-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               placeholder="••••••••"
               dir="ltr"
+              autoComplete="current-password"
             />
-            <p className="mt-1.5 text-xs text-[var(--text-tertiary)]">
-              رمزت رو فراموش کردی؟ توی ربات <a href="https://t.me/Foroshgrambot" className="text-[var(--primary)] hover:underline">@Foroshgrambot</a> دستور <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">/reset_password</code> رو بزن.
-            </p>
           </div>
-        )}
+          <p className="mt-2 text-xs text-[var(--text-tertiary)] leading-relaxed">
+            💡 نام کاربری و رمز عبور خود را از بخش
+            <span className="mx-1 inline-flex items-center gap-0.5 rounded bg-gray-100 px-1.5 py-0.5 font-semibold text-gray-700">
+              ⚙️ تنظیمات سایت
+            </span>
+            در ربات
+            <a href="https://t.me/Foroshgrambot" className="mx-1 text-[var(--primary)] hover:underline">@Foroshgrambot</a>
+            دریافت یا تنظیم کنید.
+          </p>
+        </div>
 
         <button
-          type="submit" disabled={loading}
+          type="submit"
+          disabled={loading}
           className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-blue-500 py-3 text-sm font-bold text-white transition-all hover:bg-blue-600 active:scale-[0.97] disabled:opacity-50"
         >
           {loading ? (
@@ -105,18 +128,24 @@ export default function LoginPage() {
         <div className="mt-6 space-y-2 border-t border-[var(--border-light)] pt-5 text-xs text-[var(--text-tertiary)]">
           <div className="flex items-center justify-center gap-2">
             <Store className="h-3.5 w-3.5 text-blue-500" />
-            فروشنده → پنل فروش (شناسه تلگرام + رمز)
+            فروشنده → پنل فروش (نام کاربری + رمز)
           </div>
           <div className="flex items-center justify-center gap-2">
             <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />
-            ادمین → پنل مدیریت (شناسه + رمز)
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <User className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
-            مشتری → فقط سفارش‌های خود
+            ادمین → پنل مدیریت (نام کاربری + رمز)
           </div>
         </div>
       </form>
+
+      {/* back to home */}
+      <div className="mt-8 text-center">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-sm text-blue-500 hover:underline"
+        >
+          ← بازگشت به صفحه اصلی
+        </Link>
+      </div>
     </div>
   );
 }

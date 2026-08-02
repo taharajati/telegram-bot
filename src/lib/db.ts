@@ -362,3 +362,29 @@ export async function closePool() {
     _pool = null;
   }
 }
+// ─── Seller Username Auth ────────────────────────────────
+export async function getSellerByUsername(username: string) {
+  return queryOne<{ user_id: number; username: string; password_hash: string | null; shop_id: number }>(
+    'SELECT so.user_id, so.username, so.password_hash, so.shop_id FROM shop_owners so WHERE LOWER(so.username) = LOWER($1)',
+    [username]
+  );
+}
+
+export async function setSellerUsername(userId: number, username: string): Promise<boolean> {
+  try {
+    await exec(
+      'UPDATE shop_owners SET username = $1 WHERE user_id = $2',
+      [username, userId]
+    );
+    return true;
+  } catch {
+    return false; // duplicate username
+  }
+}
+
+export async function getSellerByUserId(userId: number) {
+  return queryOne<{ user_id: number; username: string | null; password_hash: string | null; shop_id: number }>(
+    'SELECT user_id, username, password_hash, shop_id FROM shop_owners WHERE user_id = $1',
+    [userId]
+  );
+}
