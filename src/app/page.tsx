@@ -248,7 +248,7 @@ export default async function HomePage() {
                 <div key={p.id} className="group rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white p-5 shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-pop)] hover:-translate-y-0.5">
                   <div className="mb-4 flex h-36 items-center justify-center rounded-[var(--radius)] bg-[var(--bg-muted)]">
                     {p.image_file_id ? (
-                      <img src={p.image_file_id} alt={p.name} className="h-full w-full rounded-[var(--radius)] object-cover" />
+                      <img src={`/api/product-image/${p.id}`} alt={p.name} className="h-full w-full rounded-[var(--radius)] object-cover" />
                     ) : (
                       <ShoppingBag className="h-10 w-10 text-[var(--text-tertiary)]" />
                     )}
@@ -286,7 +286,7 @@ export default async function HomePage() {
                 <div key={s.id} className="group rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white p-5 shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-pop)] hover:-translate-y-0.5">
                   <div className="flex items-center gap-3.5">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] bg-blue-100 text-blue-600">
-                      <Store className="h-5 w-5" />
+                      <span className="text-lg font-black">{s.name.charAt(0)}</span>
                     </div>
                     <div className="min-w-0">
                       <h3 className="truncate font-bold">{s.name}</h3>
