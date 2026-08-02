@@ -1,7 +1,7 @@
 # پروژه فروشگرام (Foroshgram) — Telegram Order Bot
 
-> **نسخه:** 2.5 | **تاریخ:** ۱۴۰۵-۰۵-۲۱ (2026-08-12)  \
-> **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)   \
+> **نسخه:** 2.6 | **تاریخ:** ۱۴۰۵-۰۵-۲۲ (2026-08-13)  
+> **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)   
 > **پلتفرم سفارش آنلاین چندمستأجری تلگرام**
 
 ---
@@ -59,6 +59,7 @@
 - **جستجوی تعاملی**: تایپ نام محصول
 - **جستجوی همگانی محصولات** (`/searchall`): سرچ در تمام فروشگاه‌های فعال
 - **جستجوی فروشگاه‌ها** (`/findshop`): پیدا کردن فروشگاه با نام/یوزرنیم
+- **دکمه جستجو در منوی `/start`**: هم برای همه کاربران (جدید و بازگشتی)
 - **سبد خرید رها شده**: یادآوری خودکار پس از ۱۲ ساعت
 - **خرید مجدد (Reorder)**: بازگرداندن محصولات سفارش قبلی به سبد
 - **کد تخفیف**: فروشنده کد درصدی/مبلغی می‌سازد، مشتری در checkout اعمال می‌کند
@@ -818,17 +819,22 @@ order:start → (اگر fast-checkout) ASK_NAME
 - ویرایش: نام، وضعیت، توضیحات
 - حذف: تأیید دوم → اخطار آبشار → حذف cascade با SQL مستقیم
 
-### ۶.۸. پیام همگانی (Broadcast)
+#### ۶.۸. پیام همگانی (Broadcast)
 
 - دریافت متن → ارسال به همه کاربران `is_blocked=False`
 - فاصله ۰.۰۴ ثانیه (Rate Limit)
 - Forbidden → علامت‌گذاری کاربر `blocked`
 - آمار نهایی: موفق / ناموفق / بلاک
+- **پیام مخصوص فروشگاه** (`admin:broadcast:shop:{id}`): فقط به کاربرانی که `last_shop_id == id` باشد ارسال می‌شود
 
-### ۶.۹. تایید/رد فروشنده
+#### ۶.۹. مدیریت فروشگاه‌ها (فقط ادمین کل)
 
-- **تایید**: `admin:seller:approve` → `shop.status = "active"` → پیام خوش‌آمدگویی به فروشنده + لینک فروشگاه
-- **رد**: `admin:seller:reject` → Conversation برای دلیل → `shop.status = "rejected"` + پیام به فروشنده
+- لیست + صفحه‌بندی
+- **لیست همه فروشگاه‌ها** (`admin:shops:all`): نمایش تمام فروشگاه‌ها با دکمه `📣 تبلیغ` برای هر فروشگاه
+- فعال/غیرفعال کردن
+- ویرایش: نام، وضعیت، توضیحات
+- حذف: تأیید دوم → اخطار آبشار → حذف cascade با SQL مستقیم (شامل `shop_subscriptions`, `cart`, `wishlist`, `products`, `categories`, `shop_owners`, `claim_codes`, `order_items`, `orders`)
+- **نوتیفیکیشن به فروشنده**: بعد از حذف، به صاحب فروشگاه پیام حذف ارسال می‌شود
 
 ---
 
@@ -927,7 +933,19 @@ order:start → (اگر fast-checkout) ASK_NAME
 
 ---
 
-### ۷.۹. استراتژی انقضای اشتراک (Real-time، بدون کرون)
+### ۷.۹. حذف فروشگاه توسط فروشنده (`seller:delete`)
+
+فروشنده می‌تواند فروشگاه خود را حذف کند:
+
+1. از پنل فروشنده → `🗑 حذف فروشگاه`
+2. تأیید دوم با هشدار کامل (محصولات، دسته‌ها، سفارش‌ها، سبد، اشتراک‌ها)
+3. حذف تمام داده‌های وابسته (cascade): `shop_subscriptions`, `cart`, `wishlist`, `products`, `categories`, `shop_owners`, `claim_codes`, `order_items`, `orders`, `conversations`, `discount_codes`, `messages`
+4. **نوتیفیکیشن به فروشنده**: پیام تایید حذف ارسال می‌شود
+5. **چک مالکیت**: فقط صاحب فروشگاه (`ShopOwner.user_id == update.effective_user.id`) می‌تواند حذف کند
+
+---
+
+### ۷.۱۰. استراتژی انقضای اشتراک (Real-time، بدون کرون)
 
 **قرارداد صریح:** هیچ کرون‌جابی برای انقضای اشتراک وجود ندارد.
 
@@ -935,6 +953,12 @@ order:start → (اگر fast-checkout) ASK_NAME
 - **دکوریتور چک می‌کند:** هر بار مسیر مشتری/فروشنده صدا زده می‌شود، `has_active_subscription(shop_id)` بلافاصله در دیتابیس چک می‌شود — بدون فیلد کش‌شده در `Shop`
 - **Sync با `shop.status`:** فقط در `verify_subscription` (تایید ادمین) و `reject_subscription`، `shop.status = "active"/"suspended"` ست می‌شود. انقضای طبیعی اشتراک `shop.status` را تغییر نمی‌دهد (چون real-time چک می‌شود)
 - **مزیت:** هیچ حلقه‌ی جاافتاده، هیچ inconsistency بین `shop.status` و واقعیت اشتراک، مقیاس‌پذیر (خونده فقط در لحظه request)
+
+---
+
+### ۷.۱۱. دوره آزمایشی (Trial) — ۱۳ روز
+
+فروشگاه‌های جدید تأییدشده به صورت خودکار **۱۳ روز** اشتراک آزمایشی می‌گیرند (نسخه ۲.۶: از ۷ روز به ۱۳ روز افزایش یافت). این فقط برای فروشگاه‌های **جدید** اعمال می‌شود — فروشگاه‌های موجود `end_date` قبلی‌شان را حفظ می‌کنند.
 
 ---
 
@@ -1334,15 +1358,20 @@ transition_order(PAID)
 | `admin:orders:history:{page}` | `list_all_orders` | تاریخچه |
 | `admin:orders:detail:{id}:{source}` | `order_detail` | جزئیات سفارش |
 | `admin:orders:status:{id}:{status}` | `change_order_status` | تغییر وضعیت |
-| `admin:shops:list:{page}` | `list_shops` | لیست فروشگاه‌ها |
+| `admin:shops:list:{page}` | `list_shops` | لیست فروشگاه‌ها (فروشگاه‌های ادمین) |
+| `admin:shops:all:{page}` | `list_all_shops` | **لیست همه فروشگاه‌ها (ادمین کل)** |
 | `admin:shops:add` | `start_add_shop` | افزودن فروشگاه |
 | `admin:shops:edit:{id}` | `edit_shop` | ویرایش فروشگاه |
 | `admin:shops:toggle:{id}` | `toggle_shop` | فعال/غیرفعال |
 | `admin:shops:delete:{id}` | `delete_shop_confirm` | تأیید حذف |
 | `admin:shops:delete_final:{id}` | `delete_shop_final` | حذف نهایی |
-| `admin:broadcast:start` | `start_broadcast` | پیام همگانی |
+| `admin:broadcast:start` | `start_broadcast` | پیام همگانی (همه کاربران) |
+| `admin:broadcast:shop:{id}` | `broadcast_shop_start` | **پیام همگانی مخصوص فروشگاه** |
 | `admin:seller:approve:{shop_id}` | `handle_admin_approve` | تایید فروشنده |
 | `admin:seller:reject:{shop_id}` | `handle_admin_reject` | رد فروشنده |
+| `admin:sub:detail:{id}` | `admin_subscription_detail` | جزئیات اشتراک |
+| `admin:sub:verify:{id}` | `admin_verify_subscription` | تایید اشتراک |
+| `admin:sub:reject:{id}` | `admin_reject_subscription` | رد اشتراک |
 
 ### ۱۲.۶. Command‌های ربات
 
@@ -1376,6 +1405,7 @@ transition_order(PAID)
 | `/orders` | سفارش‌های در حال پیگیری |
 | `/pending_shops` | فروشگاه‌های در انتظار تایید |
 | `/stats` | آمار کلی |
+| `/subscriptions` | اشتراک‌های در انتظار تایید |
 
 ### ۱۲.۷. سطح‌بندی BotCommandScope
 
@@ -1619,15 +1649,83 @@ ADMIN_IDS=8497713691
 - [x] **حذف قفل سطح فروشگاه در `confirm_card_payment`**: وابستگی به `reserved_stock` اتمیک باقی ماند — چند کاربر می‌تونن همزمان بخرن تا جایی که موجودی کافیه
 - [x] **فیلد توضیحات سفارش (`customer_notes`)**: ستون `VARCHAR(500)` در `Order`، state `ASK_NOTES` در checkout، نمایش در خلاصه و نوتیف فروشنده
 - [x] **بهبود پیام اعلان فروشنده**: نام، تلفن، آدرس، توضیحات خریدار، جزئیات مبلغ (جمع کالاها/هزینه ارسال/مبلغ قابل پرداخت/شماره تراکنش)
-- [x] **فیکس `\n` لیترال در پیام‌های اشتراک**: تمام `\\n` به newline واقعی تبدیل شدند
+- [x] **فیکس `\\n` لیترال در پیام‌های اشتراک**: تمام `\\\\n` به newline واقعی تبدیل شدند
 - [x] **پیش‌فرض کارت ادمین برای اشتراک**: `ADMIN_CARD_NUMBER` و `ADMIN_CARD_HOLDER` در `config.py` با default مقداردهی
 - [x] **جستجوی همگانی محصولات** (`/searchall`): سرچ در تمام فروشگاه‌های فعال
 - [x] **جستجوی فروشگاه‌ها** (`/findshop`): پیدا کردن فروشگاه با نام/یوزرنیم
+- [x] **دکمه جستجو در منوی `/start` برای همه کاربران**: هم کاربران جدید (platform welcome) و هم کاربران بازگشتی (خوش برگشتی) اکنون دکمه `🔍 جستجوی فروشگاه و محصول` را دارند
+- [x] **مدیریت فروشگاه‌ها برای ادمین (`admin:shops:all`)**: لیست تمام فروشگاه‌ها با صفحه‌بندی و دکمه `📣 تبلیغ` برای هر فروشگاه
+- [x] **Broadcast مخصوص فروشگاه**: ادمین می‌تواند پیام همگانی به کاربرانِ بازدیدکننده یک فروشگاه خاص بفرستد (`admin:broadcast:shop:{id}`) — بر اساس `user.last_shop_id`
+- [x] **افزایش دوره آزمایشی**: از ۷ روز به ۱۳ روز (فروشگاه‌های جدید تأییدشده)
+- [x] **فیکس امنیتی `seller_delete_final`**: چک مالکیت فروشگاه قبل از حذف — جلوگیری از حذف توسط کاربران غیرمجاز
+- [x] **فیکس `support_command`**: پشتیبانی از Message context (نه فقط CallbackQuery) — `/support` از پیام متنی کار می‌کرد اما `seller_inbox` انتظار CallbackQuery داشت
+- [x] **فیکس حذف فروشگاه FK cleanup**: حذف `shop_subscriptions` قبل از حذف فروشگاه (جلوگیری از ForeignKeyViolation)
+- [x] **فیکس MissingGreenlet در `get_subscription_display`**: eager loading `SubscriptionPlan` با `session.get` به‌جای lazy-load خارج از greenlet
+- [x] **فیکس promo-30s variants**: حذف محتوای تکراری HTML/CSS در فایل‌های خروجی
+- [x] **تست‌های ادغام جدید**: `test_integration_delete_shop.py` (۱۲ تست) + `test_broadcast_shop.py` (۱۲ تست)
+- [x] **مجموع تست‌ها**: ۵۵ تست (۱۰ subscription + ۲۱ subscription_handlers + ۱۲ integration_delete_shop + ۱۲ broadcast_shop)
 
-#### تست‌ها
-- [x] **تست جامع اسمیک هندلرها** (`tests/test_handlers_smoke.py`): ۳۰ تست که همه callback/message handlerهای ثبت‌شده را صدا می‌زند و مطمئن می‌شوند `Exception` مدیریت‌نشده نمی‌دهند. نتیجه: ✅ ۳۰/۳۰
-- [x] **پاک‌سازی وابسته به ترتیب** در `test_flow.py`: `User` → `Order` → `OrderItem` → `Shop` → `Category` → `Product` (children before parents)
-- [x] **تست‌های جداگانه روی `foroshgram_test`**: هر دو فایل تست قبل از هر import، `DATABASE_URL` را از `TEST_DATABASE_URL` اورراید می‌کنند؛ اگر متغیر ست نشده باشد با اخطار fallback می‌کنند
+### 📱 محتوای تبلیغاتی — نسخه ۳۰ ثانیه (نسخه ۲.۶)
+
+در کنار دموهای بلند (۲ دقیقه) برای یوتیوب/آپارات، **نسخه ۳۰ ثانیه** برای ریلز/شورتز تولید شده:
+
+**فایل اصلی:** `promo-30s.html` (روت پروژه)  
+**تولیدکننده:** `promo_variants/gen_30s_v2.py`  
+**معماری:** موبایل-فیرست، Tap/Click یکسان، انیمیشن CSS با reflow ریست، progress bar با rAF (۶۰fps)، ۸ صحنه با زمان‌بندی دقیق ۳۰ ثانیه
+
+**تنوع رنگی (۱۰ تم):**
+| فایل | تم | رنگ اصلی |
+|------|-----|----------|
+| `promo-30s-01.html` | بنفش تیره | `#663399` |
+| `promo-30s-02.html` | روشن | `#f5f5f0` |
+| `promo-30s-03.html` | آبی نیمه‌شب | `#1a3a5c` |
+| `promo-30s-04.html` | نئون سایبر | `#00ffff` |
+| `promo-30s-05.html` | رز گلد | `#e8b4b8` |
+| `promo-30s-06.html` | سفید مینیمال | `#ffffff` |
+| `promo-30s-07.html` | اقیانوس | `#006d77` |
+| `promo-30s-08.html` | کهربایی | `#ffbf00` |
+| `promo-30s-09.html` | کهکشانی | `#1a1a2e` |
+| `promo-30s-10.html` | کربن مشکی | `#111111` |
+
+**فایل‌های صوتی تولید شده** (با `edge-tts` + `ffmpeg` در `promo_variants/gen_audio.py`):
+```
+promo_variants/audio/
+  s1_pain.mp3          # صحنه ۱: درد فروشنده
+  s2_solution.mp3      # صحنه ۲: معرفی راه‌حل
+  s3_registration.mp3  # صحنه ۳: ثبت‌نام
+  s4_panel.mp3         # صحنه ۴: پنل مدیریت
+  s5_purchase.mp3      # صحنه ۵: خرید مشتری
+  s6_fulfillment.mp3   # صحنه ۶: مدیریت سفارش
+  s7_features.mp3      # صحنه ۷: امکانات
+  s8_cta.mp3           # صحنه ۸: CTA
+  full_narration.mp3   # ترکیب ۸ صحنه
+```
+
+**صوت‌ها:** Persian Neural TTS (Microsoft) — دو صدا `fa-IR-FaridNeural` (مرد) و `fa-IR-DilaraNeural` (زن) — کاملاً رایگان، بدون API Key.
+
+**فیکس مهم (نسخه ۲.۶):** اسکریپت `gen_30s_v2.py` محتوای HTML را دو بار می‌نوشت (خط ۳۶۴ `</html:root {` مشخصه). با `head -n 363` فایل اصلاح شد و ۱۰ تنوع بازتولید شدند.
+
+---
+
+### 🐛 باگ‌های رفع شده در جولای ۲۰۲۶ (نسخه ۲.۶)
+
+| # | باگ | شدت | فایل | تست کشف کرد؟ |
+|---|-----|------|------|-------------|
+| ۱ | `seller_delete_final` بدون چک مالکیت — هر کسی فروشگاه رو حذف می‌کرد | 🔴 امنیتی | `seller_panel.py` | ✅ `test_seller_delete_shop_unauthorized_user` |
+| ۲ | `support_command` — `Conversation` ایمپورت نشده بود | 🟠 کرش | `seller_panel.py` | ✅ `test_support_command_as_seller` |
+| ۳ | حذف فروشگاه FK violation — `shop_subscriptions` قبل از حذف فروشگاه پاک نشد | 🟠 کرش | `shops.py` | ✅ `test_admin_delete_shop_with_active_subscription` |
+| ۴ | `MissingGreenlet` در `get_subscription_display` — lazy load `plan` خارج از greenlet | 🟠 کرش | `services/subscription.py` | ❌ (production crash) |
+| ۵ | `Order.deleted_at` فیلد وجود نداشته در `myshop_command` | 🟠 کرش | `seller_panel.py` | ❌ (production crash) |
+| ۶ | `query.answer()` روی `Message` در `support_command` | 🟠 کرش | `seller_panel.py` | ❌ (production crash) |
+| ۷ | فایل‌های promo-30s variant — محتوای تکراری HTML/CSS (دو صفحه کنار هم) | 🟡 نمایش | `promo-30s-*.html` | ❌ (manual QA) |
+
+### 🔧 بهبودهای فنی
+
+- **`gen_30s_v2.py` فیکس شد**: جلوی تکرار خروجی HTML گرفته شد
+- **`make_shop` تست فیکس**: `commit()` + `refresh()` به‌جای `flush()` — باعث `shop` در session بعدی دیده نمی‌شد
+- **Import `Shop` در `send_broadcast_shop`**: قبلاً `NameError` می‌داد
+
+---
 
 ### 🔄 در حال انجام
 
@@ -1652,6 +1750,41 @@ ADMIN_IDS=8497713691
 - [ ] لاگین با OTP تلگرام
 - [ ] سبد خرید چند فروشگاهی
 - [ ] اپلیکیشن موبایل (React Native)
+
+---
+
+## ۱۴. تغییرات و نقشه راه (نسخه ۲.۶ — ۱۴۰۵-۰۵-۲۲)
+
+### ✨ ویژگی‌های جدید در نسخه ۲.۶
+
+| ویژگی | توضیح | فایل‌ها |
+|---------|--------|---------|
+| **دکمه جستجو در منوی `/start`** | هم برای کاربران جدید و هم بازگشتی | `handlers/start.py` |
+| **لیست همه فروشگاه‌ها برای ادمین** | `admin:shops:all:{page}` با صفحه‌بندی | `handlers/admin/shops.py` |
+| **Broadcast مخصوص فروشگاه** | `admin:broadcast:shop:{id}` — پیام به کاربران بازدیدکننده یک فروشگاه | `handlers/admin/broadcast.py` |
+| **افزایش دوره آزمایشی** | از ۷ روز به ۱۳ روز | `services/subscription.py` |
+| **تست‌های ادغام حذف فروشگاه** | ۱۲ تست پوشش FK cleanup، نوتیف، مالکیت | `tests/test_integration_delete_shop.py` |
+| **تست‌های Broadcast مخصوص فروشگاه** | ۱۲ تست پوشش broadcast، بلاک، unauthorized | `tests/test_broadcast_shop.py` |
+| **پاسخ ادمین به پیام پشتیبانی** | دکمه 💬 پاسخ در فوروارد پیام + ConversationHandler | `handlers/support.py`, `main.py` |
+| **لیست پیام‌های پشتیبانی در پنل ادمین** | دکمه 📨 پیام‌های پشتیبانی در پنل ادمین | `handlers/admin/panel.py` |
+
+### 🐛 باگ‌های رفع شده در جولای ۲۰۲۶ (نسخه ۲.۶)
+
+| # | باگ | شدت | فایل | تست کشف کرد؟ |
+|---|-----|------|------|-------------|
+| ۱ | `seller_delete_final` بدون چک مالکیت — هر کسی فروشگاه رو حذف می‌کرد | 🔴 امنیتی | `seller_panel.py` | ✅ `test_seller_delete_shop_unauthorized_user` |
+| ۲ | `support_command` — `Conversation` ایمپورت نشده بود | 🟠 کرش | `seller_panel.py` | ✅ `test_support_command_as_seller` |
+| ۳ | حذف فروشگاه FK violation — `shop_subscriptions` قبل از حذف فروشگاه پاک نشد | 🟠 کرش | `shops.py` | ✅ `test_admin_delete_shop_with_active_subscription` |
+| ۴ | `MissingGreenlet` در `get_subscription_display` — lazy load `plan` خارج از greenlet | 🟠 کرش | `services/subscription.py` | ❌ (production crash) |
+| ۵ | `Order.deleted_at` فیلد وجود نداشته در `myshop_command` | 🟠 کرش | `seller_panel.py` | ❌ (production crash) |
+| ۶ | `query.answer()` روی `Message` در `support_command` | 🟠 کرش | `seller_panel.py` | ❌ (production crash) |
+| ۷ | فایل‌های promo-30s variant — محتوای تکراری HTML/CSS (دو صفحه کنار هم) | 🟡 نمایش | `promo-30s-*.html` | ❌ (manual QA) |
+
+### 🔧 بهبودهای فنی
+
+- **`gen_30s_v2.py` فیکس شد**: جلوی تکرار خروجی HTML گرفته شد
+- **`make_shop` تست فیکس**: `commit()` + `refresh()` به‌جای `flush()` — باعث `shop` در session بعدی دیده نمی‌شد
+- **Import `Shop` در `send_broadcast_shop`**: قبلاً `NameError` می‌داد
 
 ---
 

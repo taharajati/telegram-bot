@@ -89,6 +89,7 @@ docker-compose rm -f && docker-compose up -d
 ```
 
 ## نکات حیاتی عملیات
+- **⚠️ JWT_SECRET الزامی:** وبسایت Next.js بدون متغیر محیطی `JWT_SECRET` (حداقل ۳۲ کاراکتر تصادفی) استارت نمی‌شود. قبل از هر بیلد یا دیپلوی سایت، حتماً این متغیر را در `.env.production` یا Docker Compose تنظیم کن. مقدار پیش‌فرض حذف شده است.
 - **Docker Compose v1** روی سرور نصب شده (دستور `docker-compose` نه `docker compose`)
 - **هیچ `__pycache__` یا `.next` در سرور نیست** — همه در container build میشه
 - **Nginx Reverse Proxy** روی سرور کانفیگ شده (`nginx.conf` با SSL، `nginx-no-ssl.conf` برای توسعه)
