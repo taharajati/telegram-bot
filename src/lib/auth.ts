@@ -10,7 +10,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { getShopById, getAdminByUserId } from '@/lib/db';
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'foroshgram_default_secret_change_me');
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || (() => { throw new Error('JWT_SECRET is not set'); })());
 const COOKIE_NAME = 'fsh_session';
 const EXPIRY = '7d';
 
@@ -55,7 +55,7 @@ export async function setSession(payload: SessionPayload) {
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: isProduction, // HTTPS required in production
-    sameSite: 'lax',     // CSRF protection: blocks cross-origin POST
+    sameSite: isProduction ? 'strict' : 'lax',     // CSRF protection: blocks cross-origin POST
     path: '/',
     maxAge: 7 * 24 * 60 * 60,
   });

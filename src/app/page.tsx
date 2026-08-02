@@ -24,12 +24,12 @@ export default async function HomePage() {
     getRecentActiveShops(5).catch(() => []),
   ]);
 
-  const title = heroContent.title || 'فروشگاه تلگرامیت رو در ۳ دقیقه راه بنداز';
-  const subtitle = heroContent.subtitle || 'فروشگرام هر کسب‌وکاری رو به فروشگاه آنلاین تبدیل می‌کنه.';
+  const title = (heroContent as Record<string,string>).title || 'فروشگاه تلگرامیت رو در ۳ دقیقه راه بنداز';
+  const subtitle = (heroContent as Record<string,string>).subtitle || 'فروشگرام هر کسب‌وکاری رو به فروشگاه آنلاین تبدیل می‌کنه.';
 
   const features: { title: string; desc: string; icon: string }[] = (() => {
     try {
-      const raw = featureContent.items;
+      const raw = (featureContent as Record<string,string>).items;
       return raw ? JSON.parse(raw) : [
         { title: 'ربات اختصاصی', desc: 'هر فروشنده یه پنل اختصاصی توی تلگرام داره', icon: 'bot' },
         { title: 'پرداخت کارت‌به‌کارت', desc: 'واریز مستقیم به شماره کارت فروشنده', icon: 'payment' },

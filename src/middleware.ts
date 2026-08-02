@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'foroshgram_default_secret_change_me');
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || (() => { throw new Error('JWT_SECRET is not set'); })());
 const COOKIE = 'fsh_session';
 
 export const config = {

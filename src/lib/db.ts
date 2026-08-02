@@ -171,6 +171,7 @@ export async function getShopOwner(userId: number) {
     username: string | null;
     password_hash: string | null;
     password_salt: string | null;
+    must_change_password: boolean;
     registered_at: Date;
   }>('SELECT * FROM shop_owners WHERE user_id = $1', [userId]);
   return row;
@@ -197,6 +198,7 @@ export async function getAdminByUserId(userId: number) {
     user_id: number;
     password_hash: string;
     created_at: Date;
+    must_change_password: boolean;
   }>('SELECT * FROM admins WHERE user_id = $1', [userId]);
   return row;
 }
@@ -227,6 +229,7 @@ export async function getRecentActivity(limit = 10) {
   const recentOrders = await query<{
     id: number; tracking_code: string; status: string; payment_status: string;
     total_price: number; shop_id: number; created_at: Date;
+    must_change_password: boolean;
   }>(`SELECT id, tracking_code, status, payment_status, total_price, shop_id, created_at
      FROM orders ORDER BY created_at DESC LIMIT $1`, [limit]);
   return recentOrders.map(o => ({
