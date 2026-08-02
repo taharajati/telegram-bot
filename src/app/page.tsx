@@ -283,7 +283,7 @@ export default async function HomePage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {shops.map((s) => (
-                <div key={s.id} className="group rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white p-5 shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-pop)] hover:-translate-y-0.5">
+                <Link key={s.id} href={`/shop/${s.id}`} className="group rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white p-5 shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-pop)] hover:-translate-y-0.5">
                   <div className="flex items-center gap-3.5">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] bg-blue-100 text-blue-600">
                       <span className="text-lg font-black">{s.name.charAt(0)}</span>
@@ -293,7 +293,7 @@ export default async function HomePage() {
                       <p className="truncate text-xs text-[var(--text-tertiary)]">{s.description || 'فروشگاه فعال'}</p>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
