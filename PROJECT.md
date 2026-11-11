@@ -1,6 +1,6 @@
 # پروژه فروشگرام (Foroshgram) — Telegram Order Bot
 
-> **نسخه:** 2.6 | **تاریخ:** ۱۴۰۵-۰۵-۲۲ (2026-08-13)  
+> **نسخه:** 2.7 | **تاریخ:** ۱۴۰۵-۰۵-۱۹ (2026-08-10)  
 > **ربات:** [@Foroshgrambot](https://t.me/Foroshgrambot)   
 > **پلتفرم سفارش آنلاین چندمستأجری تلگرام**
 
@@ -558,12 +558,14 @@ CHECK ((is_trial = true AND plan_id IS NULL) OR (is_trial = false AND plan_id IS
 - **JWT** با کتابخانه `jose` (Edge Runtime compatible) — کوکی `fsh_session` (httpOnly, SameSite=Lax)
 - **bcrypt** برای هش رمز (جایگزین SHA-256 در آپدیت امنیتی)
 - `ADMIN_PASSWORD` از env vars **حذف شده** — رمز ادمین در جدول `admins` با bcrypt
+- **ورود با یوزرنیم:** ادمین با تلگرام ID (عدد)، فروشنده با username (متن). در `login/route.ts` قبل از `parseInt` حتماً چک `^\d+$` — وگرنه `pg_int64.ParseInt` روی رشته غیرعددی خطای 500 می‌دهد.
 - **Salt جداگانه** برای هر فروشنده (`password_salt`) — برای مهاجرت از SHA-256 نگه داشته شده
 - **Rate limit**: Redis-backed با fallback in-memory — ۵ تلاش ناموفق → ۱۵ دقیقه قفل
 - **CSRF protection**: HMAC-SHA256 double-submit cookie pattern روی POST/PATCH/DELETE endpoints
 - **رمزنگاری اطلاعات بانکی**: AES-256-GCM با PBKDF2 key derivation (کلید از `ENCRYPTION_KEY` env)
-- **AJre-check وضعیت فروشگاه**: `requireSeller()` هر ریکوئست `shop.active` و `password_hash` رو از DB چک می‌کنه
-- **اجبار تغییر رمز**: `must_change_password` flag بعد از `/reset_password` — login موفق redirect به `/change-password`
+- **Re-check وضعیت فروشگاه**: `requireSeller()` هر ریکوئست `shop.active` و `password_hash` رو از DB چک می‌کنه
+- **اجبار تغییر رمز**: `must_change_password` flag بعد از `/reset_password` — لاگین موفق redirect به `/change-password`
+- **تغییر رمز دستی**: ادمین در `/admin/settings` و فروشنده در `/seller/settings` — از طریق `POST /api/auth/change-password` با `{ currentPassword, newPassword }`
 - **De-duplication رسید**: SHA-256 hash + UNIQUE constraint روی `payment_receipt_hash`
 - **Escape HTML**: همه ورودی‌های کاربر قبل از `parse_mode=HTML` escape می‌شن (جلوگیری از injection)
 - **Middleware** (Next.js): محافظت مسیرهای `/admin/*` و `/seller/*`
@@ -866,6 +868,7 @@ order:start → (اگر fast-checkout) ASK_NAME
 - هش bcrypt + ذخیره در `shop_owners.password_hash`
 - Salt جدید هر بار تولید می‌شود
 - `must_change_password = True` بعد از `/reset_password` — لاگین بعدی الزاماً به `/change-password` ریدایرکت می‌شود
+- **تغییر رمز از سایت:** فروشنده در `/seller/settings` و ادمین در `/admin/settings` رمز را عوض می‌کنند (API: `POST /api/auth/change-password`). پیام ربات «رمز موقت» لینک این صفحات را می‌دهد.
 
 ### ۷.۴. کد تخفیف
 
@@ -1234,9 +1237,10 @@ transition_order(PAID)
 
 | مسیر | متد | پارامترها | پاسخ موفق | نیاز به احراز |
 |------|------|-----------|-----------|---------------|
-| `/api/auth/login` | POST | `{ userId, password? }` | `{ success, role, shopId? }` | خیر |
+| `/api/auth/login` | POST | `{ username, password }` | `{ success, role, shopId? }` + کوکی `fsh_session` | خیر |
 | `/api/auth/logout` | POST | — | `{ success: true }` | خیر |
 | `/api/auth/me` | GET | — | `{ userId, role, shopId? }` | بله |
+| `/api/auth/change-password` | POST | `{ currentPassword, newPassword }` | `{ success: true }` | بله |
 | `/api/admin/create-claim-code` | POST | `{ shopId, expiresAt }` | `{ code }` | ادمین |
 | `/api/admin/orders/[id]/status` | PATCH | `{ status }` | `{ success: true }` | ادمین |
 | `/api/admin/toggle-shop` | POST | `{ shopId }` | `{ success }` | ادمین |
@@ -1244,7 +1248,16 @@ transition_order(PAID)
 | `/api/seller/orders/[id]/status` | PATCH | `{ status }` | `{ success }` | فروشنده |
 | `/api/seller/shop-info` | GET | — | `{ shop }` | فروشنده |
 | `/api/seller/toggle-product` | POST | `{ productId }` | `{ success }` | فروشنده |
+| `/api/seller/products` | GET/POST | — | لیست/افزودن محصولات | فروشنده |
+| `/api/seller/products/[id]` | GET/PUT | `{ id }` | محصول | فروشنده |
+| `/api/seller/products/upload` | POST | form-data | آپلود عکس | فروشنده |
+| `/api/seller/stats` | GET | — | آمار فروش | فروشنده |
+| `/api/seller/categories` | GET | — | دسته‌بندی‌ها | فروشنده |
 | `/api/product-image/[id]` | GET | — | image file | خیر |
+
+> ⚠️ **نکته Next.js 16:** در route handlers با پارامتر داینامیک (`[id]`)، تایپ `params` باید `Promise<{ id: string }>` باشد — نه `{ params: { id } }` ساده. در غیر این صورت build خطا می‌دهد.
+
+> ⚠️ **نکته کوکی در Route Handlers:** در Next.js 16، `cookies().set()` کار نمی‌کند (فقط read-only). برای ست کوکی در API route حتماً از `await setSessionCookie(res, payload)` (در `src/lib/auth.ts`) روی `NextResponse` استفاده کن. فراموشی `await` باعث می‌شود لاگین جواب بدهد ولی کوکی ست نشود (سشن نمی‌ماند).
 
 ### ۱۲.۲. سیستم پیام خریدار-فروشنده (Conversations)
 
@@ -1431,32 +1444,85 @@ delete_seller_menu(bot, chat_id)  # حذف دستورات فروشنده
 |-------|-------|
 | آدرس | `185.204.168.57` (خارج ایران) |
 | کاربر | `ubuntu` |
-| استک | Docker Compose |
+| کلید SSH | `C:\s\ar-me-privatekey.pem` |
+| استک | Docker (⚠️ docker-compose v1 نصب است ولی خراب است — فقط با `docker` خام کار کن) |
 
-### ۱۳.۲. Docker Compose
+### ۱۳.۲. کانتینرها (واقعیت فعلی)
 
-```yaml
-services:
-  postgres:
-    image: postgres:16-alpine
-    ports: ["5432:5432"]
-  bot:
-    build: ./telegram_order_bot
-    depends_on: [postgres]
-  website:
-    build: ./telegram_order_website
-    ports: ["3000:3000"]
-    depends_on: [postgres]
+⚠️ **docker-compose نسخه 1.29 روی سرور هست ولی کار نمی‌کند** — همه چیز با دستورات `docker` مستقیم مدیریت می‌شود.
+
+| سرویس | نام کانتینر | پورت | image فعلی |
+|-------|-------------|------|-----------|
+| PostgreSQL 16 | `f746043009ed_foroshgram_postgres` (پیشوند هش!) | 5432 (internal) | — |
+| وب‌سایت Next.js | `foroshgram_website` | 3000 | `714f06e6652f` (تازه‌ترین بیلد) |
+| ربات تلگرام | `e3ae8fee6ab5_foroshgram_bot` (پیشوند هش!) | — | `b4c0c9177e92` |
+| Grafana | `foroshgram_grafana` | 3001 | — |
+| Prometheus | `foroshgram_prometheus` | 9091 | — |
+
+⚠️ پستگرس و ربات **پیشوند هش** دارند — نام دقیق را همیشه با `docker ps` بگیر.
+⚠️ همه روی شبکه `foroshgram_default` — پستگرس با hostname `postgres` در دسترس است.
+
+### ۱۳.۲.۱. ری‌کریت ربات بعد از تغییر env
+
+⚠️ **`docker restart` env جدید را نمی‌خواند!** — env در زمان `docker create` لحظه‌ای می‌شود. برای اعمال تغییرات در `.env` ربات باید کانتینر را حذف و دوباره بسازی:
+
+```bash
+docker rm -f e3ae8fee6ab5_foroshgram_bot
+docker run -d --name e3ae8fee6ab5_foroshgram_bot \
+  --network foroshgram_default \
+  -v /opt/foroshgram/telegram_order_bot:/app \
+  --env-file /opt/foroshgram/telegram_order_bot/.env \
+  --restart unless-stopped \
+  foroshgram_bot:latest
 ```
 
-### ۱۳.۳. Deployment
+⚠️ **متغیرهای حیاتی ربات:** `WEBSITE_URL` (برای دانلود عکس‌ها از سایت — اضافه شد ۱۴۰۵-۰۵-۱۹) و `ENCRYPTION_KEY` (در `/opt/foroshgram/.env` ریشه — اگر نباشد ربات با RuntimeError کرش می‌کند).
 
-- `deploy-to-vps.sh` — استقرار مستقیم با bash
-- `deploy-via-ssh.py` — استقرار خودکار با SSH + Docker
-- `fix-deployment.py` — رفع مشکلات استقرار
+### ۱۳.۳. بیلد/دیپلوی وب‌سایت (روش مرجح)
+
+> ⚠️ **حتماً `--no-cache`!** بیلد با cache تغییرات را نمی‌گیرد. اجرا با `tmux` برای اینکه SSH قطع نشود.
+
+```bash
+cd /opt/foroshgram/telegram_order_website
+export JWT_SECRET=$(grep '^JWT_SECRET=' .env.production | cut -d= -f2-)
+tmux kill-session -t build 2>/dev/null; tmux new-session -d -s build \
+  "docker build --no-cache --build-arg JWT_SECRET=\"\$JWT_SECRET\" -t foroshgram_website:latest . > /tmp/website_build.log 2>&1"
+tail -f /tmp/website_build.log | grep 'Successfully built'   # روی سرور پیگیری
+
+# اجرای کانتینر — از image (نه فایل‌های host!)
+docker rm -f foroshgram_website 2>/dev/null || true
+docker run -d --name foroshgram_website \
+  --restart unless-stopped \
+  --network foroshgram_default \
+  -p 3000:3000 \
+  --env-file /opt/foroshgram/telegram_order_website/.env.production \
+  -v /opt/foroshgram/data/product_images:/app/data/product_images \
+  foroshgram_website:latest
+```
+
+⚠️ **از `--env-file` استفاده کن و `-e DATABASE_URL` را نده** — اگر خالی داده شود، لاگین با خطای SASL خراب می‌شود.
+⚠️ **کانتینر از image می‌خواند** نه از فایل‌های host. `scp` به `/opt/.../src` هیچ اثری ندارد؛ باید rebuild + run جدید کنی.
+
+**ریستارت ربات:**
+```bash
+docker restart <bot_name>     # نام دقیق با docker ps
+docker logs <bot> --tail 100  # بررسی خطا
+```
+
+### ۱۳.۴. دیسک VPS (هشدار)
+
+> دیسک ~23G است. بیلدهای مکرر `--no-cache` حجم containerd را پر می‌کنند.
+> اگر بیلد با `No space left on device` خطا داد: `sudo docker system prune -af --volumes`
+
+### ۱۳.۵. Deployment
+
+- `deploy-to-vps.sh` — استقرار مستقیم با bash (قدیمی — با احتیاط)
+- `deploy-via-ssh.py` — استقرار خودکار با SSH + Docker (قدیمی)
+- `fix-deployment.py` — رفع مشکلات استقرار (قدیمی)
 - `fix-nginx.py` — رفع مشکلات Nginx
+- **روش پیشنهادی:** کل پروژه لوکال را tar + scp کن و روی سرور rebuild کن (نه scp پراکنده).
 
-### ۱۳.۴. Backup & Restore (جديد)
+### ۱۳.۶. Backup & Restore (جديد)
 
 | فایل | توضیح |
 |------|-------|
@@ -1470,33 +1536,12 @@ services:
 - هفتگی: یکشنبه‌ها (حفظ ۴ هفته)
 - ماهانه: اول هر ماه (حفظ ۱۲ ماه)
 
-**استقرار در Docker Compose:**
-```yaml
-backup:
-  build:
-    context: .
-    dockerfile: scripts/Dockerfile.backup
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-    - ./scripts:/scripts:ro
-    - ./backups:/backups
-    - ./init-scripts:/init-scripts:ro
-    - ./rclone.conf:/config/rclone.conf:ro
-  restart: unless-stopped
-```
-
-**تنظیم rclone (یک‌بار روی VPS):**
-```bash
-chmod +x scripts/setup-rclone.sh
-./scripts/setup-rclone.sh
-```
-
-### ۱۳.۵. Nginx
+### ۱۳.۷. Nginx
 
 - `nginx.conf` — کانفیگ کامل با SSL
 - `nginx-no-ssl.conf` — کانفیگ بدون SSL (توسعه)
 
-### ۱۳.۵. متغیرهای محیطی
+### ۱۳.۸. متغیرهای محیطی
 
 **.env ربات (telegram_order_bot/.env):**
 ```ini
@@ -1505,11 +1550,13 @@ ADMIN_IDS=8497713691
 DATABASE_URL=postgresql+asyncpg://foroshgram:...@postgres/foroshgram
 NOTIFICATION_CHANNEL_ID=-100...
 PROXY_URL=http://user:pass@host:port
+WEBSITE_URL=https://telegramorder.ir
+ENCRYPTION_KEY=...
 ```
 
 **.env سایت (telegram_order_website/.env.production):**
 ```ini
-DATABASE_URL=postgresql://foroshgram:...@postgres/foroshgram
+DATABASE_URL=postgresql://foroshgram:***@postgres/foroshgram
 JWT_SECRET=...
 ADMIN_IDS=8497713691
 ```
@@ -1595,6 +1642,7 @@ ADMIN_IDS=8497713691
 - [x] Escape HTML ورودی کاربر (جلوگیری از injection)
 - [x] De-duplication رسید پرداخت (SHA-256 hash + UNIQUE)
 - [x] اجبار تغییر رمز بعد reset (must_change_password)
+- [x] **تغییر رمز از سایت**: صفحات `/admin/settings` و `/seller/settings` + `POST /api/auth/change-password`
 - [x] بک‌آپ خودکار PostgreSQL (daily/weekly/monthly + S3 آماده)
 
 ### 🔧 رفع باگ‌ها و بهبودهای اعمال شده
@@ -1730,12 +1778,36 @@ promo_variants/audio/
 ### 🔄 در حال انجام
 
 - [x] زمان‌بندی کرون برای `scripts/backup.sh` — فعال در container
-- [ ] DNS + SSL نهایی
-- [ ] صفحه عمومی فروشگاه `/shop/[id]`
+- [x] DNS + SSL نهایی — `telegramorder.ir` فعال (Nginx + Certbot)
+- [x] صفحه عمومی فروشگاه `/shop/[id]`
 - [x] تست‌های خودکار مسیرهای پولی — `tests/test_flow.py` اضافه شد (۷ سناریو)
 - [x] تست اسمیک هندلرها — `tests/test_handlers_smoke.py` (۳۰/۳۰ ✅)
+- [x] **رفع نمایش عکس محصولات (وب + ربات)** — ۱۴۰۵-۰۵-۱۹: هم ویترین و هم ربات عکس‌های آپلودی جدید را نمایش می‌دهند (جزئیات در «عملیات ۱۴۰۵-۰۵-۱۹»)
 - [ ] رفع تخصیص فروشگاه دوم (`@dasttiarfrooshbot`)
 - [ ] تکمیل redemption Claim Code
+
+### ✅ تکمیل‌شده در مرداد ۱۴۰۵ (نسخه ۲.۷ — وبسایت)
+
+- [x] **صفحات مدیریت سایت**: `/seller/stats`، `/seller/products/new`، `/seller/products/[id]/edit`، `SellerLayoutClient` (منوی پنل)
+- [x] **تغییر رمز از سایت**: صفحات `/admin/settings` و `/seller/settings` + API `POST /api/auth/change-password`
+- [x] **رفع لاگین 500**: چک `^\d+$` قبل `parseInt` برای ورود ادمین
+- [x] **رفع سشن (Next.js 16)**: `setSessionCookie` با `NextResponse.cookies.set()` + `await` — کوکی در Route Handlers ست می‌شود
+- [x] **رفع `column oi.price does not exist`**: استفاده از `oi.unit_price` در کوئری‌های آمار
+- [x] **دکمه «👤 اطلاعات حساب» ادمین**: رفع `AttributeError: 'Admin' object has no attribute 'username'` — استفاده از `user_id`
+- [x] **پایدارسازی سرور**: docker-compose کنار گذاشته شد، همه سرویس‌ها با `docker` خام
+- [x] **پاک‌سازی دیسک**: `docker system prune` بعد از پر شدن دیسک (containerd ~21GB)
+
+### ✅ عملیات ۱۴۰۵-۰۵-۱۹ (runtime fixes — نسخه ۲.۷)
+
+- [x] **رفع خطای اتصال وب به postgres (28P01)**: رمز عبور در `.env.production` وب با رمز واقعی DB یکی نبود → از `.env` ربات به‌روز شد (در هر دو سمت یکسان شد)
+- [x] **رفع خالی بودن ویترین**: بعد از اصلاح رمز، کانتینر وب `rm + run` شد (نه restart — env تازه نخوانده می‌شد)
+- [x] **رفع عکس محصولات در وب**: volume `/opt/foroshgram/data/product_images:/app/data/product_images` به `docker run` اضافه شد (فعلاً `:ro`)
+- [x] **رفع کرش ربات با `BadRequest: Invalid file http url`**: جدول `product_images` محصولات 287/288 مسیر نسبی `/api/product-image-file/...` داشتند نه file_id تلگرام → `menu.py` حالا `image_url`-های نسبی را فیلتر می‌کند
+- [x] **عکس جدیدترین محصولات در ربات**: `menu.py` حالا اگر `image_file_id` نبود ولی `image_url` بود، از `WEBSITE_URL + image_url` (مثلاً `https://telegramorder.ir/api/product-image-file/...`) عکس را دانلود و در آلبوم می‌فرستد
+- [x] **افزودن `WEBSITE_URL` به env ربات**: مقدار `https://telegramorder.ir` — بدون آن ربات عکس‌های آپلودی جدید را نمی‌فرستاد
+- [x] **افزودن `ENCRYPTION_KEY` به env ربات**: از `/opt/foroshgram/.env` ریشه کپی شد — بدون آن ربات بعد از recreate با `RuntimeError` کرش می‌کرد (کارت‌های ذخیره‌شده رمزگشایی نمی‌شدند)
+- [x] **رفع عکس ویترین برای محصولات بدون file_id**: `page.tsx` حالا `p.image_url` را مستقیم استفاده می‌کند اگر `image_file_id` نبود
+- [x] **بیلد جدید وب deploy شد**: `714f06e6652f` — با `--build-arg JWT_SECRET=...` از `.env.production`
 
 ### 📅 برنامه آینده
 
@@ -1819,7 +1891,7 @@ promo_variants/audio/
 
 1. **دوتایی status و payment_status** — دو فیلد state معنایی هم‌پوشان. ریشه خیلی از باگ‌های state-machine همین دو-منبع-حقیقت‌بودن (جزئیات در ادامه)
 2. **Persistence مکالمه‌ها** — اگه PTB با PicklePersistence کانفیگ نشده باشه، هر بار دیپلوی state کاربران پاک می‌شه
-3. **DNS/SSL نهایی نشده** → ⬜ باقی‌مانده — خارج از scope کد
+3. **یکسان نبودن رمز DB در env های مختلف** — (رفع شد ۱۴۰۵-۰۵-۱۹ ولی هشدار می‌ماند): `.env.production` وب و `.env` ربات باید **همیشه** رمز یکسان داشته باشند. هر بار تغییر رمز، هر دو فایل باید آپدیت شوند
 4. **تک‌نقطه‌ای بودن زیرساخت** — Postgres + Bot + Website همه روی یک VPS. نیاز به staging + CI/CD
 5. **Deploy بدون staging** — الگوی فعلی: «دیپلوی کن، اگه خراب شد فیکس کن» → نیاز به CI/CD pipeline
 6. **مانیتورینگ بدون Alert** — Prometheus/Grafana داری ولی Alertmanager نیست → باید اضافه بشه
@@ -1949,34 +2021,40 @@ Telegramorderbot/
         │   ├── 33482531.txt          # فایل اینماد
         │   ├── not-found.tsx / error.tsx
         │   ├── admin/                # پنل ادمین
-        │   │   ├── layout.tsx
+        │   │   ├── layout.tsx + AdminLayoutClient.tsx   # منو + چک auth
         │   │   ├── page.tsx          # داشبورد
         │   │   ├── shops/page.tsx
         │   │   ├── products/page.tsx
         │   │   ├── categories/page.tsx
         │   │   ├── orders/page.tsx + [id]/page.tsx
         │   │   ├── users/page.tsx
-        │   │   └── claim-codes/page.tsx
+        │   │   ├── claim-codes/page.tsx
+        │   │   └── settings/page.tsx # تغییر رمز ادمین
         │   ├── seller/               # پنل فروشنده
-        │   │   ├── layout.tsx
-        │   │   ├── page.tsx          # داشبورد
+        │   │   ├── layout.tsx + SellerLayoutClient.tsx  # منوی + چک auth
+        │   │   ├── page.tsx          # داشبورد (نمودار فروش)
+        │   │   ├── stats/page.tsx    # آمار فروش
         │   │   ├── products/page.tsx
-        │   │   └── orders/page.tsx + [id]/page.tsx
+        │   │   ├── products/new/page.tsx
+        │   │   ├── products/[id]/edit/page.tsx
+        │   │   ├── orders/page.tsx + [id]/page.tsx
+        │   │   └── settings/page.tsx # تغییر رمز فروشنده
         │   └── api/                  # API Routes
-        │       ├── auth/login|logout|me/route.ts
+        │       ├── auth/login|logout|me|change-password/route.ts
         │       ├── admin/create-claim-code|toggle-shop|toggle-user-block/route.ts
         │       ├── admin/orders/[id]/status/route.ts
-        │       ├── seller/shop-info|toggle-product/route.ts
+        │       ├── seller/products/route.ts + [id]/route.ts + upload/route.ts
+        │       ├── seller/shop-info|toggle-product|stats|categories/route.ts
         │       ├── seller/orders/[id]/status/route.ts
         │       └── product-image/[id]/route.ts       # عکس محصول
         ├── components/
         │   ├── layout/ (Header, Footer, ProtectedLayout)
         │   └── shared/ (Card, ...)
         ├── lib/
-        │   ├── auth.ts               # JWT + سشن + requireSeller/requireAdmin
+        │   ├── auth.ts               # JWT + سشن + setSessionCookie + requireSeller/requireAdmin
         │   ├── crypto.ts             # AES-256-GCM (Node.js native)
         │   ├── csrf.ts               # HMAC-SHA256 double-submit
-        │   ├── db.ts                 # pg Pool + query helpers
+        │   ├── db.ts                 # pg Pool + query helpers + queryOne
         │   ├── rate-limiter.ts       # Redis-backed + in-memory fallback
         │   └── utils.ts
         └── types/
@@ -1991,9 +2069,8 @@ Telegramorderbot/
 │   └── seed_admin.py             # افزودن ادمین اولیه
 ├── deploy-to-vps.sh / deploy-via-ssh.py
 ├── fix-deployment.py / fix-nginx.py
-├── deploy_bot_sftp.py            # (مختل) دیپلوی SFTP
+├── deploy_bot_sftp.py
 ├── deploy_bot_v2.py / deploy_bot_v3.py
-├── deploy_chan.py / deploy_paramiko.py
 ├── upload_*.py                   # آپلود chunk شده فایل‌ها
 └── .env                          # متغیرهای محیطی (رد شده در git)
 ```

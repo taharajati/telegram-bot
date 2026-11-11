@@ -32,12 +32,18 @@ description: "قوانین حیاتی که هیچوقت نباید فراموش 
 - **پروکسی (برای کلون/پول):** SOCKS5 `127.0.0.1:10808`
 - **دایرکتوری پروژه:** `/opt/foroshgram/`
 
-## کانتینرها (Docker Compose v1 - دستور `docker-compose`)
+## کانتینرها (⚠️ docker-compose v1 خراب است — فقط با `docker` خام کار کن)
 | سرویس | نام کانتینر | وضعیت | پورت |
 |-------|-------------|--------|------|
-| PostgreSQL 16 | `foroshgram_postgres` | healthy | 5432 |
-| ربات تلگرام | `foroshgram_bot` | running | — |
+| PostgreSQL 16 | `f746043009ed_foroshgram_postgres` (پیشوند هش!) | healthy | 5432 |
+| ربات تلگرام | `e3ae8fee6ab5_foroshgram_bot` (پیشوند هش!) | running | — |
 | وبسایت Next.js | `foroshgram_website` | running | 3000 |
+| Grafana | `foroshgram_grafana` | running | 3001 |
+| Prometheus | `foroshgram_prometheus` | running | 9091 |
+
+⚠️ نام دقیق کانتینرها را همیشه با `docker ps` بگیر — پستگرس و ربات پیشوند هش دارند.
+⚠️ **دستور `docker-compose` نسخه 1.29 روی سرور هست ولی خراب است — استفاده نکن.**
+⚠️ **شبکه داکر:** همه روی `foroshgram_default` — پستگرس با hostname `postgres` در دسترس است.
 
 ## ربات‌ها
 - **ربات اصلی:** `@Foroshgrambot` (ID: 8871159970)
@@ -78,38 +84,70 @@ delete_seller_menu(bot, chat_id)  # حذف دستورات فروشنده
 - **لینک مستقیم محصول در ربات:** `https://t.me/Foroshgrambot?start=product_[id]`
 - **فایل اینماد:** `public/33482531.txt` در ریشه وبسایت
 
-## دستورات دپلوی
+## دستورات دپلوی (واقعیت فعلی — docker خام، نه compose)
 ```bash
-# روی سرور
-cd /opt/foroshgram
-docker-compose build && docker-compose up -d
+# روی سرور — بیلد سایت (همیشه --no-cache؛ با cache تغییرات گرفته نمی‌شود)
+cd /opt/foroshgram/telegram_order_website
+export JWT_SECRET=$(grep '^JWT_SECRET=' .env.production | cut -d= -f2-)
+tmux kill-session -t build 2>/dev/null; tmux new-session -d -s build \
+  "docker build --no-cache --build-arg JWT_SECRET=\"\$JWT_SECRET\" -t foroshgram_website:latest . > /tmp/website_build.log 2>&1"
+tail -f /tmp/website_build.log | grep 'Successfully built'
 
-# برای reload env vars (باید rm کنیم)
-docker-compose rm -f && docker-compose up -d
+# اجرای کانتینر — با --env-file (نه -e DATABASE_URL!)
+docker rm -f foroshgram_website 2>/dev/null || true
+docker run -d --name foroshgram_website --restart unless-stopped \
+  --network foroshgram_default -p 3000:3000 \
+  --env-file /opt/foroshgram/telegram_order_website/.env.production \
+  -v /opt/foroshgram/data/product_images:/app/data/product_images \
+  foroshgram_website:latest
+
+# ریستارت ربات
+docker restart <bot_name>   # نام را با docker ps بگیر
 ```
 
 ## نکات حیاتی عملیات
-- **⚠️ JWT_SECRET الزامی:** وبسایت Next.js بدون متغیر محیطی `JWT_SECRET` (حداقل ۳۲ کاراکتر تصادفی) استارت نمی‌شود. قبل از هر بیلد یا دیپلوی سایت، حتماً این متغیر را در `.env.production` یا Docker Compose تنظیم کن. مقدار پیش‌فرض حذف شده است.
-- **Docker Compose v1** روی سرور نصب شده (دستور `docker-compose` نه `docker compose`)
-- **هیچ `__pycache__` یا `.next` در سرور نیست** — همه در container build میشه
-- **Nginx Reverse Proxy** روی سرور کانفیگ شده (`nginx.conf` با SSL، `nginx-no-ssl.conf` برای توسعه)
-- **اسکریپت‌های دپلوی:** `deploy-to-vps.sh`، `deploy-via-ssh.py`، `fix-deployment.py`، `fix-nginx.py`
+- **⚠️ JWT_SECRET الزامی:** وب‌سایت Next.js بدون متغیر محیطی `JWT_SECRET` (حداقل ۳۲ کاراکتر تصادفی) استارت نمی‌شود. قبل از هر بیلد/دیپلوی حتماً در `.env.production` یا Docker `--build-arg` تنظیم کن.
+- **Docker Compose v1 روی سرور خراب است** — فقط از `docker` خام استفاده کن.
+- **هیچ `__pycache__` یا `.next` در سرور نیست** — همه در container build می‌شود.
+- **Nginx Reverse Proxy** روی سرور کانفیگ شده (`nginx.conf` با SSL، `nginx-no-ssl.conf` برای توسعه).
+- **⚠️ کوکی لاگین در Route Handlers:** در Next.js 16 باید `NextResponse.cookies.set()` استفاده شود. تابع `setSessionCookie(res, payload)` در `src/lib/auth.ts` این کار را انجام می‌دهد — همیشه `await` شود.
+- **⚠️ تغییر رمز:** ادمین/فروشنده در `/admin/settings` یا `/seller/settings` رمز را تغییر می‌دهند. پیام ربات «رمز موقت» به این آدرس‌ها ارجاع می‌دهد.
+- **اسکریپت‌های دپلوی:** `deploy-to-vps.sh`، `deploy-via-ssh.py`، `fix-deployment.py`، `fix-nginx.py` (برخی قدیمی هستند — با دقت استفاده کن).
 
 ## عیب‌یابی سریع
 | مشکل | راه‌حل |
 |-------|--------|
-| Env vars لود نشد | `docker-compose rm -f bot website && docker-compose up -d` |
-| ربات ریستارت می‌خوره | لاگ: `docker-compose logs -f bot` — معمولاً proxy یا token |
-| Migration دیتابیس | اسکریپت‌ها در `init-scripts/` — در container init اجرا میشن |
+| Env vars لود نشد | کانتینر را با `--env-file` درست بساز (نه `-e DATABASE_URL`) |
+| ربات ریستارت می‌خوره | لاگ: `docker logs <bot> --tail 100` — معمولاً proxy/token یا AttributeError در handler |
+| Migration دیتابیس | اسکریپت‌ها در `init-scripts/` — در container init اجرا می‌شن |
 | Nginx 502 | `fix-nginx.py` روی سرور اجرا کن |
 | SSL تموم شده | `certbot renew` و reload nginx |
+| دیسک پر در بیلد | `sudo docker system prune -af --volumes` (active ها حذف نمی‌شن) |
+| لاگین 500 | چک regex `^\d+$` قبل parseInt؛ کوکی با `await setSessionCookie` ست شود |
 
-## استقرار فایل‌ها (Local → VPS)
-روش استاندارد: `docker cp` فایل‌ها به `/tmp/` → `docker cp` به کانتینر → restart
-```python
-# نمونه: deploy_all2.py استفاده می‌کنه
-# 1. base64 encode فایل
-# 2. python -c "import base64; f=open('/tmp/deploy_x.py','wb'); f.write(base64.b64decode('...'))"
-# 3. docker cp /tmp/deploy_x.py foroshgram_bot:/app/handlers/x.py
-# 4. docker exec python -m py_compile ... && docker restart foroshgram_bot
+## استقرار فایل‌ها (Local → VPS) — روش پیشنهادی
+**سرناخ پروژه لوکال کل را sync و rebuild کن** (نه scp پراکنده):
+
+```bash
+# ۱) کل پروژه (بدون node_modules/.next/.git) را tar می‌کنیم
+cd T:/dars/projects/telegram/Telegramorderbot
+tar --exclude='node_modules' --exclude='.next' --exclude='.git' -czf /tmp/foroshgram_sync.tar.gz .
+
+# ۲) scp به سرور
+scp -i C:/s/ar-me-privatekey.pem /tmp/foroshgram_sync.tar.gz ubuntu@185.204.168.57:/tmp/
+
+# ۳) روی سرور extract و rebuild
+ssh -i C:/s/ar-me-privatekey.pem ubuntu@185.204.168.57 "
+  cd /opt/foroshgram
+  tar -xzf /tmp/foroshgram_sync.tar.gz --strip-components=1
+  # ... سپس بیلد سایت با --no-cache و run
+"
+```
+
+برای ربات (source mount شده در کانتینر):
+```bash
+scp -i C:/s/ar-me-privatekey.pem \
+  "T:/dars/projects/telegram/Telegramorderbot/telegram_order_bot/handlers/seller_panel.py" \
+  ubuntu@185.204.168.57:/opt/foroshgram/telegram_order_bot/handlers/
+docker restart <bot_name>
 ```

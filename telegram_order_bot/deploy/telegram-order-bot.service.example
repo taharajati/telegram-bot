@@ -1,0 +1,24 @@
+; نمونه سرویس systemd برای اجرای دائمی ربات روی VPS
+; مسیر پیشنهادی: /etc/systemd/system/telegram-order-bot.service
+;
+; مراحل نصب:
+;   1. این فایل رو با مسیرها و یوزر واقعی خودت ویرایش کن
+;   2. sudo cp telegram-order-bot.service.example /etc/systemd/system/telegram-order-bot.service
+;   3. sudo systemctl daemon-reload
+;   4. sudo systemctl enable --now telegram-order-bot
+;   5. مشاهده‌ی لاگ‌ها: sudo journalctl -u telegram-order-bot -f
+
+[Unit]
+Description=Telegram Order Management Bot
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_LINUX_USER
+WorkingDirectory=/path/to/telegram_order_bot
+ExecStart=/path/to/telegram_order_bot/venv/bin/python3 main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
