@@ -42,6 +42,8 @@ from handlers.admin import products as admin_products
 from handlers.admin import shops as admin_shops
 from handlers.common import cancel_conversation, noop_callback, about_platform
 from handlers import conversations as msg
+from handlers import widgets as widgets_h
+from services import widgets as widgets_svc
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -92,6 +94,7 @@ async def _post_init(application: Application):
 
     await init_db()
     _get_key()  # pre-warm encryption key (scrypt derivation takes ~2s)
+    widgets_svc.init(application.bot)
     logger.info("پایگاه داده آماده شد ✅")
 
     await set_default_menu(application.bot)
@@ -280,7 +283,6 @@ def _register_seller_handlers(application: Application):
     application.add_handler(CallbackQueryHandler(seller_panel.seller_delete_final, pattern="^seller:delete_final:"))
     application.add_handler(CallbackQueryHandler(seller_panel.seller_orders_pending, pattern="^seller:orders:pending$"))
     application.add_handler(CallbackQueryHandler(seller_panel.seller_orders_history, pattern="^seller:orders:history$"))
-    application.add_handler(CallbackQueryHandler(seller_panel.seller_order_detail, pattern="^seller:order_detail:"))
     application.add_handler(CallbackQueryHandler(admin_panel.admin_stats, pattern="^seller:stats$"))
     application.add_handler(CommandHandler("reset_password", seller_panel.reset_password_command))
 
@@ -327,7 +329,10 @@ def _register_admin_handlers(application: Application):
             admin_products.ASK_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_products.add_price)],
             admin_products.ASK_CATEGORY: [CallbackQueryHandler(admin_products.add_category, pattern="^admin:products:add:cat:")],
             admin_products.ASK_STOCK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_products.add_stock)],
-            admin_products.ASK_PHOTO: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, admin_products.add_photo)],
+            admin_products.ASK_PHOTO: [
+                MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, admin_products.add_photo),
+                CallbackQueryHandler(admin_products.add_photo_button, pattern="^admin:products:add:(done|nophoto)$"),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
         name="add_product_conversation",
@@ -518,6 +523,7 @@ def build_application() -> Application:
     _register_seller_handlers(application)
     _register_admin_handlers(application)
     _register_messaging_handlers(application)
+    widgets_h.register(application)
 
     application.add_error_handler(error_handler)
     return application
@@ -527,7 +533,15 @@ def main():
     config.validate()
     application = build_application()
     logger.info(f"ربات «{config.STORE_NAME}» در حال اجراست...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=2.0, timeout=0, drop_pending_updates=True)
+    # Long polling: پاسخ فوری به‌جای تأخیر ۲ ثانیه‌ای. آپدیت‌های زمان ری‌استارت دور ریخته نمی‌شن
+    # (رسید پرداخت یا سفارشی که وسط دیپلوی فرستاده شده نباید گم بشه).
+    # widget_query هنوز در Update.ALL_TYPES کتابخانه نیست، پس دستی اضافه می‌شه.
+    application.run_polling(
+        allowed_updates=[*Update.ALL_TYPES, "widget_query"],
+        poll_interval=0.0,
+        timeout=30,
+        drop_pending_updates=False,
+    )
     logger.info("ربات متوقف شد.")
 
 

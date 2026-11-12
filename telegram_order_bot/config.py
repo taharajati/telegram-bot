@@ -71,6 +71,24 @@ ADMIN_CARD_HOLDER = os.getenv("ADMIN_CARD_HOLDER", "طه رجعتی").strip()
 # Subscription grace period (days after expiry before forced suspend)
 SUBSCRIPTION_GRACE_DAYS = int(os.getenv("SUBSCRIPTION_GRACE_DAYS", "7"))
 
+# ─── Free mode ─────────────────────────────────────────────────
+# true: فروشگرام برای همه‌ی فروشنده‌ها رایگانه؛ اشتراک و تعلیق خودکار بعد از اتمام مهلت غیرفعاله.
+# برای برگشت به مدل اشتراکی false کن (فروشگاه‌هایی که در حالت رایگان ساخته شدن اشتراک ندارن و
+# باید قبلش برای‌شون دوره‌ی آزمایشی ساخته بشه).
+FREE_MODE = os.getenv("FREE_MODE", "true").lower() == "true"
+
+# ─── Seller onboarding ─────────────────────────────────────────
+# فروشگاه جدید بلافاصله با دوره‌ی آزمایشی فعال می‌شه و ادمین فقط باخبر می‌شه.
+# اگه false باشه، فروشگاه تا تایید دستی ادمین در وضعیت draft می‌مونه.
+AUTO_APPROVE_SHOPS = os.getenv("AUTO_APPROVE_SHOPS", "true").lower() == "true"
+
+# ─── Telegram Widgets (Bot API 10.4) ───────────────────────────
+# ویجت‌ها پیام‌های تعاملی داخل چت هستن (رهگیری زنده سفارش، داشبورد فروشنده).
+WIDGETS_ENABLED = os.getenv("WIDGETS_ENABLED", "true").lower() == "true"
+# ارسال خودکار ویجت رهگیری بعد از ثبت رسید. پیش‌فرض خاموش: نسخه‌های قدیمی تلگرام
+# ویجت رو «پیام پشتیبانی‌نشده» نشون می‌دن؛ تا اون موقع مشتری با دکمه بازش می‌کنه.
+WIDGET_AUTO_SEND = os.getenv("WIDGET_AUTO_SEND", "false").lower() == "true"
+
 def validate():
     if not BOT_TOKEN:
         raise RuntimeError("توکن ربات تنظیم نشده!")

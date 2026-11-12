@@ -2,7 +2,7 @@
 """Full E2E test for Foroshgram bot - runs on VPS."""
 import requests, time, json, subprocess, sys, os
 
-TOKEN = "8871159970:AAGGYu0KboxPNEiqw29jnpAvYcdOLW5WmaQ"
+TOKEN = os.environ["BOT_TOKEN"]
 BASE = f"https://api.telegram.org/bot{TOKEN}"
 ADMIN_ID = 8497713691
 

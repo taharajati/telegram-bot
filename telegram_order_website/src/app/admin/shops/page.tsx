@@ -1,47 +1,61 @@
-// ─── Admin: Shops ───
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Store } from 'lucide-react';
-import { getAllShops } from '@/lib/db';
-import { toJalali } from '@/lib/utils';
-import Card from '@/components/shared/Card';
+import { getAdminShops } from '@/lib/queries';
+import { formatDate, formatNumber } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState, PageHeader } from '@/components/ui/states';
+import { Table, Td, Th, Truncate } from '@/components/ui/table';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'فروشگاه‌ها' };
 
 export default async function AdminShopsPage() {
-  const shops = await getAllShops();
+  const shops = await getAdminShops();
+  const now = new Date();
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-black">فروشگاه‌ها</h1>
-
+      <PageHeader title="فروشگاه‌ها" description={`${formatNumber(shops.length)} فروشگاه ثبت‌شده`} />
       {shops.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {shops.map((shop: any) => (
-            <Card key={shop.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-bold">{shop.name}</h3>
-                  {shop.description && (
-                    <p className="mt-1 text-sm text-[var(--text-tertiary)] line-clamp-2">{shop.description}</p>
-                  )}
-                  <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                    <span>شناسه: {shop.id}</span>
-                    <span>·</span>
-                    <span>{toJalali(shop.created_at)}</span>
-                  </div>
-                </div>
-                <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                  shop.is_active ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--danger)]/10 text-[var(--danger)]'
-                }`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${shop.is_active ? 'bg-[var(--success)]' : 'bg-[var(--danger)]'}`} />
-                  {shop.is_active ? 'فعال' : 'غیرفعال'}
-                </span>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <Table caption="فروشگاه‌های پلتفرم">
+          <thead>
+            <tr><Th>فروشگاه</Th><Th>مالک</Th><Th>محصولات</Th><Th>سفارش‌ها</Th><Th>اشتراک</Th><Th>وضعیت</Th><Th>تاریخ ثبت</Th></tr>
+          </thead>
+          <tbody>
+            {shops.map((s) => {
+              const subLive = s.sub_end && new Date(s.sub_end) > now;
+              return (
+                <tr key={s.id} className="hover:bg-canvas">
+                  <Td className="font-semibold">
+                    <Link href={`/shop/${s.id}`} className="underline-offset-4 hover:underline">
+                      <Truncate max="max-w-48">{s.name}</Truncate>
+                    </Link>
+                  </Td>
+                  <Td className="text-ink-muted" dir="ltr">{s.owner_username ? <bdi>@{s.owner_username}</bdi> : '—'}</Td>
+                  <Td className="tabular-nums">{formatNumber(s.product_count)}</Td>
+                  <Td className="tabular-nums">{formatNumber(s.order_count)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums">
+                    {s.sub_end ? (
+                      <>
+                        <Badge tone={subLive ? 'success' : 'danger'}>{subLive ? (s.sub_trial ? 'آزمایشی' : 'فعال') : 'منقضی'}</Badge>
+                        <span className="ms-2 text-xs text-ink-subtle">{formatDate(s.sub_end)}</span>
+                      </>
+                    ) : '—'}
+                  </Td>
+                  <Td>
+                    <Badge tone={s.status === 'draft' ? 'warning' : s.is_active ? 'success' : 'danger'}>
+                      {s.status === 'draft' ? 'پیش‌نویس' : s.is_active ? 'فعال' : 'غیرفعال'}
+                    </Badge>
+                  </Td>
+                  <Td className="whitespace-nowrap text-ink-muted tabular-nums">{formatDate(s.created_at)}</Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
       ) : (
-        <Card><p className="py-8 text-center text-[var(--text-tertiary)]">هیچ فروشگاهی یافت نشد.</p></Card>
+        <EmptyState icon={Store} title="هنوز فروشگاهی ثبت نشده" description="فروشگاه‌ها از ربات تلگرام و با دعوت‌نامه ساخته می‌شوند." />
       )}
     </div>
   );

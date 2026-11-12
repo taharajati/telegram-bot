@@ -58,8 +58,13 @@ def order_detail_keyboard(order: Order, back_target: str, actor: str = "admin") 
     rows = []
     allowed = get_allowed_targets(order, actor)
 
-    # ── preparing → tracking number → shipped ──
-    if order.status == OrderStatus.PREPARING:
+    # ── paid / confirmed / preparing → (tracking number) → shipped ──
+    if order.status in (OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING):
+        if order.status != OrderStatus.PREPARING:
+            rows.append([InlineKeyboardButton(
+                "📦 در حال آماده‌سازی (اختیاری)",
+                callback_data=f"admin:orders:status:{order.id}:preparing",
+            )])
         if order.tracking_number:
             # Already has tracking → show ship button
             rows.append([InlineKeyboardButton(
@@ -98,16 +103,12 @@ def order_detail_keyboard(order: Order, back_target: str, actor: str = "admin") 
     # ── other usual status transitions ──
     else:
         for next_status in allowed:
+            if next_status == OrderStatus.CANCELLED:
+                continue  # دکمه‌ی لغو پایین‌تر جدا اضافه می‌شه
             label = ORDER_STATUS_LABELS[next_status]
             rows.append([InlineKeyboardButton(
                 f"➡️ تغییر به «{label}»",
                 callback_data=f"admin:orders:status:{order.id}:{next_status}",
-            )])
-        # Tracking button for confirmed (before preparing)
-        if order.status == OrderStatus.CONFIRMED:
-            rows.append([InlineKeyboardButton(
-                "📮 ثبت کد رهگیری",
-                callback_data=f"admin:orders:tracking:{order.id}",
             )])
         if order.tracking_number:
             rows.append([InlineKeyboardButton(
@@ -431,27 +432,7 @@ async def customer_confirm_delivery(update: Update, context: ContextTypes.DEFAUL
         await query.answer(str(e), show_alert=True)
         return
 
-    # Notify seller with detailed info
-    try:
-        shop_owner = await _get_shop_owner(order.shop_id)
-        if shop_owner:
-            # Build detailed message for seller
-            seller_text = (
-                f"✅ <b>مشتری تحویل گرفت — سفارش #{order.tracking_code}</b>\n\n"
-                f"👤 مشتری: {order.receiver_name}\n"
-                f"📞 تماس: {order.phone}\n"
-                f"📍 آدرس: {order.shipping_address}\n"
-                f"💰 مبلغ: {format_price(order.total_price)}\n"
-            )
-            if order.tracking_number:
-                seller_text += f"📮 کد رهگیری: <code>{order.tracking_number}</code>\n"
-            await context.bot.send_message(
-                chat_id=shop_owner,
-                text=seller_text,
-                parse_mode="HTML",
-            )
-    except Exception:
-        pass
+    await notify_seller_delivered(context.bot, order)
 
     # Show detailed confirmation to customer
     detail_text = _order_detail_text(order)
@@ -467,6 +448,29 @@ async def customer_confirm_delivery(update: Update, context: ContextTypes.DEFAUL
         f"برای خرید بعدی: /start",
         parse_mode="HTML",
     )
+
+
+async def notify_seller_delivered(bot, order: Order) -> None:
+    """به فروشنده خبر می‌ده که مشتری دریافت سفارش رو تأیید کرده."""
+    try:
+        shop_owner = await _get_shop_owner(order.shop_id)
+        if shop_owner:
+            seller_text = (
+                f"✅ <b>مشتری تحویل گرفت — سفارش #{order.tracking_code}</b>\n\n"
+                f"👤 مشتری: {order.receiver_name}\n"
+                f"📞 تماس: {order.phone}\n"
+                f"📍 آدرس: {order.shipping_address}\n"
+                f"💰 مبلغ: {format_price(order.total_price)}\n"
+            )
+            if order.tracking_number:
+                seller_text += f"📮 کد رهگیری: <code>{order.tracking_number}</code>\n"
+            await bot.send_message(
+                chat_id=shop_owner,
+                text=seller_text,
+                parse_mode="HTML",
+            )
+    except Exception:
+        pass
 
 
 async def _get_shop_owner(shop_id: int) -> int | None:

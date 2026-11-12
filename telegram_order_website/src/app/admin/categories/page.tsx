@@ -1,34 +1,39 @@
-// ─── Admin: Categories ───
-import { Tags } from 'lucide-react';
+import type { Metadata } from 'next';
+import { FolderTree } from 'lucide-react';
 import { getAllShops, getCategoriesByShop } from '@/lib/db';
-import Card from '@/components/shared/Card';
+import { Card, CardTitle } from '@/components/ui/card';
+import { EmptyState, PageHeader } from '@/components/ui/states';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'دسته‌بندی‌ها' };
 
 export default async function AdminCategoriesPage() {
   const shops = await getAllShops();
-  const allCategories = await Promise.all(
-    shops.map(async (shop) => ({ shop, categories: await getCategoriesByShop(shop.id) }))
-  );
+  const groups = (await Promise.all(shops.map(async (shop) => ({ shop, categories: await getCategoriesByShop(shop.id) }))))
+    .filter((g) => g.categories.length > 0);
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-black">دسته‌بندی‌ها</h1>
-      <div className="grid gap-4 lg:grid-cols-2">
-        {allCategories
-          .filter((s) => s.categories.length > 0)
-          .map(({ shop, categories }) => (
-            <div key={shop.id} className="rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white p-5 shadow-[var(--shadow-card)]">
-              <h2 className="mb-3 font-bold">{shop.name}</h2>
-              {categories.map((cat) => (
-                <div key={cat.id} className="flex items-center justify-between border-b border-[var(--border-light)]/50 py-2 last:border-0">
-                  <span className="text-sm font-medium">{cat.name}</span>
-                  <span className="text-xs text-[var(--text-tertiary)]">{cat.description || '—'}</span>
-                </div>
-              ))}
-            </div>
+      <PageHeader title="دسته‌بندی‌ها" description="دسته‌بندی‌ها به تفکیک فروشگاه. ساخت و ویرایش از ربات انجام می‌شود." />
+      {groups.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {groups.map(({ shop, categories }) => (
+            <Card key={shop.id} as="section">
+              <CardTitle>{shop.name}</CardTitle>
+              <ul className="mt-2">
+                {categories.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-4 border-b border-line py-2 text-sm last:border-b-0">
+                    <span className="font-medium">{c.name}</span>
+                    <span className="truncate text-xs text-ink-subtle">{c.description || '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
           ))}
-      </div>
+        </div>
+      ) : (
+        <EmptyState icon={FolderTree} title="هنوز دسته‌بندی‌ای ساخته نشده" description="با ساخت اولین دسته در ربات، اینجا نمایش داده می‌شود." />
+      )}
     </div>
   );
 }

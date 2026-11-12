@@ -1,146 +1,54 @@
-"use client";
+import type { Metadata } from 'next';
+import { getSellerContext } from '@/lib/panel';
+import { getSellerOverview } from '@/lib/queries';
+import { formatNumber, formatPrice } from '@/lib/utils';
+import { Card, CardTitle } from '@/components/ui/card';
+import { EmptyState, PageHeader, StatCard } from '@/components/ui/states';
+import { Table, Td, Th, Truncate } from '@/components/ui/table';
+import { BarChart } from '@/components/panel/bar-chart';
+import { BarChart3 } from 'lucide-react';
 
-import { useState, useEffect } from 'react';
-import { TrendingUp, ShoppingBag, DollarSign, Clock, Loader2 } from 'lucide-react';
-import Card from '@/components/shared/Card';
-import { formatPrice } from '@/lib/utils';
+export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'آمار فروش' };
 
-interface StatsData {
-  totalRevenue: number;
-  totalOrders: number;
-  pendingOrders: number;
-  salesChart: Array<{date: string, order_count: string, daily_revenue: string}>;
-  topProducts: Array<{name: string, total_sold: string, product_revenue: string}>;
-}
-
-export default function SellerStatsPage() {
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/seller/stats')
-      .then(res => res.json())
-      .then(data => {
-        setStats(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load stats:', err);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-[var(--primary)]" size={40} />
-      </div>
-    );
-  }
-
-  if (!stats) return <div>خطا در دریافت اطلاعات</div>;
+export default async function SellerStatsPage() {
+  const { shop } = await getSellerContext();
+  const o = await getSellerOverview(shop.id);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-black">📊 آمار و گزارش‌ها</h1>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 rounded-full text-green-600">
-              <DollarSign size={24} />
-            </div>
-            <div>
-              <p className="text-sm text-[var(--text-tertiary)]">درآمد کل</p>
-              <p className="text-xl font-bold text-[var(--primary)]">{formatPrice(stats.totalRevenue)}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-100 rounded-full text-blue-600">
-              <ShoppingBag size={24} />
-            </div>
-            <div>
-              <p className="text-sm text-[var(--text-tertiary)]">تعداد سفارشات</p>
-              <p className="text-xl font-bold">{stats.totalOrders}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-orange-100 rounded-full text-orange-600">
-              <Clock size={24} />
-            </div>
-            <div>
-              <p className="text-sm text-[var(--text-tertiary)]">در انتظار بررسی</p>
-              <p className="text-xl font-bold">{stats.pendingOrders}</p>
-            </div>
-          </div>
-        </Card>
+    <div>
+      <PageHeader title="آمار فروش" description="فقط سفارش‌های پرداخت‌شده و لغونشده حساب می‌شوند. روزها به وقت تهران‌اند." />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="فروش ۳۰ روز گذشته" value={formatPrice(o.revenue30d)} emphasis />
+        <StatCard label="فروش کل" value={formatPrice(o.revenueTotal)} />
+        <StatCard label="سفارش پرداخت‌شده" value={formatNumber(o.paidOrders)} hint={`از ${formatNumber(o.totalOrders)} سفارش`} />
+        <StatCard label="محصولات" value={formatNumber(o.products)} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Chart */}
-        <Card className="p-6">
-          <h3 className="mb-4 font-bold flex items-center gap-2">
-            <TrendingUp size={20} />
-            نمودار فروش ۷ روز گذشته
-          </h3>
-          <div className="h-64 flex items-end gap-2">
-            {stats.salesChart.map((day, idx) => {
-              const maxRev = Math.max(...stats.salesChart.map(d => parseFloat(d.daily_revenue)), 1);
-              const height = (parseFloat(day.daily_revenue) / maxRev) * 100;
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="relative w-full bg-gray-100 rounded-t-md overflow-hidden" style={{height: '200px'}}>
-                    <div 
-                      className="absolute bottom-0 w-full bg-[var(--primary)] transition-all duration-500 group-hover:bg-[var(--primary-dark)]"
-                      style={{height: `${height}%`}}
-                    />
-                  </div>
-                  <span className="text-xs text-[var(--text-tertiary)]">
-                    {new Date(day.date).toLocaleDateString('fa-IR', {month: 'short', day: 'numeric'})}
-                  </span>
-                </div>
-              );
-            })}
-            {stats.salesChart.length === 0 && (
-              <div className="w-full h-full flex items-center justify-center text-[var(--text-tertiary)]">
-                داده‌ای برای نمایش وجود ندارد
-              </div>
-            )}
-          </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card as="section">
+          <CardTitle>فروش ۷ روز گذشته</CardTitle>
+          <div className="mt-4"><BarChart data={o.chart} caption="فروش پرداخت‌شده‌ی روزانه در هفت روز گذشته" /></div>
         </Card>
-
-        {/* Top Products */}
-        <Card className="p-6">
-          <h3 className="mb-4 font-bold flex items-center gap-2">
-            <TrendingUp size={20} className="rotate-90" />
-            پرفروش‌ترین محصولات
-          </h3>
-          <div className="space-y-4">
-            {stats.topProducts.map((product, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-[var(--bg-muted)] rounded-[var(--radius)]">
-                <div>
-                  <p className="font-semibold text-sm">{product.name}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{product.total_sold} عدد فروش رفته</p>
-                </div>
-                <span className="font-bold text-[var(--primary)] text-sm">
-                  {formatPrice(parseFloat(product.product_revenue))}
-                </span>
-              </div>
-            ))}
-            {stats.topProducts.length === 0 && (
-              <div className="text-center text-[var(--text-tertiary)] py-8">
-                هنوز فروشی ثبت نشده است
-              </div>
-            )}
-          </div>
-        </Card>
+        <section aria-labelledby="top-h">
+          <h2 id="top-h" className="mb-3 text-base font-bold">پرفروش‌ترین محصولات</h2>
+          {o.topProducts.length > 0 ? (
+            <Table caption="پرفروش‌ترین محصولات">
+              <thead><tr><Th>محصول</Th><Th>تعداد فروش</Th><Th>درآمد</Th></tr></thead>
+              <tbody>
+                {o.topProducts.map((t) => (
+                  <tr key={t.name}>
+                    <Td><Truncate max="max-w-48">{t.name}</Truncate></Td>
+                    <Td className="tabular-nums">{formatNumber(t.sold)}</Td>
+                    <Td className="tabular-nums">{formatPrice(t.revenue)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          ) : (
+            <EmptyState icon={BarChart3} title="هنوز فروشی ثبت نشده" description="بعد از اولین سفارش پرداخت‌شده، محصولات پرفروش اینجا نمایش داده می‌شوند." />
+          )}
+        </section>
       </div>
     </div>
   );

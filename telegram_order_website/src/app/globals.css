@@ -1,99 +1,80 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/*
+  Design tokens — فروشگرام
+  رنگ‌های نام‌دار: brand, ink, canvas, success, danger, warning (+ نسخه‌ی soft برای پس‌زمینه‌ی نشان‌ها)
+  فاصله‌ها: مقیاس پیش‌فرض Tailwind (ضریب ۴px)؛ فقط مقادیر ضریب ۴ و ۸ استفاده می‌شود.
+  کنتراست (روی سفید): brand 4.9:1، ink-muted 7:1، ink-subtle 4.9:1، line-strong 3.1:1
+*/
+@theme {
+  --font-sans: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
 
-:root {
-  /* ── Telegram-inspired palette ── */
-  --bg: #f0f2f5;
-  --bg-card: #ffffff;
-  --bg-muted: #e8eaed;
-  --bg-soft: #f5f5f5;
-  --surface: #ffffff;
-  --text: #1a1a1a;
-  --text-secondary: #5e6c78;
-  --text-tertiary: #8b95a0;
-  --primary: #0088cc;
-  --primary-dark: #006da3;
-  --primary-light: #e3f2fd;
-  --primary-glow: rgba(0, 136, 204, 0.08);
-  --secondary: #5b21b6;
-  --secondary-light: #f0eaff;
-  --telegram: #0088cc;
-  --border: #d1d9e0;
-  --border-light: #e8eaed;
-  --danger: #e53935;
-  --success: #43a047;
-  --warning: #fb8c00;
-  --bg-sidebar: #ffffff;
-  --bg-navbar: rgba(255, 255, 255, 0.92);
-  --bg-input: #ffffff;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-pop: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --radius: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
-}
+  --color-brand: #0077b3;
+  --color-brand-strong: #006399;
+  --color-brand-soft: #e6f3fa;
 
-/* ── Shared neutral tokens ── */
-* { box-sizing: border-box; }
-html { direction: rtl; }
+  --color-ink: #14202b;
+  --color-ink-muted: #4a5a68;
+  --color-ink-subtle: #637381;
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Vazirmatn', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --color-canvas: #f4f7fa;
+  --color-surface: #ffffff;
+  --color-line: #d5dde4;
+  --color-line-strong: #8394a3;
+
+  --color-success: #15803d;
+  --color-success-soft: #e7f5ec;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fdeceb;
+  --color-warning: #92400e;
+  --color-warning-soft: #fdf3e1;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-pop: 0 8px 24px rgb(20 32 43 / 0.12);
+  --shadow-sticky: 0 1px 0 rgb(20 32 43 / 0.06);
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
-
-/* ── Animations ── */
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  33% { transform: translateY(-12px) rotate(1deg); }
-  66% { transform: translateY(-6px) rotate(-0.5deg); }
-}
-@keyframes pulse-soft {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-@keyframes blob {
-  0% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(20px, -30px) scale(1.1); }
-  50% { transform: translate(-10px, 20px) scale(0.9); }
-  75% { transform: translate(-30px, -10px) scale(1.05); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-@keyframes appear {
-  0% { opacity: 0; transform: translateY(12px) scale(0.97); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes count-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+@layer base {
+  html {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-brand-soft);
+  }
+  /* ورودی‌های عددی/کد همیشه چپ‌به‌راست و هم‌عرض */
+  input[dir="ltr"] {
+    text-align: start;
+  }
+  summary {
+    cursor: pointer;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
 }
 
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-blob { animation: blob 8s ease-in-out infinite; }
-.animate-appear { animation: appear 0.6s ease-out forwards; }
-.animate-count-up { animation: count-up 0.5s ease-out forwards; }
-.animate-marquee { animation: marquee 30s linear infinite; }
-.animate-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2.5s ease-in-out infinite;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -170,6 +170,8 @@ async def has_active_subscription(shop_id: int, session: AsyncSession) -> bool:
 # ─── Get subscription status for display ───────────────────
 async def get_subscription_display(shop_id: int, session: AsyncSession) -> str:
     """متن وضعیت اشتراک برای نمایش به فروشنده."""
+    if config.FREE_MODE:
+        return "🆓 رایگان"
     sub = await get_current_subscription(shop_id, session)
 
     if not sub:
@@ -277,6 +279,9 @@ async def auto_suspend_expired_subscriptions(bot=None):
     فقط سفارش‌های جدید مسدود می‌شن (سفارش‌های در حال پردازش کامل می‌شن).
     همچنین ۳ روز مونده به اتمام هشدار میده.
     """
+    if config.FREE_MODE:
+        return  # حالت رایگان: هیچ فروشگاهی به‌خاطر اتمام اشتراک تعلیق نمی‌شه و یادآوری هم نمی‌ره
+
     now = utcnow()
     three_days = timedelta(days=3)
     grace_days = timedelta(days=config.SUBSCRIPTION_GRACE_DAYS)

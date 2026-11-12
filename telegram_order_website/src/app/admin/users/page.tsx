@@ -1,68 +1,50 @@
-// ─── Admin: Users ───
-import { Users, Ban, Check } from 'lucide-react';
+import type { Metadata } from 'next';
+import { Users } from 'lucide-react';
 import { getAllUsers } from '@/lib/db';
-import { toJalali } from '@/lib/utils';
+import { formatDate, formatNumber } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState, PageHeader } from '@/components/ui/states';
+import { Table, Td, Th, Truncate } from '@/components/ui/table';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'کاربران' };
 
 export default async function AdminUsersPage() {
   const users = await getAllUsers();
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-black">کاربران ({users.length})</h1>
-
-      <div className="overflow-x-auto rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white shadow-[var(--shadow-card)]">
-        <table className="w-full text-sm">
+      <PageHeader title="کاربران" description={`${formatNumber(users.length)} کاربر در ربات`} />
+      {users.length > 0 ? (
+        <Table caption="کاربران ربات">
           <thead>
-            <tr className="border-b border-[var(--border-light)]">
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">شناسه</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">نام</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">نام کاربری</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">تلفن</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">مسدود</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">تاریخ</th>
-              <th className="px-4 py-3"></th>
-            </tr>
+            <tr><Th>شناسه</Th><Th>نام</Th><Th>نام کاربری</Th><Th>تلفن</Th><Th>وضعیت</Th><Th>تاریخ ثبت‌نام</Th><Th><span className="sr-only">عملیات</span></Th></tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.user_id} className="border-b border-[var(--border-light)]/50 transition hover:bg-[var(--bg-muted)]">
-                <td className="px-4 py-3 text-[var(--text-tertiary)]">{user.user_id}</td>
-                <td className="px-4 py-3 font-semibold">{user.first_name || '—'}</td>
-                <td className="px-4 py-3 text-[var(--text-secondary)]">@{user.username || '—'}</td>
-                <td className="px-4 py-3 text-[var(--text-secondary)]" dir="ltr">{user.phone || '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    user.is_blocked
-                      ? 'bg-[var(--danger)]/10 text-[var(--danger)]'
-                      : 'bg-[var(--success)]/10 text-[var(--success)]'
-                  }`}>
-                    {user.is_blocked ? <Ban className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                    {user.is_blocked ? 'بله' : 'خیر'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-[var(--text-tertiary)]">{toJalali(user.registered_at)}</td>
-                <td className="px-4 py-3">
+            {users.map((u) => (
+              <tr key={u.user_id} className="hover:bg-canvas">
+                <Td className="text-ink-subtle tabular-nums" dir="ltr"><bdi>{u.user_id}</bdi></Td>
+                <Td className="font-semibold">{u.first_name ? <Truncate max="max-w-40">{u.first_name}</Truncate> : '—'}</Td>
+                <Td className="text-ink-muted" dir="ltr">{u.username ? <bdi>@{u.username}</bdi> : '—'}</Td>
+                <Td className="text-ink-muted" dir="ltr"><bdi>{u.phone || '—'}</bdi></Td>
+                <Td><Badge tone={u.is_blocked ? 'danger' : 'success'}>{u.is_blocked ? 'مسدود' : 'فعال'}</Badge></Td>
+                <Td className="whitespace-nowrap text-ink-muted tabular-nums">{formatDate(u.registered_at)}</Td>
+                <Td>
                   <form action="/api/admin/toggle-user-block" method="POST">
-                    <input type="hidden" name="user_id" value={user.user_id} />
-                    <button
-                      type="submit"
-                      className={`rounded-[var(--radius)] px-2.5 py-1 text-xs font-semibold transition ${
-                        user.is_blocked
-                          ? 'bg-[var(--success)]/10 text-[var(--success)] hover:bg-[var(--success)]/20'
-                          : 'bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/20'
-                      }`}
-                    >
-                      {user.is_blocked ? 'رفع مسدودیت' : 'مسدود'}
+                    <input type="hidden" name="user_id" value={u.user_id} />
+                    <button type="submit" className="inline-flex min-h-9 items-center rounded-sm border border-line-strong px-3 text-xs font-semibold hover:bg-canvas">
+                      {u.is_blocked ? 'رفع مسدودیت' : 'مسدود کردن'}
+                      <span className="sr-only"> {u.first_name || u.user_id}</span>
                     </button>
                   </form>
-                </td>
+                </Td>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+        </Table>
+      ) : (
+        <EmptyState icon={Users} title="هنوز کاربری ثبت‌نام نکرده" description="کاربران با اولین ورود به ربات اینجا نمایش داده می‌شوند." />
+      )}
     </div>
   );
 }

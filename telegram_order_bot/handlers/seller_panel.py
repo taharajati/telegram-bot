@@ -15,9 +15,10 @@ from telegram.ext import (
 
 from database.db import async_session
 from database.models import Admin, Shop, ShopOwner
-from utils.helpers import format_price, is_super_admin
+from utils.helpers import format_price, is_super_admin, to_jalali
 from utils.crypto import safe_encrypt, safe_decrypt
 from utils.tg_helpers import get_current_shop_id, render_view
+import config
 from config import WEBSITE_URL
 
 from sqlalchemy import select
@@ -86,12 +87,13 @@ async def _build_seller_panel(user_id: int, bot_username: str = "") -> tuple[str
         [InlineKeyboardButton("📜 تاریخچه سفارش‌ها", callback_data="admin:orders:history:0")],
         # ── آمار و مالی ──
         [InlineKeyboardButton("📊 آمار فروش", callback_data="seller:stats")],
+        *([[InlineKeyboardButton("📈 داشبورد زنده", callback_data="seller:live")]] if config.WIDGETS_ENABLED else []),
         [InlineKeyboardButton("💰 کدهای تخفیف", callback_data="discount:list")],
         # ── پیام‌ها ──
         [InlineKeyboardButton("💬 پیام‌های مشتریان", callback_data="seller:inbox")],
         # ── تنظیمات ──
         [InlineKeyboardButton("🧾 تنظیمات پرداخت", callback_data="seller:payment_settings")],
-        [InlineKeyboardButton("💳 اشتراک فروشگاه", callback_data="seller:subscription:show")],
+        *([] if config.FREE_MODE else [[InlineKeyboardButton("💳 اشتراک فروشگاه", callback_data="seller:subscription:show")]]),
         [InlineKeyboardButton("🏪 لینک فروشگاه", callback_data="seller:show_link")],
         [InlineKeyboardButton("📷 عکس کاور", callback_data="seller:set_banner")],
         [InlineKeyboardButton("⚙️ تنظیمات سایت", callback_data="seller:site_settings")],
@@ -746,6 +748,7 @@ async def seller_delete_final(update: Update, context: ContextTypes.DEFAULT_TYPE
         await session.execute(sa_text("DELETE FROM shop_owners WHERE shop_id = :sid"), {"sid": shop_id})
         await session.execute(sa_text("DELETE FROM claim_codes WHERE shop_id = :sid"), {"sid": shop_id})
         await session.execute(sa_text("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE shop_id = :sid)"), {"sid": shop_id})
+        await session.execute(sa_text("DELETE FROM order_widgets WHERE order_id IN (SELECT id FROM orders WHERE shop_id = :sid)"), {"sid": shop_id})
         await session.execute(sa_text("DELETE FROM orders WHERE shop_id = :sid"), {"sid": shop_id})
         await session.execute(sa_text("DELETE FROM conversations WHERE shop_id = :sid"), {"sid": shop_id})
         await session.execute(sa_text("DELETE FROM discount_codes WHERE shop_id = :sid"), {"sid": shop_id})
@@ -795,15 +798,18 @@ async def _show_seller_pending_orders(message, user_id: int):
         result = await session.execute(
             select(Order).where(
                 Order.shop_id == shop_id,
-                Order.status.in_([OrderStatus.PENDING_PAYMENT, OrderStatus.PENDING]),
+                Order.status.in_([
+                    OrderStatus.PENDING_PAYMENT, OrderStatus.PENDING,
+                    OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING,
+                ]),
             ).order_by(Order.created_at.desc())
         )
         orders = result.scalars().all()
 
     if not orders:
         await message.reply_text(
-            "📦 سفارش‌های در انتظار پرداخت\n\n"
-            "هیچ سفارشی در انتظار پرداخت وجود ندارد.",
+            "🧾 سفارش‌های جدید\n\n"
+            "فعلاً سفارشی منتظر اقدام تو نیست. 🎉",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 بازگشت", callback_data="seller:panel_back")]
             ]),
@@ -811,11 +817,13 @@ async def _show_seller_pending_orders(message, user_id: int):
         )
         return
 
-    lines = ["📦 سفارش‌های در انتظار پرداخت\n"]
+    lines = ["🧾 سفارش‌های جدید و در جریان\n"]
     buttons = []
     for o in orders:
         payment_info = ""
-        if o.payment_method == "card_to_card":
+        if o.status in (OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING):
+            payment_info = " — پرداخت شده، منتظر ارسال 📦"
+        elif o.payment_method == "card_to_card":
             if o.payment_receipt_at:
                 payment_info = " — رسید آپلود شده ✅"
             else:
@@ -824,11 +832,11 @@ async def _show_seller_pending_orders(message, user_id: int):
             payment_info = " — پرداخت درب منزل 🚚"
 
         lines.append(
-            f"🔹 {o.tracking_code} — {o.total_price:,} تومان{payment_info}\n"
-            f"   {o.created_at.strftime('%Y-%m-%d %H:%M')}"
+            f"🔹 {o.tracking_code} — {format_price(o.total_price)}{payment_info}\n"
+            f"   {to_jalali(o.created_at)}"
         )
         buttons.append([
-            InlineKeyboardButton(f"👁 {o.tracking_code}", callback_data=f"seller:order_detail:{o.id}")
+            InlineKeyboardButton(f"👁 {o.tracking_code}", callback_data=f"admin:orders:detail:{o.id}")
         ])
 
     buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="seller:panel_back")])
@@ -865,7 +873,6 @@ async def seller_orders_history(update: Update, context: ContextTypes.DEFAULT_TY
         result = await session.execute(
             select(Order).where(
                 Order.shop_id == shop_id,
-                Order.deleted_at.is_(None),
             ).order_by(Order.created_at.desc()).limit(50)
         )
         orders = result.scalars().all()
@@ -903,11 +910,11 @@ async def seller_orders_history(update: Update, context: ContextTypes.DEFAULT_TY
             payment_info = " (درب منزل)"
 
         lines.append(
-            f"{status_emoji} {o.tracking_code} — {o.total_price:,} تومان{payment_info} — {o.status}\n"
-            f"   {o.created_at.strftime('%Y-%m-%d %H:%M')}"
+            f"{status_emoji} {o.tracking_code} — {format_price(o.total_price)}{payment_info}\n"
+            f"   {to_jalali(o.created_at)}"
         )
         buttons.append([
-            InlineKeyboardButton(f"👁 {o.tracking_code}", callback_data=f"seller:order_detail:{o.id}")
+            InlineKeyboardButton(f"👁 {o.tracking_code}", callback_data=f"admin:orders:detail:{o.id}:history")
         ])
 
     buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="seller:panel_back")])
@@ -916,158 +923,6 @@ async def seller_orders_history(update: Update, context: ContextTypes.DEFAULT_TY
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(buttons),
         parse_mode="HTML"
-    )
-
-
-async def seller_order_detail(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """جزئیات سفارش برای فروشنده."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-
-    shop_id = await _get_shop_id(user_id)
-    if not shop_id:
-        await query.edit_message_text("❌ شما فروشنده نیستید.")
-        return
-
-    parts = query.data.split(":")
-    order_id = int(parts[2])
-
-    async with async_session() as session:
-        from database.models import Order, OrderItem, Product
-        from sqlalchemy import select
-        result = await session.execute(
-            select(Order).where(
-                Order.id == order_id,
-                Order.shop_id == shop_id,
-                Order.deleted_at.is_(None),
-            )
-        )
-        order = result.scalar_one_or_none()
-
-        if not order:
-            await query.edit_message_text("❌ این سفارش پیدا نشد. شاید حذف شده یا کد اشتباهه.")
-            return
-
-        # Get order items
-        items_result = await session.execute(
-            select(OrderItem, Product.name).join(Product, OrderItem.product_id == Product.id).where(
-                OrderItem.order_id == order.id
-            )
-        )
-        items = items_result.all()
-
-    status_text = {
-        "pending_payment": "⏳ در انتظار پرداخت",
-        "pending": "⏳ در انتظار تایید",
-        "paid": "💰 پرداخت شده",
-        "confirmed": "📦 تایید شده",
-        "preparing": "📦 در حال آماده‌سازی",
-        "shipped": "🚚 ارسال شده",
-        "delivered": "✅ تحویل داده شده",
-        "cancelled": "❌ لغو شده",
-        "card_payment_rejected": "❌ پرداخت رد شده",
-    }.get(order.status, f"❓ {order.status}")
-
-    items_text = ""
-    for item, product_name in items:
-        items_text += f"  • {product_name} × {item.quantity} = {item.price * item.quantity:,} تومان\n"
-
-    text = (
-        f"🧾 سفارش {order.tracking_code}\n\n"
-        f"👤 مشتری: {order.customer_name}\n"
-        f"📞 تلفن: {order.customer_phone}\n"
-        f"📍 آدرس: {order.customer_address[:80]}{'...' if len(order.customer_address or '') > 80 else ''}\n\n"
-        f"📦 اقلام:\n{items_text}\n"
-        f"💰 مبلغ کل: {order.total_price:,} تومان\n"
-        f"💳 روش پرداخت: {'کارت‌به‌کارت' if order.payment_method == 'card_to_card' else 'درب منزل'}\n"
-        f"📊 وضعیت: {status_text}\n"
-        f"🕐 تاریخ: {order.created_at.strftime('%Y-%m-%d %H:%M')}"
-    )
-
-    # Action buttons based on status
-    buttons = []
-    if order.status in ("pending_payment", "pending"):
-        buttons.append([InlineKeyboardButton("✅ تایید پرداخت", callback_data=f"seller:order_action:pay:{order.id}")])
-        buttons.append([InlineKeyboardButton("❌ لغو سفارش", callback_data=f"seller:order_action:cancel:{order.id}")])
-    elif order.status == "paid":
-        buttons.append([InlineKeyboardButton("📦 آماده‌سازی", callback_data=f"seller:order_action:prepare:{order.id}")])
-    elif order.status == "preparing":
-        buttons.append([InlineKeyboardButton("🚚 ارسال شد", callback_data=f"seller:order_action:ship:{order.id}")])
-
-    buttons.append([InlineKeyboardButton("🔙 بازگشت", callback_data="seller:orders:history")])
-
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="HTML")
-
-
-# ═══════════════════════════════════════════════════════════════
-# Order Actions (status transitions)
-# ═══════════════════════════════════════════════════════════════
-
-async def handle_order_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر وضعیت سفارش توسط فروشنده."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-
-    parts = query.data.split(":")
-    if len(parts) < 4:
-        return
-
-    action = parts[2]  # pay, prepare, ship, cancel
-    order_id = int(parts[3])
-
-    shop_id = await _get_shop_id(user_id)
-    if not shop_id:
-        await query.edit_message_text("❌ شما فروشنده نیستید.")
-        return
-
-    status_map = {
-        "pay": "paid",
-        "prepare": "preparing",
-        "ship": "shipped",
-        "cancel": "cancelled",
-    }
-    new_status = status_map.get(action)
-    if not new_status:
-        return
-
-    async with async_session() as session:
-        from database.models import Order
-        result = await session.execute(
-            select(Order).where(
-                Order.id == order_id,
-                Order.shop_id == shop_id,
-                Order.deleted_at.is_(None),
-            )
-        )
-        order = result.scalar_one_or_none()
-        if not order:
-            await query.edit_message_text("❌ سفارش یافت نشد.")
-            return
-
-        # Release stock on cancellation
-        if new_status == "cancelled":
-            from services.order_service import cancel_order_and_release_stock
-            await cancel_order_and_release_stock(order.id, bot=context.bot)
-        else:
-            from services.order_service import transition_order
-            await transition_order(order.id, new_status, bot=context.bot)
-
-    action_text = {
-        "pay": "✅ پرداخت تایید شد",
-        "prepare": "📦 در حال آماده‌سازی",
-        "ship": "🚚 ارسال شد",
-        "cancel": "❌ لغو شد",
-    }.get(action, "وضعیت تغییر کرد")
-
-    await query.edit_message_text(
-        f"{action_text}\n\n"
-        f"🧾 سفارش {order.tracking_code}",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 بازگشت", callback_data="seller:orders:history")]
-        ])
     )
 
 

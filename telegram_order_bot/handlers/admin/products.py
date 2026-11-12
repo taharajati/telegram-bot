@@ -18,6 +18,21 @@ from utils.image_storage import download_and_store_image, download_and_store_mul
 from services.restock import _check_and_notify_restock
 
 ASK_NAME, ASK_DESC, ASK_PRICE, ASK_CATEGORY, ASK_STOCK, ASK_PHOTO = range(6)
+
+DEFAULT_CATEGORY_NAME = "محصولات"
+_STOCK_PROMPT = "چند عدد ازش موجوده؟ (فقط عدد، مثال: 20)"
+_PHOTO_SKIP_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("⏭ بدون عکس ثبت کن", callback_data="admin:products:add:nophoto")],
+])
+_PHOTO_DONE_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("✅ ثبت محصول", callback_data="admin:products:add:done")],
+])
+_NUMBER_NOISE = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789", ",٬، ")
+
+
+def _clean_number(text: str) -> str:
+    """ارقام فارسی/عربی رو لاتین می‌کنه و جداکننده‌ی هزارگان رو برمی‌داره."""
+    return (text or "").strip().translate(_NUMBER_NOISE)
 EDIT_ASK_VALUE = 0
 ASK_PHOTO_CHANGE = 0  # state for change photo mini-conversation
 PRODUCTS_PER_PAGE = 8
@@ -114,26 +129,21 @@ async def start_add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
         has_category = result.scalar_one_or_none() is not None
 
     if not has_category:
-        context.user_data.pop("new_product", None)
-        await render_view(query, context,
-            "⚠️ قبل از افزودن محصول، باید دسته‌بندی بسازی!\n\n"
-            "اول از بخش «مدیریت دسته‌بندی‌ها» یه دسته بساز، "
-            "بعدش برگرد و محصولت رو اضافه کن 👌",
-            InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 بازگشت به پنل", callback_data="admin:panel")
-            ]])
-        )
-        return ConversationHandler.END
+        # فروشنده‌ی تازه‌وارد رو برای ساختن دسته‌بندی برنمی‌گردونیم؛ یه دسته‌ی پیش‌فرض می‌سازیم
+        # که بعداً از «دسته‌بندی‌ها» قابل تغییر نامه.
+        async with async_session() as session:
+            session.add(Category(name=DEFAULT_CATEGORY_NAME, shop_id=shop_id))
+            await session.commit()
 
     context.user_data["new_product"] = {"shop_id": shop_id}
-    await render_view(query, context, "نام محصول جدید رو وارد کن:\n(برای لغو /cancel)", None)
+    await render_view(query, context, "➕ محصول جدید\n\nاسم محصول رو بفرست:\n(برای لغو /cancel)", None)
     return ASK_NAME
 
 
 @admin_only
 async def add_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["new_product"]["name"] = update.message.text.strip()
-    await update.message.reply_text("توضیحات محصول رو وارد کن (یا بنویس «ندارد»):")
+    await update.message.reply_text("یه توضیح کوتاه برای محصول بنویس (اگه نمی‌خوای، «-» بفرست):")
     return ASK_DESC
 
 
@@ -141,13 +151,13 @@ async def add_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     desc = update.message.text.strip()
     context.user_data["new_product"]["description"] = None if desc in ("ندارد", "-") else desc
-    await update.message.reply_text("قیمت محصول رو به تومان و فقط با عدد وارد کن (مثال: 150000):")
+    await update.message.reply_text("قیمت محصول به تومان چنده؟ (فقط عدد، مثال: 150000)")
     return ASK_PRICE
 
 
 @admin_only
 async def add_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = update.message.text.strip().replace(",", "").replace("٬", "")
+    raw = _clean_number(update.message.text)
     if not raw.isdigit():
         await update.message.reply_text("لطفاً فقط عدد وارد کن (مثال: 150000):")
         return ASK_PRICE
@@ -169,6 +179,11 @@ async def add_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("new_product", None)
         return ConversationHandler.END
 
+    if len(categories) == 1:
+        context.user_data["new_product"]["category_id"] = categories[0].id
+        await update.message.reply_text(_STOCK_PROMPT)
+        return ASK_STOCK
+
     rows = [[InlineKeyboardButton(c.name, callback_data=f"admin:products:add:cat:{c.id}")] for c in categories]
     await update.message.reply_text("دسته‌بندی محصول رو انتخاب کن:", reply_markup=InlineKeyboardMarkup(rows))
     return ASK_CATEGORY
@@ -180,21 +195,20 @@ async def add_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     cat_id = int(query.data.split(":")[4])
     context.user_data["new_product"]["category_id"] = cat_id
-    await render_view(query, context, "موجودی اولیه رو وارد کن (فقط عدد، مثال: 20):", None)
+    await render_view(query, context, _STOCK_PROMPT, None)
     return ASK_STOCK
 
 
 @admin_only
 async def add_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = update.message.text.strip()
+    raw = _clean_number(update.message.text)
     if not raw.isdigit():
         await update.message.reply_text("لطفاً فقط عدد وارد کن:")
         return ASK_STOCK
     context.user_data["new_product"]["stock"] = int(raw)
     await update.message.reply_text(
-        "عکس‌های محصول رو بفرست. می‌تونی چندتا عکس بفرستی.\n"
-        "بعد از آخرین عکس بنویس «همین کافیه».\n"
-        "اگه عکس نمی‌خوای بنویس «رد شو»:"
+        "📷 حالا عکس محصول رو بفرست (می‌تونی چندتا بفرستی).",
+        reply_markup=_PHOTO_SKIP_KB,
     )
     return ASK_PHOTO
 
@@ -212,32 +226,55 @@ async def add_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.message.photo:
             data["image_file_ids"].append(update.message.photo[-1].file_id)
             await update.message.reply_text(
-                f"✅ عکس اول ذخیره شد. "
-                "عکس بعدی رو بفرست، یا بنویس «همین کافیه» تا محصول ثبت بشه:"
+                "✅ عکس اول ذخیره شد. اگه عکس دیگه‌ای داری بفرست، وگرنه محصول رو ثبت کن 👇",
+                reply_markup=_PHOTO_DONE_KB,
             )
-        else:
-            await update.message.reply_text(
-                "عکس‌های محصول رو بفرست. می‌تونی چندتا عکس بفرستی.\n"
-                "بعد از آخرین عکس بنویس «همین کافیه».\n"
-                "اگه عکس نمی‌خوای بنویس «رد شو»:"
-            )
-        return ASK_PHOTO
+            return ASK_PHOTO
 
     if update.message.photo:
         data["image_file_ids"].append(update.message.photo[-1].file_id)
         await update.message.reply_text(
-            f"✅ {len(data['image_file_ids'])} عکس ذخیره شد.\n"
-            "عکس بعدی رو بفرست، یا بنویس «همین کافیه» تا محصول ثبت بشه:"
+            f"✅ {len(data['image_file_ids'])} عکس ذخیره شد. عکس بعدی رو بفرست یا محصول رو ثبت کن 👇",
+            reply_markup=_PHOTO_DONE_KB,
         )
         return ASK_PHOTO
 
-    if update.message.text and update.message.text.strip() in ("همین کافیه", "تمام", "done"):
+    text = (update.message.text or "").strip()
+    if text in ("همین کافیه", "تمام", "done"):
         pass  # proceed to save
-    elif update.message.text and update.message.text.strip() == "رد شو":
+    elif text == "رد شو":
         data["image_file_ids"] = []
     else:
-        await update.message.reply_text("عکس بفرست، یا بنویس «همین کافیه» / «رد شو»:")
+        await update.message.reply_text(
+            "عکس محصول رو بفرست، یا یکی از دکمه‌ها رو بزن 👇",
+            reply_markup=_PHOTO_DONE_KB if data.get("image_file_ids") else _PHOTO_SKIP_KB,
+        )
         return ASK_PHOTO
+
+    return await _finish_add_product(update, context)
+
+
+@admin_only
+async def add_photo_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دکمه‌های مرحله‌ی عکس: «ثبت محصول» یا «بدون عکس»."""
+    query = update.callback_query
+    await query.answer()
+    data = context.user_data.get("new_product")
+    if data is None:
+        await query.edit_message_text("جلسه‌ی افزودن محصول منقضی شده، دوباره شروع کن.")
+        return ConversationHandler.END
+    if query.data.endswith(":nophoto"):
+        data["image_file_ids"] = []
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    return await _finish_add_product(update, context)
+
+
+async def _finish_add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = context.user_data["new_product"]
+    message = update.effective_message
 
     # --- Save product with image download & local storage ---
     image_ids = data.get("image_file_ids", [])
@@ -272,14 +309,18 @@ async def add_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ))
         await session.commit()
 
-    photo_count = len(image_ids)
-    await update.message.reply_text(
-        f"✅ محصول «{data['name']}» با {photo_count} عکس اضافه شد (عکس‌ها ذخیره شدند)",
+        product_id = product.id
+
+    link = f"https://t.me/{context.bot.username}?start=product_{product_id}"
+    await message.reply_text(
+        f"✅ محصول «{data['name']}» اضافه شد و الان توی فروشگاهت دیده می‌شه.\n\n"
+        f"🔗 لینک مستقیم محصول (برای استوری و کانال):\n{link}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ افزودن محصول جدید", callback_data="admin:products:add")],
+            [InlineKeyboardButton("➕ افزودن محصول بعدی", callback_data="admin:products:add")],
             [InlineKeyboardButton("📦 لیست محصولات", callback_data="admin:products:list:0")],
             [InlineKeyboardButton("🔙 پنل مدیریت", callback_data="admin:panel")],
-        ])
+        ]),
+        disable_web_page_preview=True,
     )
     context.user_data.pop("new_product", None)
     return ConversationHandler.END

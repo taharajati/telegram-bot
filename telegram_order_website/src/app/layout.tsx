@@ -1,36 +1,44 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import type { Metadata, Viewport } from 'next';
+import localFont from 'next/font/local';
 import { Toaster } from 'react-hot-toast';
+import './globals.css';
+
+const vazirmatn = localFont({
+  src: './fonts/Vazirmatn-Variable.woff2',
+  variable: '--font-vazirmatn',
+  weight: '100 900',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'فروشگرام | اتوماسیون فروش در تلگرام',
-  description: 'فروشگاه تلگرامیت رو در ۳ دقیقه راه بنداز. سفارش، پرداخت و پیگیری — همه خودکار.',
+  title: {
+    default: 'فروشگرام | فروشگاه تلگرامی با مدیریت خودکار سفارش',
+    template: '%s | فروشگرام',
+  },
+  description:
+    'فروشگاه تلگرامی خودت را راه بینداز؛ سفارش، رسید کارت‌به‌کارت و پیگیری مشتری در یک پنل مدیریت می‌شود.',
   icons: { icon: '/favicon.svg' },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  themeColor: '#0077b3',
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] antialiased">
-        <Header />
-        <main className="min-h-[calc(100vh-8rem)]">
-          {children}
-        </main>
-        <Footer />
+    <html lang="fa" dir="rtl" className={vazirmatn.variable}>
+      <body>
+        {children}
         <Toaster
           position="top-center"
           toastOptions={{
             style: {
-              background: 'var(--surface)',
-              color: 'var(--text)',
-              border: '1px solid var(--border-light)',
-              borderRadius: 'var(--radius)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-ink)',
+              border: '1px solid var(--color-line)',
+              borderRadius: 'var(--radius-sm)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: '14px',
             },
           }}
         />

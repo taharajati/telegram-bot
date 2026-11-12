@@ -1,213 +1,99 @@
-// ─── Seller Dashboard ───
-import { Package, ShoppingCart, Store, TrendingUp } from 'lucide-react';
-import { getShopOwner, getShopById, getShopStats, getOrdersByShop, query } from '@/lib/db';
-import { requireSeller } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-import { formatPrice, toJalali, getStatusLabel } from '@/lib/utils';
-import Card from '@/components/shared/Card';
+// داشبورد فروشنده — مخاطب: صاحب فروشگاه؛ اولویت: «امروز چه کاری منتظر من است؟»
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { AlertCircle, ShoppingCart } from 'lucide-react';
+import { getSellerContext } from '@/lib/panel';
+import { getOrdersPage, getSellerOverview, getShopSubscription } from '@/lib/queries';
+import { formatDate, formatNumber, formatPrice } from '@/lib/utils';
+import { Card, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState, PageHeader, StatCard } from '@/components/ui/states';
+import { BarChart } from '@/components/panel/bar-chart';
+import { OrdersTable } from '@/components/panel/orders';
+import { buttonStyles } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'داشبورد فروشنده' };
 
 export default async function SellerDashboardPage() {
-  const session = await requireSeller().catch(() => redirect('/login'));
-  const owner = await getShopOwner(session.userId);
-  if (!owner) redirect('/login');
+  const { shop } = await getSellerContext();
+  const [o, recent, sub] = await Promise.all([
+    getSellerOverview(shop.id),
+    getOrdersPage({ shopId: shop.id, pageSize: 5 }),
+    getShopSubscription(shop.id).catch(() => null),
+  ]);
 
-  const shop = await getShopById(owner.shop_id);
-  const stats = await getShopStats(owner.shop_id);
-  const orders = (await getOrdersByShop(owner.shop_id)).slice(0, 10);
-
-  // Fetch Sales Chart Data (Last 7 Days)
-  const salesChart = await query(
-    `SELECT 
-       DATE(created_at) as date, 
-       COUNT(*) as order_count, 
-       COALESCE(SUM(total_price), 0) as daily_revenue
-     FROM orders 
-     WHERE shop_id = $1 AND created_at >= NOW() - INTERVAL '7 days'
-     GROUP BY DATE(created_at)
-     ORDER BY date ASC`,
-    [owner.shop_id]
-  );
-
-  // Fetch Top Products
-  const topProducts = await query(
-    `SELECT 
-      p.name, 
-      SUM(oi.quantity) as total_sold,
-      SUM(oi.quantity * oi.unit_price) as product_revenue
-    FROM order_items oi
-    JOIN products p ON oi.product_id = p.id
-    JOIN orders o ON oi.order_id = o.id
-    WHERE o.shop_id = $1 AND o.status = 'completed'
-    GROUP BY p.id, p.name
-    ORDER BY total_sold DESC
-    LIMIT 5`,
-    [owner.shop_id]
-  );
+  const subActive = sub && sub.approval_status === 'approved' && new Date(sub.end_date) > new Date();
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black">داشبورد فروشنده</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">فروشگاه: {shop?.name || '—'}</p>
-      </div>
+      <PageHeader title="داشبورد" description={`فروشگاه «${shop.name}» — فروش فقط از سفارش‌های پرداخت‌شده و لغونشده حساب می‌شود.`} />
 
-      {/* Summary Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <div className="flex items-center gap-3">
-            <Package className="h-7 w-7 text-blue-500" />
-            <div>
-              <p className="text-2xl font-black">{stats.totalProducts}</p>
-              <p className="text-xs text-[var(--text-tertiary)]">محصولات</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <ShoppingCart className="h-7 w-7 text-[var(--success)]" />
-            <div>
-              <p className="text-2xl font-black">{stats.totalOrders}</p>
-              <p className="text-xs text-[var(--text-tertiary)]">کل سفارش‌ها</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <ShoppingCart className="h-7 w-7 text-amber-500" />
-            <div>
-              <p className="text-2xl font-black">{stats.pendingOrders}</p>
-              <p className="text-xs text-[var(--text-tertiary)]">در انتظار بررسی</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <ShoppingCart className="h-7 w-7 text-[var(--success)]" />
-            <div>
-              <p className="text-2xl font-black">{stats.paidOrders}</p>
-              <p className="text-xs text-[var(--text-tertiary)]">پرداخت شده</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <ShoppingCart className="h-7 w-7 text-[var(--primary)]" />
-            <div>
-              <p className="text-2xl font-black text-[var(--primary)]">{formatPrice(stats.totalRevenue)}</p>
-              <p className="text-xs text-[var(--text-tertiary)]">مجموع فروش</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Charts Section */}
-      <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Chart */}
-        <Card className="p-6">
-          <h3 className="mb-4 font-bold flex items-center gap-2">
-            <TrendingUp size={20} />
-            نمودار فروش ۷ روز گذشته
-          </h3>
-          <div className="h-64 flex items-end gap-2">
-            {salesChart.map((day: any, idx: number) => {
-              const maxRev = Math.max(...salesChart.map((d: any) => parseFloat(d.daily_revenue)), 1);
-              const height = (parseFloat(day.daily_revenue) / maxRev) * 100;
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="relative w-full bg-gray-100 rounded-t-md overflow-hidden" style={{height: '200px'}}>
-                    <div 
-                      className="absolute bottom-0 w-full bg-[var(--primary)] transition-all duration-500 group-hover:bg-[var(--primary-dark)]"
-                      style={{height: `${height}%`}}
-                    />
-                  </div>
-                  <span className="text-xs text-[var(--text-tertiary)]">
-                    {new Date(day.date).toLocaleDateString('fa-IR', {month: 'short', day: 'numeric'})}
-                  </span>
-                </div>
-              );
-            })}
-            {salesChart.length === 0 && (
-              <div className="w-full h-full flex items-center justify-center text-[var(--text-tertiary)]">
-                داده‌ای برای نمایش وجود ندارد
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Top Products */}
-        <Card className="p-6">
-          <h3 className="mb-4 font-bold flex items-center gap-2">
-            <TrendingUp size={20} className="rotate-90" />
-            پرفروش‌ترین محصولات
-          </h3>
-          <div className="space-y-4">
-            {topProducts.map((product: any, idx: number) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-[var(--bg-muted)] rounded-[var(--radius)]">
-                <div>
-                  <p className="font-semibold text-sm">{product.name}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{product.total_sold} عدد فروش رفته</p>
-                </div>
-                <span className="font-bold text-[var(--primary)] text-sm">
-                  {formatPrice(parseFloat(product.product_revenue))}
-                </span>
-              </div>
-            ))}
-            {topProducts.length === 0 && (
-              <div className="text-center text-[var(--text-tertiary)] py-8">
-                هنوز فروشی ثبت نشده است
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Recent Orders */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold">آخرین سفارش‌ها</h2>
-        <Link href="/seller/orders" className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline">
-          مشاهده همه
-        </Link>
-      </div>
-
-      {orders.length > 0 ? (
-        <div className="overflow-x-auto rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white shadow-[var(--shadow-card)]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-light)]">
-                <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">کد</th>
-                <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">مبلغ</th>
-                <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">وضعیت</th>
-                <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">گیرنده</th>
-                <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">تاریخ</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order: any) => (
-                <tr key={order.id} className="border-b border-[var(--border-light)]/50 transition hover:bg-[var(--bg-muted)]">
-                  <td className="px-4 py-3 font-mono text-xs font-semibold">#{order.tracking_code}</td>
-                  <td className="px-4 py-3 font-bold text-[var(--primary)]">{formatPrice(order.total_price)}</td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex rounded-full border border-current px-2.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-                      {getStatusLabel(order.status)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">{order.receiver_name || '—'}</td>
-                  <td className="px-4 py-3 text-[var(--text-tertiary)]">{toJalali(order.created_at)}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/seller/orders/${order.id}`} className="text-sm font-semibold text-[var(--primary)] hover:underline">جزئیات</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {(o.awaitingReview > 0 || o.lowStock > 0) && (
+        <div className="mb-6 space-y-2" role="region" aria-label="کارهای منتظر اقدام">
+          {o.awaitingReview > 0 && (
+            <Link href="/seller/orders?status=pending_payment" className="flex items-center gap-3 rounded-md border border-warning bg-warning-soft p-4 text-sm font-semibold text-warning">
+              <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+              {formatNumber(o.awaitingReview)} رسید پرداخت منتظر بررسی توست. تأیید یا رد از ربات انجام می‌شود.
+            </Link>
+          )}
+          {o.lowStock > 0 && (
+            <Link href="/seller/products" className="flex items-center gap-3 rounded-md border border-line bg-surface p-4 text-sm font-semibold text-ink">
+              <AlertCircle className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
+              موجودی {formatNumber(o.lowStock)} محصول فعال کمتر از ۵ عدد است.
+            </Link>
+          )}
         </div>
-      ) : (
-        <Card><p className="py-8 text-center text-[var(--text-tertiary)]">هیچ سفارشی ثبت نشده است.</p></Card>
       )}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="فروش امروز" value={formatPrice(o.revenueToday)} emphasis />
+        <StatCard label="فروش ۷ روز گذشته" value={formatPrice(o.revenue7d)} />
+        <StatCard label="سفارش آماده‌ی ارسال" value={formatNumber(o.toShip)} hint="پرداخت‌شده یا تأییدشده" />
+        <StatCard label="در انتظار پرداخت" value={formatNumber(o.awaitingPayment)} />
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <Card as="section">
+          <CardTitle>فروش ۷ روز گذشته</CardTitle>
+          <div className="mt-4"><BarChart data={o.chart} caption="فروش پرداخت‌شده‌ی روزانه در هفت روز گذشته" /></div>
+        </Card>
+
+        <Card as="section">
+          <CardTitle>اشتراک فروشگاه</CardTitle>
+          {sub ? (
+            <div className="mt-3 space-y-2 text-sm">
+              <Badge tone={subActive ? 'success' : sub.approval_status === 'pending' ? 'warning' : 'danger'}>
+                {subActive ? 'فعال' : sub.approval_status === 'pending' ? 'در انتظار تأیید ادمین' : 'منقضی یا ردشده'}
+              </Badge>
+              <p className="text-ink-muted">
+                {sub.is_trial ? 'دوره‌ی آزمایشی' : `پلن ${sub.plan_name ?? '—'}`}
+                {' · '}پایان: <span className="tabular-nums">{formatDate(sub.end_date)}</span>
+              </p>
+              {!subActive && <p className="text-xs text-ink-subtle">برای تمدید، در ربات از بخش اشتراک اقدام کن.</p>}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-ink-muted">اشتراکی برای این فروشگاه ثبت نشده است.</p>
+          )}
+        </Card>
+      </div>
+
+      <section className="mt-8" aria-labelledby="recent-h">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 id="recent-h" className="text-lg font-bold">آخرین سفارش‌ها</h2>
+          <Link href="/seller/orders" className="text-sm font-semibold text-brand underline-offset-4 hover:underline">همه‌ی سفارش‌ها</Link>
+        </div>
+        {recent.rows.length > 0 ? (
+          <OrdersTable orders={recent.rows} basePath="/seller/orders" caption="آخرین سفارش‌های فروشگاه" />
+        ) : (
+          <EmptyState
+            icon={ShoppingCart}
+            title="هنوز سفارشی ثبت نشده"
+            description="لینک فروشگاه را در کانال یا بیو بگذار؛ سفارش‌ها همین‌جا و در ربات نمایش داده می‌شوند."
+            action={<Link href={`/shop/${shop.id}`} className={buttonStyles({ variant: 'secondary' })}>مشاهده‌ی صفحه‌ی فروشگاه</Link>}
+          />
+        )}
+      </section>
     </div>
   );
 }

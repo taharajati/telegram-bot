@@ -92,8 +92,15 @@ export async function PUT(
     try {
       await client.query('BEGIN');
 
+      // Stock before this update — needed below to detect a 0 → available restock
+      const existingRes = await client.query(
+        'SELECT stock, reserved_stock FROM products WHERE id = $1 AND shop_id = $2',
+        [productId, owner.shop_id]
+      );
+      const existingProduct: { stock: number; reserved_stock: number } | undefined = existingRes.rows[0];
+
       // If the main image is a legacy API URL (from file_id), keep existing image_url
-      let mainImageUrl = images[0] || null;
+      let mainImageUrl = images?.[0] || null;
       if (mainImageUrl && mainImageUrl.startsWith('/api/product-image/')) {
         const existing = await client.query('SELECT image_url FROM products WHERE id = $1', [productId]);
         mainImageUrl = existing.rows[0]?.image_url || null;
@@ -131,7 +138,9 @@ export async function PUT(
       // ── Restock notification ──────────────────────────────
       // If stock went from 0 → >0, notify subscribers via Telegram Bot API
       try {
-        const oldStock = existingProduct?.available_stock ?? existingProduct?.stock ?? 0;
+        const oldStock = existingProduct
+          ? Number(existingProduct.stock) - Number(existingProduct.reserved_stock || 0)
+          : 0;
         const newStock = Number(stock) || 0;
         if (oldStock < 1 && newStock > 0) {
           const botToken = process.env.BOT_TOKEN;

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { signSession, setSessionCookie } from '@/lib/auth';
 import { getSellerByUsername, getAdminByUserId } from '@/lib/db';
+import { checkLoginRateLimit, recordFailedLogin, clearLoginRateLimit } from '@/lib/rate-limiter';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'نام کاربری و رمز عبور الزامی است' },
         { status: 400 }
+      );
+    }
+
+    // Brute-force protection: limit attempts per username + client IP
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateKey = `${String(username).toLowerCase()}|${ip}`;
+    const limit = await checkLoginRateLimit(rateKey);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'تعداد تلاش‌های ناموفق زیاد بود. چند دقیقه‌ی دیگر دوباره امتحان کنید.' },
+        { status: 429 }
       );
     }
 
@@ -27,6 +39,7 @@ export async function POST(request: NextRequest) {
           shopId: seller.shop_id,
           loginMethod: 'username',
         });
+        await clearLoginRateLimit(rateKey);
         const res = NextResponse.json({ success: true, role: 'seller' });
         await setSessionCookie(res, {
           userId: seller.user_id,
@@ -50,6 +63,7 @@ export async function POST(request: NextRequest) {
             role: 'admin',
             loginMethod: 'username',
           });
+          await clearLoginRateLimit(rateKey);
           const res = NextResponse.json({ success: true, role: 'admin' });
           await setSessionCookie(res, {
             userId: admin.user_id,
@@ -61,6 +75,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await recordFailedLogin(rateKey);
     return NextResponse.json(
       { error: 'نام کاربری یا رمز عبور اشتباه است' },
       { status: 401 }

@@ -26,7 +26,7 @@ cd /opt/foroshgram
 
 # 4. Create production .env files
 cat > telegram_order_bot/.env << 'EOF'
-BOT_TOKEN=8921572262:AAF57sD_SE_BjXUUnQqi8aT41bA90FCxeQU
+BOT_TOKEN=CHANGE_ME_PASTE_TOKEN_FROM_BOTFATHER
 ADMIN_IDS=8497713691
 DATABASE_URL=postgresql+asyncpg://foroshgram:${POSTGRES_PASSWORD}@postgres:5432/foroshgram
 STORE_NAME=فروشگرام

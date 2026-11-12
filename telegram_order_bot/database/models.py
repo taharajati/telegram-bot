@@ -48,8 +48,9 @@ ORDER_STATUS_LABELS = {
 ALLOWED_TRANSITIONS = {
     OrderStatus.PENDING_PAYMENT: [OrderStatus.PAID, OrderStatus.CANCELLED],
     OrderStatus.PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-    OrderStatus.PAID: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
-    OrderStatus.CONFIRMED: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+    # فروشنده می‌تونه بعد از تایید پرداخت مستقیم «ارسال شد» بزنه؛ آماده‌سازی مرحله‌ی اختیاریه
+    OrderStatus.PAID: [OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
+    OrderStatus.CONFIRMED: [OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.CANCELLED],
     OrderStatus.PREPARING: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
     OrderStatus.SHIPPED: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
     OrderStatus.DELIVERED: [],
@@ -522,3 +523,16 @@ class ShopSubscription(Base):
             and not self.is_expired
             and self.superseded_at is None
         )
+
+
+class OrderWidget(Base):
+    """پیام ویجت «رهگیری زنده» هر سفارش — برای به‌روزرسانی درجا با editMessageWidgetData."""
+    __tablename__ = "order_widgets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), unique=True, index=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    message_id: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (Index("ix_order_widgets_chat_message", "chat_id", "message_id"),)

@@ -279,44 +279,23 @@ async def run_all():
     state = await seller_reg_h.seller_registration_start(fake_update(query=q, user_id=reg_user_id), ctx)
     check("seller_reg:start", state is not None)
 
-    if state:
+    if state is not None:
         upd = fake_update(message_text="فروشگاه جدید", user_id=reg_user_id)
         state = await seller_reg_h.ask_name(upd, ctx)
-        check("reg:ask_name", state is not None)
+        check("reg:ask_name", state == seller_reg_h.ASK_PHONE)
 
-    if state:
-        upd = fake_update(message_text="توضیح فروشگاه", user_id=reg_user_id)
-        state = await seller_reg_h.ask_desc(upd, ctx)
-        check("reg:ask_desc", state is not None)
-
-    if state:
         upd = fake_update(message_text="09123456789", user_id=reg_user_id)
+        upd.message.contact = None
         state = await seller_reg_h.ask_phone(upd, ctx)
-        check("reg:ask_phone", state is not None)
+        check("reg:ask_phone", state == seller_reg_h.ASK_CARD_NUMBER)
 
-    if state:
-        upd = fake_update(message_text="-", user_id=reg_user_id)
-        state = await seller_reg_h.ask_channel(upd, ctx)
-        check("reg:ask_channel", state is not None)
+        upd = fake_update(message_text="6037991234567890", user_id=reg_user_id)
+        state = await seller_reg_h.ask_card_number(upd, ctx)
+        check("reg:ask_card_number", state == seller_reg_h.ASK_CARD_HOLDER)
 
-    if state:
-        upd = fake_update(message_text="-", user_id=reg_user_id)
-        state = await seller_reg_h.ask_card(upd, ctx)
-        check("reg:ask_card", state is not None)
-
-    if state:
-        upd = fake_update(message_text="-", user_id=reg_user_id)
+        upd = fake_update(message_text="علی محمدی", user_id=reg_user_id)
         state = await seller_reg_h.ask_card_holder(upd, ctx)
-        check("reg:ask_card_holder", state is not None)
-
-    if state:
-        upd = fake_update(message_text="testpass", user_id=reg_user_id)
-        state = await seller_reg_h.ask_password(upd, ctx)
-        check("reg:ask_password", state is not None)
-
-    q = fake_callback_query("seller_reg:confirm", user_id=reg_user_id)
-    await seller_reg_h.confirm_registration(fake_update(query=q, user_id=reg_user_id), ctx)
-    check("seller_reg:confirm", q.edit_message_text.called or q.answer.called)
+        check("reg:ask_card_holder → shop created", state == -1)
 
     # ═══════════════════════════════════════════════════════════
     # SECTION 9: SELLER PANEL

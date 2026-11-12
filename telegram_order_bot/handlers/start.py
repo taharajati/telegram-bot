@@ -32,7 +32,7 @@ def _platform_welcome(first_name: str) -> tuple[str, InlineKeyboardMarkup]:
         "🛒 می‌خوای خرید کنی؟\n"
         "از لینک فروشگاهی که توی کانال یا گروه هست استفاده کن. با زدن لینک، مستقیم می‌ری به محصولات.\n\n"
         "🏪 می‌خوای فروشگاه بزنی؟\n"
-        "دکمه پایین («می‌خوام فروشگاه بسازم») رو بزن. ثبت‌نام فقط ۸ قدمه و چند دقیقه‌ای تموم می‌شه.\n\n"
+        "دکمه پایین («می‌خوام فروشگاه بسازم») رو بزن. فقط ۳ سؤال کوتاهه و فروشگاهت همون لحظه فعال می‌شه.\n\n"
         "خب، از کدوم مسیر بریم؟"
     )
     keyboard = InlineKeyboardMarkup([
@@ -449,6 +449,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ─── استخراج پارامتر start ──────────────────────────
     start_param = context.args[0] if context.args else None
+
+    # ─── لینک «فروشگاهت رو بساز» از سایت (start=newshop) ───
+    if start_param == "newshop":
+        await register_user(tg_user)
+        await update.message.reply_text(
+            f"سلام {tg_user.first_name or 'دوست عزیز'} 👋\n\n"
+            "فروشگاهت با ۳ سؤال کوتاه ساخته می‌شه و همون لحظه آماده‌ی فروشه. شروع کنیم؟",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏪 ساخت فروشگاه", callback_data="seller_reg:start")],
+            ]),
+        )
+        return
+
     shop_id = await resolve_shop_id_from_start(start_param)
 
     # ─── لینک مستقیم دسته‌بندی (category_123) ──────────

@@ -1,39 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { buttonStyles } from '@/components/ui/button';
 
-export default function GlobalError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <html lang="fa" dir="rtl">
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] antialiased">
-        <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-          <div className="text-7xl font-extrabold text-red-500 mb-4">۵۰۰</div>
-          <h1 className="text-2xl font-bold mb-2">خطای سرور</h1>
-          <p className="text-[var(--text-secondary)] mb-8 max-w-md">
-            یه اشکالی پیش اومده! تیم فنی در جریان هست.
-          </p>
-          <div className="flex gap-4">
-            <button
-              onClick={reset}
-              className="rounded-lg bg-[var(--primary)] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
-            >
-              تلاش مجدد
-            </button>
-            <Link
-              href="/"
-              className="rounded-lg border border-[var(--border-light)] bg-[var(--surface)] px-6 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover-bg)]"
-            >
-              صفحه اصلی
-            </Link>
-          </div>
-        </div>
-      </body>
-    </html>
+    <main id="content" className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <h1 className="text-2xl font-extrabold">صفحه بارگذاری نشد</h1>
+      <p className="mt-2 text-sm text-ink-muted">
+        درخواست به سرور یا پایگاه داده کامل نشد. چند ثانیه بعد دوباره تلاش کن؛ اگر ادامه داشت از صفحه‌ی اصلی وارد شو.
+      </p>
+      <div className="mt-6 flex gap-3">
+        <button type="button" onClick={reset} className={buttonStyles()}>تلاش دوباره</button>
+        <Link href="/" className={buttonStyles({ variant: 'secondary' })}>صفحه‌ی اصلی</Link>
+      </div>
+    </main>
   );
 }

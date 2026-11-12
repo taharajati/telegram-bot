@@ -1,9 +1,16 @@
-// ─── Admin: Claim Codes ───
-import { Key, Plus } from 'lucide-react';
+import type { Metadata } from 'next';
+import { KeyRound } from 'lucide-react';
 import { getAllClaimCodes, getAllShops } from '@/lib/db';
-import { toJalali } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { buttonStyles } from '@/components/ui/button';
+import { Card, CardTitle } from '@/components/ui/card';
+import { Select } from '@/components/ui/field';
+import { EmptyState, PageHeader } from '@/components/ui/states';
+import { Table, Td, Th } from '@/components/ui/table';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'کدهای دعوت' };
 
 export default async function AdminClaimCodesPage() {
   const [codes, shops] = await Promise.all([getAllClaimCodes(), getAllShops()]);
@@ -11,75 +18,41 @@ export default async function AdminClaimCodesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-2xl font-black">
-          <Key className="h-6 w-6 text-[var(--primary)]" />
-          کدهای دعوت
-        </h1>
-        <details className="relative">
-          <summary className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-lg)] bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--primary-dark)] transition-all active:scale-[0.97] [&::-webkit-details-marker]:hidden">
-            <Plus className="h-4 w-4" />
-            ساخت کد جدید
-          </summary>
-          <form
-            action="/api/admin/create-claim-code"
-            method="POST"
-            className="absolute left-0 top-full z-10 mt-2 w-72 rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white p-4 shadow-[var(--shadow-pop)]"
-          >
-            <select
-              name="shop_id"
-              className="mb-3 w-full rounded-[var(--radius)] border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[var(--primary)]"
-              required
-            >
-              <option value="">انتخاب فروشگاه...</option>
-              {shops.map((shop) => (
-                <option key={shop.id} value={shop.id}>{shop.name}</option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              className="w-full rounded-[var(--radius-lg)] bg-[var(--primary)] py-2.5 text-sm font-semibold text-white hover:bg-[var(--primary-dark)] transition-all active:scale-[0.97]"
-            >
-              ایجاد کد
-            </button>
-          </form>
-        </details>
-      </div>
+      <PageHeader title="کدهای دعوت" description="هر کد یک‌بار مصرف است و مالک فروشگاه با آن حساب خود را به فروشگاه وصل می‌کند." />
 
-      <div className="overflow-x-auto rounded-[var(--radius-xl)] border border-[var(--border-light)] bg-white shadow-[var(--shadow-card)]">
-        <table className="w-full text-sm">
+      <Card as="section" className="mb-6 max-w-md">
+        <CardTitle>ساخت کد جدید</CardTitle>
+        <form action="/api/admin/create-claim-code" method="POST" className="mt-3 space-y-3">
+          <label htmlFor="shop_id" className="block text-sm font-semibold">فروشگاه</label>
+          <Select id="shop_id" name="shop_id" required defaultValue="">
+            <option value="" disabled>انتخاب فروشگاه</option>
+            {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </Select>
+          <button type="submit" className={buttonStyles()}>ساخت کد دعوت</button>
+        </form>
+      </Card>
+
+      {codes.length > 0 ? (
+        <Table caption="کدهای دعوت">
           <thead>
-            <tr className="border-b border-[var(--border-light)]">
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">کد</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">فروشگاه</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">استفاده شده</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">توسط</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">انقضا</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--text-tertiary)]">تاریخ ساخت</th>
-            </tr>
+            <tr><Th>کد</Th><Th>فروشگاه</Th><Th>وضعیت</Th><Th>استفاده‌کننده</Th><Th>انقضا</Th><Th>تاریخ ساخت</Th></tr>
           </thead>
           <tbody>
-            {codes.map((code) => (
-              <tr key={code.id} className="border-b border-[var(--border-light)]/50 transition hover:bg-[var(--bg-muted)]">
-                <td className="px-4 py-3 font-mono text-xs font-semibold">{code.code}</td>
-                <td className="px-4 py-3 text-[var(--text-secondary)]">{shopMap.get(code.shop_id) || code.shop_id}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    code.is_used
-                      ? 'bg-[var(--danger)]/10 text-[var(--danger)]'
-                      : 'bg-[var(--success)]/10 text-[var(--success)]'
-                  }`}>
-                    {code.is_used ? 'بله' : 'خیر'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-[var(--text-tertiary)]">{code.used_by || '—'}</td>
-                <td className="px-4 py-3 text-[var(--text-tertiary)]">{toJalali(code.expires_at)}</td>
-                <td className="px-4 py-3 text-[var(--text-tertiary)]">{toJalali(code.created_at)}</td>
+            {codes.map((c) => (
+              <tr key={c.id}>
+                <Td className="font-mono text-xs font-semibold" dir="ltr"><bdi>{c.code}</bdi></Td>
+                <Td className="text-ink-muted">{shopMap.get(c.shop_id) || `#${c.shop_id}`}</Td>
+                <Td><Badge tone={c.is_used ? 'neutral' : 'success'}>{c.is_used ? 'استفاده‌شده' : 'آماده‌ی استفاده'}</Badge></Td>
+                <Td className="text-ink-muted tabular-nums" dir="ltr"><bdi>{c.used_by || '—'}</bdi></Td>
+                <Td className="whitespace-nowrap tabular-nums">{formatDate(c.expires_at)}</Td>
+                <Td className="whitespace-nowrap tabular-nums">{formatDate(c.created_at)}</Td>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+        </Table>
+      ) : (
+        <EmptyState icon={KeyRound} title="هنوز کد دعوتی ساخته نشده" description="برای وصل‌کردن مالک به یک فروشگاه، از فرم بالا یک کد بساز." />
+      )}
     </div>
   );
 }

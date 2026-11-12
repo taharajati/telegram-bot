@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """End-to-end test for Foroshgram bot via Telegram Bot API."""
+import os
 import requests
 import time
 import json
 import sys
 
-TOKEN = "8871159970:AAGGYu0KboxPNEiqw29jnpAvYcdOLW5WmaQ"
+TOKEN = os.environ["BOT_TOKEN"]
 BASE = f"https://api.telegram.org/bot{TOKEN}"
 CHAT_ID = 8497713691  # admin
 

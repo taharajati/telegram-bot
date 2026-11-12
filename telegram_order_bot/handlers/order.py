@@ -164,6 +164,28 @@ async def start_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
                            InlineKeyboardMarkup([[InlineKeyboardButton("🏠 شروع", callback_data="nav:main")]]))
         return ConversationHandler.END
 
+    # فروشگاهی که هنوز کارت ثبت نکرده نمی‌تونه پول بگیره: مشتری رو وسط راه معطل نمی‌کنیم
+    # و همون لحظه به فروشنده خبر می‌دیم که یه خرید منتظر کارتشه.
+    async with async_session() as session:
+        checkout_shop = await session.get(Shop, shop_id)
+    if checkout_shop and not get_enabled_payment_methods(checkout_shop):
+        await render_view(query, context,
+            "⏳ این فروشگاه هنوز اطلاعات پرداختش رو کامل نکرده.\n\n"
+            "به فروشنده خبر دادیم؛ سبد خریدت سر جاشه و کمی بعد می‌تونی سفارشت رو ثبت کنی.",
+            InlineKeyboardMarkup([
+                [InlineKeyboardButton("🛒 سبد خرید", callback_data="cart:view")],
+                [InlineKeyboardButton("🏠 منوی اصلی", callback_data="nav:main")],
+            ]))
+        await get_notification_service(context.bot).send_to_seller(
+            shop_id,
+            "⚠️ یه مشتری همین الان می‌خواست سفارش ثبت کنه، ولی شماره کارت فروشگاهت ثبت نشده.\n\n"
+            "کارتت رو ثبت کن تا خریدها از دست نره 👇",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 ثبت شماره کارت", callback_data="seller:payment_settings")],
+            ]),
+        )
+        return ConversationHandler.END
+
     async with async_session() as session:
         cart_items = await _load_cart_with_products(session, update.effective_user.id, shop_id)
 
@@ -576,6 +598,13 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         await _notify_seller_receipt(context, order_id, shop_id, tracking, total, file_id, receipt_text)
 
+        receipt_rows = [
+            [InlineKeyboardButton("📦 سفارش‌های من", callback_data="order:history")],
+            [InlineKeyboardButton("🛍 منوی اصلی", callback_data="nav:main")],
+        ]
+        if config.WIDGETS_ENABLED and not config.WIDGET_AUTO_SEND:
+            receipt_rows.insert(0, [InlineKeyboardButton("📍 رهگیری زنده سفارش", callback_data=f"order:track:{order_id}")])
+
         if file_id:
             await update.message.reply_text(
                 f"✅ رسید شما دریافت شد!\n\n"
@@ -583,10 +612,7 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"💰 مبلغ: {format_price(total)}\n\n"
                 f"⏳ در انتظار تایید فروشنده...\n"
                 f"به محض تایید، بهت اطلاع می‌دیم ✅",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📦 سفارش‌های من", callback_data="order:history")],
-                    [InlineKeyboardButton("🛍 منوی اصلی", callback_data="nav:main")],
-                ]),
+                reply_markup=InlineKeyboardMarkup(receipt_rows),
             )
         else:
             await update.message.reply_text(
@@ -596,12 +622,13 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"🧾 شماره تراکنش: {receipt_text}\n\n"
                 f"⏳ در انتظار تایید فروشنده...\n"
                 f"به محض تایید، بهت اطلاع می‌دیم ✅",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📦 سفارش‌های من", callback_data="order:history")],
-                    [InlineKeyboardButton("🛍 منوی اصلی", callback_data="nav:main")],
-                ]),
+                reply_markup=InlineKeyboardMarkup(receipt_rows),
                 parse_mode="HTML"
             )
+
+        if config.WIDGET_AUTO_SEND:
+            from services import widgets
+            await widgets.send_order_tracker(context.bot, order_id, update.effective_chat.id)
 
         context.user_data.clear()
         return ConversationHandler.END
@@ -963,9 +990,14 @@ async def seller_approve_card_payment(update: Update, context: ContextTypes.DEFA
         await query.answer(str(e), show_alert=True)
         return
 
+    # همون‌جا قدم بعدی رو جلوی دست فروشنده می‌ذاریم (ثبت کد رهگیری / ارسال شد)
+    from handlers.admin.orders import order_detail_keyboard
     await query.edit_message_caption(
-        caption=f"✅ پرداخت تایید شد. سفارش #{order_id} نهایی شد.",
-        reply_markup=None
+        caption=(
+            f"✅ پرداخت سفارش #{order.tracking_code} تایید شد.\n\n"
+            "وقتی بسته رو فرستادی «🚚 ارسال شد» رو بزن تا مشتری باخبر بشه."
+        ),
+        reply_markup=order_detail_keyboard(order, "admin:orders:pending:0"),
     )
     # Send confirmation to customer
     ns = get_notification_service(context.bot)
@@ -1405,6 +1437,8 @@ async def order_detail_customer(update: Update, context: ContextTypes.DEFAULT_TY
     rows = []
     if order.status not in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
         rows.append([InlineKeyboardButton("🔄 خرید دوباره", callback_data=f"order:reorder:{order.id}")])
+    if config.WIDGETS_ENABLED and order.status not in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
+        rows.append([InlineKeyboardButton("📍 رهگیری زنده", callback_data=f"order:track:{order.id}")])
     rows.append([InlineKeyboardButton("💬 پیام به فروشنده", callback_data=f"msg:open_conv:{order.id}")])
     rows.append([InlineKeyboardButton("🔙 بازگشت", callback_data="order:history")])
     await render_view(query, context, _order_detail_text_customer(order), InlineKeyboardMarkup(rows))

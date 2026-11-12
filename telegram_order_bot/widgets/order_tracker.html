@@ -1,0 +1,65 @@
+<style>
+body{margin:0;direction:rtl;color:var(--tg-theme-text-color,#000)}
+.w{padding:14px 14px max(14px,env(safe-area-inset-bottom))}
+.h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.h b{font-size:16px;white-space:nowrap}
+.m{color:var(--tg-theme-hint-color,#888);font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.st{font-size:18px;font-weight:700;margin:12px 0 2px}
+.sb{color:var(--tg-theme-hint-color,#888);font-size:13px;min-height:18px}
+.tr{position:relative;height:4px;border-radius:2px;background:var(--tg-theme-secondary-bg-color,#eee);margin:22px 10% 9px}
+.fl{position:absolute;top:0;right:0;height:100%;width:0;border-radius:2px;background:var(--tg-theme-button-color,#39f);transition:width .6s ease}
+.d{position:absolute;top:-7px;width:18px;height:18px;margin-right:-9px;border-radius:50%;box-sizing:border-box;background:var(--tg-theme-bg-color,#fff);border:3px solid var(--tg-theme-secondary-bg-color,#eee);transition:border-color .4s,background .4s}
+.d.on{border-color:var(--tg-theme-button-color,#39f);background:var(--tg-theme-button-color,#39f)}
+.d.cur{background:var(--tg-theme-bg-color,#fff);animation:p 1.6s ease-in-out infinite}
+@keyframes p{50%{transform:scale(1.25)}}
+.lb{display:flex;font-size:11px;color:var(--tg-theme-hint-color,#888)}
+.lb span{width:20%;text-align:center}
+.lb .on{color:var(--tg-theme-text-color,#000)}
+.r{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--tg-theme-secondary-bg-color,#eee);font-size:14px}
+button{font:inherit;border:0;border-radius:10px}
+.cp{background:var(--tg-theme-secondary-bg-color,#eee);color:var(--tg-theme-link-color,#39f);padding:4px 10px;font-size:13px}
+.ok{width:100%;margin-top:12px;padding:11px;font-weight:700;background:var(--tg-theme-button-color,#39f);color:var(--tg-theme-button-text-color,#fff)}
+.x .st{color:var(--tg-theme-destructive-text-color,#e53935)}
+.x .tr,.x .lb,.hd{display:none}
+@media(prefers-reduced-motion:reduce){.d.cur{animation:none}.fl{transition:none}}
+</style>
+<div class="w" id="w">
+<div class="h"><b>سفارش <span id="c"></span></b><span class="m" id="sh"></span></div>
+<div class="st" id="st"></div>
+<div class="sb" id="sb"></div>
+<div class="tr"><div class="fl" id="fl"></div><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i></div>
+<div class="lb"><span>ثبت</span><span>پرداخت</span><span>آماده‌سازی</span><span>ارسال</span><span>تحویل</span></div>
+<div class="r"><span id="n"></span><b id="t"></b></div>
+<div class="r hd" id="pr"><span>کد رهگیری پستی: <b id="p"></b></span><button class="cp" id="cp">کپی</button></div>
+<button class="ok hd" id="ok">بسته به دستم رسید ✅</button>
+</div>
+<script>
+const W=window.TelegramWidget,$=i=>document.getElementById(i);
+const T=['در انتظار پرداخت','پرداخت تأیید شد','در حال آماده‌سازی','سفارش ارسال شد','تحویل داده شد'];
+const S=['بعد از واریز، رسید را برای فروشنده بفرست','فروشنده سفارش را آماده می‌کند','به‌زودی ارسال می‌شود','وقتی بسته رسید، دکمه‌ی زیر را بزن','از خریدت ممنونیم 🎉'];
+const X=['','سفارش لغو شد','رسید پرداخت تأیید نشد','وجه برگشت داده شد'];
+let o=null,busy=false;
+function draw(j){
+  try{o=JSON.parse(j==null?W.chatData:j)}catch(e){}
+  if(!o)return;
+  const s=o.s||0,x=o.x||0;
+  $('w').className=x?'w x':'w';
+  $('c').textContent='#'+o.c;$('sh').textContent=o.sh||'';
+  $('st').textContent=x?X[x]:(s==0&&o.w?'در انتظار تأیید فروشنده':T[s]);
+  $('sb').textContent=x?(o.q||''):(s==0&&o.w?'رسید دریافت شد؛ به‌محض تأیید همین‌جا به‌روز می‌شود':S[s]);
+  $('fl').style.width=s*25+'%';
+  document.querySelectorAll('.d').forEach((d,i)=>{d.style.right=i*25+'%';d.className='d'+(i<=s?' on':'')+(i==s&&s<4?' cur':'')});
+  document.querySelectorAll('.lb span').forEach((l,i)=>{l.className=i<=s?'on':''});
+  $('n').textContent=o.n?Number(o.n).toLocaleString('fa-IR')+' قلم کالا':'';$('t').textContent=o.t||'';
+  $('pr').className=o.p&&!x?'r':'r hd';$('p').textContent=o.p||'';
+  $('ok').className=s==3&&!x?'ok':'ok hd';
+}
+$('cp').addEventListener('click',()=>{if(o&&o.p){W.copyText(o.p);$('cp').textContent='کپی شد ✓'}});
+$('ok').addEventListener('click',()=>{
+  if(busy)return;busy=true;$('ok').textContent='در حال ثبت…';
+  W.request('o:d').then(a=>{busy=false;$('ok').textContent='بسته به دستم رسید ✅';if(a.result)draw(a.result);W.HapticFeedback.notificationOccurred('success')},
+  ()=>{busy=false;$('ok').textContent='نشد، دوباره بزن';W.HapticFeedback.notificationOccurred('error')});
+});
+W.onEvent('chatDataChanged',()=>draw());
+draw();if(W.ready)W.ready();
+</script>

@@ -1,29 +1,16 @@
-'use client';
-
 import Link from 'next/link';
+import { buttonStyles } from '@/components/ui/button';
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-      <div className="text-7xl font-extrabold text-[var(--primary)] mb-4">۴۰۴</div>
-      <h1 className="text-2xl font-bold mb-2">صفحه‌ای که دنبالشی پیدا نشد</h1>
-      <p className="text-[var(--text-secondary)] mb-8 max-w-md">
-        یا لینک خرابه یا این صفحه دیگه وجود نداره.
-      </p>
-      <div className="flex gap-4">
-        <Link
-          href="/"
-          className="rounded-lg bg-[var(--primary)] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
-        >
-          صفحه اصلی
-        </Link>
-        <Link
-          href="https://t.me/Foroshgrambot"
-          className="rounded-lg border border-[var(--border-light)] bg-[var(--surface)] px-6 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover-bg)]"
-        >
-          ربات فروشگرام
-        </Link>
+    <main id="content" className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <p className="text-5xl font-extrabold tabular-nums text-brand">۴۰۴</p>
+      <h1 className="mt-3 text-2xl font-extrabold">این صفحه پیدا نشد</h1>
+      <p className="mt-2 text-sm text-ink-muted">آدرس را بررسی کن؛ ممکن است لینک اشتباه باشد یا فروشگاه یا محصول غیرفعال شده باشد.</p>
+      <div className="mt-6 flex gap-3">
+        <Link href="/" className={buttonStyles()}>صفحه‌ی اصلی</Link>
+        <Link href="/shops" className={buttonStyles({ variant: 'secondary' })}>فهرست فروشگاه‌ها</Link>
       </div>
-    </div>
+    </main>
   );
 }

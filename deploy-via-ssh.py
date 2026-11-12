@@ -11,6 +11,7 @@ PROXY_HOST = '127.0.0.1'
 PROXY_PORT = 10808
 TARGET_HOST = '185.204.168.57'
 USERNAME = 'ubuntu'
+BOT_TOKEN = os.environ.get('BOT_TOKEN') or sys.exit('Set the BOT_TOKEN environment variable first')
 KEY_FILE = 'C:/s/ar-me-privatekey.pem'
 LOCAL_PROJECT = 'T:/dars/projects/telegram/Telegramorderbot'
 REMOTE = '/opt/foroshgram'
@@ -82,7 +83,7 @@ def main():
         return code
 
     # Create .env files
-    sc(f"echo 'BOT_TOKEN=8921572262:AAF57sD_SE_BjXUUnQqi8aT41bA90FCxeQU' | sudo tee {REMOTE}/telegram_order_bot/.env > /dev/null", "Bot .env")
+    sc(f"echo 'BOT_TOKEN={BOT_TOKEN}' | sudo tee {REMOTE}/telegram_order_bot/.env > /dev/null", "Bot .env")
     sc(f"echo 'ADMIN_IDS=8497713691' | sudo tee -a {REMOTE}/telegram_order_bot/.env > /dev/null", "Bot ADMIN_IDS")
     sc(f"echo 'DATABASE_URL=postgresql+asyncpg://foroshgram:${{POSTGRES_PASSWORD}}@postgres:5432/foroshgram' | sudo tee -a {REMOTE}/telegram_order_bot/.env > /dev/null", "Bot DATABASE_URL")
     sc(f"echo 'STORE_NAME=فروشگرام' | sudo tee -a {REMOTE}/telegram_order_bot/.env > /dev/null", "Bot STORE_NAME")

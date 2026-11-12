@@ -6,6 +6,10 @@ import pytest
 # Move before sys.path modifications to guarantee this runs first
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ.pop("TEST_DATABASE_URL", None)
+# کلید رمزنگاری فقط برای تست — هیچ ربطی به کلید پروداکشن نداره
+os.environ.setdefault("ENCRYPTION_KEY", "test-only-encryption-key-0123456789abcdef")
+# تست‌های اشتراک مدل پولی رو بررسی می‌کنن؛ حالت رایگان پیش‌فرض پروداکشنه
+os.environ.setdefault("FREE_MODE", "false")
 
 # Clean up config module if already loaded — this ensures the new DATABASE_URL
 # is used by SQLAlchemy when the tests start

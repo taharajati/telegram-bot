@@ -11,7 +11,7 @@ services:
       - ./init-scripts:/docker-entrypoint-initdb.d
       - ./backups:/backups
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U foroshgram -d foroshgram"]
       interval: 10s
@@ -37,7 +37,7 @@ services:
     volumes:
       - ./telegram_order_bot:/app
     ports:
-      - "9090:9090"  # Prometheus metrics
+      - "127.0.0.1:9090:9090"  # Prometheus metrics
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
     env_file:
       - ./telegram_order_website/.env.production
     environment:
-      DATABASE_URL: postgresql://foroshgram:***@postgres:5432/foroshgram
+      DATABASE_URL: postgresql://foroshgram:${POSTGRES_PASSWORD:-foroshgram_secure_2024}@postgres:5432/foroshgram
       JWT_SECRET: ${JWT_SECRET:-foroshgram_default_secret_change_me}
     ports:
       - "3000:3000"
@@ -91,12 +91,11 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
-      - "9091:9090"  # UI on host 9091
+      - "127.0.0.1:9091:9090"  # UI on host 9091
     restart: unless-stopped
 
   grafana:
@@ -113,7 +112,7 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     depends_on:
       - prometheus
     restart: unless-stopped

@@ -13,7 +13,7 @@ BACKUP_DIR="/backups"                           # mount from docker-compose
 DB_HOST="postgres"                               # service name in docker-compose
 DB_USER="foroshgram"
 DB_NAME="foroshgram"
-PGPASSWORD="${POSTGRES_PASSWORD:-foroshgram_secure_2024}"
+PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set}}"
 PG_DUMP="pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME"
 
 # Timestamp

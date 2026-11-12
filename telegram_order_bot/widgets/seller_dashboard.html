@@ -1,0 +1,64 @@
+<style>
+body{margin:0;direction:rtl;color:var(--tg-theme-text-color,#000)}
+.w{padding:14px 14px max(14px,env(safe-area-inset-bottom))}
+.h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.h b{font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.m{color:var(--tg-theme-hint-color,#888);font-size:12px;white-space:nowrap}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.k{background:var(--tg-theme-secondary-bg-color,#eee);border-radius:12px;padding:9px 11px}
+.k span{display:block;font-size:12px;color:var(--tg-theme-hint-color,#888)}
+.k b{font-size:17px}
+.k.a b{color:var(--tg-theme-destructive-text-color,#e53935)}
+.ch{display:flex;align-items:flex-end;gap:6px;height:92px;margin-top:16px}
+.b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.b i{display:block;min-height:3px;border-radius:5px 5px 2px 2px;background:var(--tg-theme-button-color,#39f);opacity:.45;transition:height .5s ease}
+.b.t i,.b.s i{opacity:1}
+.ax{display:flex;gap:6px;margin-top:5px;font-size:11px;color:var(--tg-theme-hint-color,#888)}
+.ax span{flex:1;text-align:center}
+.v{min-height:18px;margin-top:8px;font-size:13px;text-align:center;color:var(--tg-theme-hint-color,#888)}
+button{font:inherit;border:0;border-radius:10px;width:100%;margin-top:10px;padding:10px;font-weight:700;background:var(--tg-theme-button-color,#39f);color:var(--tg-theme-button-text-color,#fff)}
+@media(prefers-reduced-motion:reduce){.b i{transition:none}}
+</style>
+<div class="w">
+<div class="h"><b id="n"></b><span class="m" id="u"></span></div>
+<div class="g">
+<div class="k"><span>فروش ۷ روز اخیر</span><b id="t"></b></div>
+<div class="k"><span>سفارش‌های ۷ روز</span><b id="o"></b></div>
+<div class="k" id="ka"><span>منتظر تأیید پرداخت</span><b id="a"></b></div>
+<div class="k"><span>منتظر ارسال</span><b id="p"></b></div>
+</div>
+<div class="ch" id="ch"></div>
+<div class="ax" id="ax"></div>
+<div class="v" id="v">روی هر ستون بزن تا فروش آن روز را ببینی</div>
+<button id="rf">به‌روزرسانی</button>
+</div>
+<script>
+const W=window.TelegramWidget,$=i=>document.getElementById(i);
+const fa=n=>Number(n||0).toLocaleString('fa-IR');
+let busy=false;
+function draw(j){
+  let o=null;try{o=JSON.parse(j==null?W.chatData:j)}catch(e){}
+  if(!o)return;
+  const d=o.d||[],l=o.l||[],mx=Math.max(1,...d);
+  $('n').textContent=o.n||'';$('u').textContent=o.u?'به‌روز: '+o.u:'';
+  $('t').textContent=fa(o.t)+' ت';$('o').textContent=fa(o.o);$('a').textContent=fa(o.a);$('p').textContent=fa(o.p);
+  $('ka').className=o.a>0?'k a':'k';
+  const ch=$('ch'),ax=$('ax');ch.textContent='';ax.textContent='';
+  d.forEach((v,i)=>{
+    const b=document.createElement('div'),f=document.createElement('i'),s=document.createElement('span');
+    b.className='b'+(i==d.length-1?' t':'');f.style.height=Math.round(v/mx*100)+'%';
+    b.appendChild(f);ch.appendChild(b);s.textContent=l[i]||'';ax.appendChild(s);
+    b.addEventListener('click',()=>{
+      ch.querySelectorAll('.s').forEach(e=>e.classList.remove('s'));b.classList.add('s');
+      $('v').textContent=(l[i]||'')+': '+fa(v)+' تومان';W.HapticFeedback.selectionChanged();
+    });
+  });
+}
+$('rf').addEventListener('click',()=>{
+  if(busy)return;busy=true;$('rf').textContent='در حال دریافت…';
+  W.request('s:r').then(a=>{busy=false;$('rf').textContent='به‌روزرسانی';if(a.result)draw(a.result)},
+  ()=>{busy=false;$('rf').textContent='نشد، دوباره بزن'});
+});
+W.onEvent('chatDataChanged',()=>draw());
+draw();if(W.ready)W.ready();
+</script>
