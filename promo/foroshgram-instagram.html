@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>فروشگرام | موشن گرافیک اینستاگرام (۱۰۸۰×۱۹۲۰)</title>
+<style>
+  @font-face {
+    font-family: "Vazirmatn";
+    src: url("Vazirmatn-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: block;
+  }
+
+  :root {
+    --brand: #0077b3;
+    --brand-strong: #005f8f;
+    --brand-soft: #e3f2fa;
+    --ink: #0f1a24;
+    --ink-muted: #46586a;
+    --canvas: #f4f8fb;
+    --surface: #ffffff;
+    --line: #d5e1ea;
+    --success: #12794a;
+    --success-soft: #e0f4ea;
+    --danger: #b3261e;
+    --danger-soft: #fbe7e5;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: #0b141c; }
+  body {
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-family: "Vazirmatn", system-ui, sans-serif;
+    color: var(--ink);
+  }
+
+  /* صحنه‌ی ۱۰۸۰×۱۹۲۰ که با اندازه‌ی پنجره مقیاس می‌شود */
+  #stage {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1080px;
+    height: 1920px;
+    background: var(--canvas);
+    overflow: hidden;
+    transform: translate(-50%, -50%) scale(var(--s, .4));
+    transform-origin: center center;
+  }
+
+  .scene {
+    position: absolute;
+    inset: 0;
+    padding: 160px 88px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .45s var(--ease), visibility 0s .45s;
+  }
+  .scene.active { opacity: 1; visibility: visible; transition: opacity .45s var(--ease); }
+
+  /* هر عنصر انیمیشنی با تأخیر --d وارد می‌شود */
+  .a { opacity: 0; }
+  .scene.active .a { animation: rise .8s var(--d, 0s) var(--ease) both; }
+  .scene.active .pop { animation: pop .6s var(--d, 0s) var(--ease) both; }
+  .scene.active .fade { animation: fade .6s var(--d, 0s) ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(70px); } to { opacity: 1; transform: none; } }
+  @keyframes pop  { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  h1 { font-size: 112px; line-height: 1.35; font-weight: 900; letter-spacing: -1px; }
+  h2 { font-size: 84px; line-height: 1.4; font-weight: 800; }
+  .lead { font-size: 48px; line-height: 1.7; color: var(--ink-muted); font-weight: 500; }
+  .eyebrow { font-size: 40px; font-weight: 700; color: var(--brand); }
+  .num { font-variant-numeric: tabular-nums; }
+  .brand { color: var(--brand); }
+
+  /* ───── صحنه‌ی ۱: مشکل ───── */
+  .chat { display: flex; flex-direction: column; gap: 28px; margin-top: 90px; }
+  .bubble {
+    max-width: 82%;
+    padding: 30px 42px;
+    border-radius: 36px;
+    font-size: 44px;
+    font-weight: 600;
+    line-height: 1.5;
+    background: var(--surface);
+    border: 2px solid var(--line);
+  }
+  .bubble.in  { align-self: flex-start; border-end-start-radius: 8px; }
+  .bubble.out { align-self: flex-end; background: var(--brand-soft); border-color: #b9dcee; border-end-end-radius: 8px; }
+  .unread {
+    align-self: flex-start;
+    margin-top: 28px;
+    display: inline-flex; align-items: center; gap: 22px;
+    padding: 26px 44px;
+    border-radius: 999px;
+    background: var(--danger-soft);
+    border: 2px solid var(--danger);
+    color: var(--danger);
+    font-size: 46px; font-weight: 800;
+  }
+  .scene.active .shake { animation: rise .8s var(--d) var(--ease) both, shake 1.2s calc(var(--d) + .9s) ease-in-out 2; }
+  @keyframes shake { 0%,100% { transform: none; } 20% { transform: translateX(-14px); } 40% { transform: translateX(14px); } 60% { transform: translateX(-9px); } 80% { transform: translateX(9px); } }
+
+  /* ───── صحنه‌ی ۲: معرفی ───── */
+  .s-intro { align-items: center; text-align: center; }
+  .logo-mark {
+    width: 260px; height: 260px; border-radius: 64px;
+    background: var(--brand);
+    display: grid; place-items: center;
+    margin-bottom: 64px;
+  }
+  .logo-mark svg { width: 140px; height: 140px; }
+  .s-intro h1 { font-size: 150px; }
+  .s-intro .lead { margin-top: 36px; max-width: 840px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 70px; }
+  .tag {
+    padding: 22px 40px; border-radius: 999px;
+    border: 2px solid var(--line); background: var(--surface);
+    font-size: 38px; font-weight: 700;
+  }
+
+  /* ───── صحنه‌ی ۳: پیگیری سفارش ───── */
+  .tracker {
+    margin-top: 80px;
+    padding: 64px 56px;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    border-radius: 48px;
+  }
+  .tracker-head { display: flex; justify-content: space-between; align-items: center; font-size: 38px; color: var(--ink-muted); font-weight: 600; margin-bottom: 56px; }
+  .tracker-head b { color: var(--ink); font-weight: 800; }
+  .steps { position: relative; display: flex; flex-direction: column; gap: 52px; }
+  .steps::before, .steps .fill {
+    content: ""; position: absolute; inset-inline-start: 41px; top: 42px;
+    width: 8px; border-radius: 4px;
+  }
+  .steps::before { bottom: 42px; background: var(--line); }
+  .steps .fill { background: var(--brand); height: 0; }
+  .scene.active .steps .fill { animation: grow 4.6s .8s var(--ease) both; }
+  @keyframes grow { to { height: calc(100% - 84px); } }
+  .step { position: relative; display: flex; align-items: center; gap: 40px; font-size: 52px; font-weight: 700; color: var(--ink-muted); }
+  .dot {
+    flex: none; width: 90px; height: 90px; border-radius: 50%;
+    background: var(--surface); border: 8px solid var(--line);
+    display: grid; place-items: center; position: relative; z-index: 1;
+    font-size: 40px; font-weight: 800; color: var(--ink-muted);
+  }
+  .dot svg { width: 46px; height: 46px; opacity: 0; }
+  .scene.active .step { animation: stepOn .5s var(--t) both; }
+  .scene.active .step .dot { animation: dotOn .5s var(--t) both; }
+  .scene.active .step .dot svg { animation: fade .3s var(--t) both; }
+  @keyframes stepOn { to { color: var(--ink); } }
+  @keyframes dotOn { to { background: var(--brand); border-color: var(--brand); color: #fff; } }
+  .step.now .dot { animation: dotOn .5s var(--t) both, pulse 1.4s calc(var(--t) + .6s) ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,119,179,.45); } 100% { box-shadow: 0 0 0 36px rgba(0,119,179,0); } }
+  .note {
+    margin-top: 56px; padding: 34px 44px; border-radius: 28px;
+    background: var(--success-soft); border: 2px solid var(--success);
+    color: var(--success); font-size: 44px; font-weight: 800;
+    display: flex; align-items: center; gap: 24px;
+  }
+  .note svg { width: 56px; height: 56px; flex: none; }
+
+  /* ───── صحنه‌ی ۴: امکانات ───── */
+  .cards { display: flex; flex-direction: column; gap: 36px; margin-top: 80px; }
+  .card {
+    padding: 52px 56px;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    border-radius: 40px;
+    display: flex; gap: 40px; align-items: center;
+  }
+  .card .ic { flex: none; width: 120px; height: 120px; border-radius: 28px; background: var(--brand-soft); display: grid; place-items: center; }
+  .card .ic svg { width: 64px; height: 64px; }
+  .card h3 { font-size: 54px; font-weight: 800; line-height: 1.4; }
+  .card p { margin-top: 8px; font-size: 40px; color: var(--ink-muted); font-weight: 500; line-height: 1.6; }
+
+  /* ───── صحنه‌ی ۵: دعوت به اقدام ───── */
+  .s-cta { align-items: center; text-align: center; }
+  .btn {
+    margin-top: 80px;
+    display: inline-flex; align-items: center; gap: 28px;
+    padding: 48px 84px; border-radius: 40px;
+    background: var(--brand); color: #fff;
+    font-size: 62px; font-weight: 800;
+  }
+  .btn svg { width: 64px; height: 64px; }
+  .scene.active .btn { animation: rise .8s var(--d) var(--ease) both, ring 1.8s calc(var(--d) + 1s) ease-out infinite; }
+  @keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(0,119,179,.4); } 100% { box-shadow: 0 0 0 48px rgba(0,119,179,0); } }
+  .handle { margin-top: 56px; font-size: 56px; font-weight: 800; color: var(--brand); }
+  .s-cta .lead { margin-top: 36px; }
+
+  /* نوار پیشرفت پایین صحنه */
+  #bar { position: absolute; inset-inline: 0; bottom: 0; height: 12px; background: var(--line); }
+  #bar i { display: block; height: 100%; width: 0; background: var(--brand); }
+
+  #hint {
+    position: fixed; inset-inline-start: 16px; bottom: 12px;
+    font-size: 13px; color: #9fb3c4;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene, .scene.active, .a, .scene.active .a, .scene.active .pop, .scene.active .fade,
+    .scene.active .step, .scene.active .step .dot, .scene.active .step .dot svg, .scene.active .steps .fill,
+    .scene.active .btn, .scene.active .shake { animation: none !important; transition: none !important; }
+    .a { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage" aria-label="تیزر تبلیغاتی فروشگرام">
+
+  <!-- ۱: مشکل -->
+  <section class="scene" data-ms="3600">
+    <p class="eyebrow a" style="--d:.1s">فروشنده‌ی تلگرامی</p>
+    <h1 class="a" style="--d:.25s">سفارش‌هات بین پیام‌ها گم می‌شن؟</h1>
+    <div class="chat">
+      <div class="bubble in a" style="--d:.8s">سلام، این هنوز موجوده؟</div>
+      <div class="bubble out a" style="--d:1.3s">بله، شماره کارت می‌فرستم</div>
+      <div class="bubble in a" style="--d:1.8s">رسید رو فرستادم، تأیید شد؟</div>
+      <div class="bubble in a" style="--d:2.2s">پس سفارشم کجاست؟</div>
+      <div class="unread shake" style="--d:2.6s"><span class="num">۲۳</span> پیام خوانده‌نشده</div>
+    </div>
+  </section>
+
+  <!-- ۲: معرفی -->
+  <section class="scene s-intro" data-ms="3400">
+    <div class="logo-mark pop" style="--d:.1s">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+    </div>
+    <h1 class="a" style="--d:.5s">فروشگرام</h1>
+    <p class="lead a" style="--d:.8s">فروشگاه تلگرامی‌ات را در چند دقیقه راه بینداز. بدون برنامه‌نویسی.</p>
+    <div class="tags">
+      <span class="tag a" style="--d:1.3s">ربات تلگرام</span>
+      <span class="tag a" style="--d:1.5s">پنل مدیریت</span>
+      <span class="tag a" style="--d:1.7s">صفحه‌ی فروشگاه</span>
+    </div>
+  </section>
+
+  <!-- ۳: پیگیری سفارش -->
+  <section class="scene" data-ms="6200">
+    <p class="eyebrow a" style="--d:.1s">برای مشتری‌هایت</p>
+    <h2 class="a" style="--d:.25s">پیگیری سفارش، از ثبت تا تحویل</h2>
+    <div class="tracker a" style="--d:.6s">
+      <div class="tracker-head"><span>کد رهگیری</span><b dir="ltr" class="num">FSH-48213</b></div>
+      <div class="steps">
+        <div class="fill"></div>
+        <div class="step" style="--t:1.1s"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>ثبت سفارش</div>
+        <div class="step" style="--t:2.2s"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>پرداخت</div>
+        <div class="step now" style="--t:3.3s"><span class="dot"><span class="num">۳</span></span>آماده‌سازی</div>
+        <div class="step" style="--t:4.4s"><span class="dot"><span class="num">۴</span></span>ارسال</div>
+        <div class="step" style="--t:5.5s"><span class="dot"><span class="num">۵</span></span>تحویل</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ۴: امکانات -->
+  <section class="scene" data-ms="5000">
+    <p class="eyebrow a" style="--d:.1s">برای تو</p>
+    <h2 class="a" style="--d:.25s">هر چیزی که فروشگاه تلگرامی لازم دارد</h2>
+    <div class="cards">
+      <div class="card a" style="--d:.8s">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0077b3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/><path d="M6 15h4"/></svg></span>
+        <div><h3>پرداخت کارت‌به‌کارت</h3><p>پول مستقیم به کارت خودت می‌رود.</p></div>
+      </div>
+      <div class="card a" style="--d:1.5s">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0077b3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span>
+        <div><h3>موجودی بدون فروش مازاد</h3><p>موجودی هنگام ثبت سفارش رزرو می‌شود.</p></div>
+      </div>
+      <div class="card a" style="--d:2.2s">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0077b3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>
+        <div><h3>داشبورد فروش</h3><p>فروش امروز، هفته و ماه در یک نگاه.</p></div>
+      </div>
+      <div class="card a" style="--d:2.9s">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0077b3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span>
+        <div><h3>کد تخفیف</h3><p>درصدی یا مبلغی، با سقف تعداد استفاده.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ۵: دعوت به اقدام -->
+  <section class="scene s-cta" data-ms="4200">
+    <h1 class="a" style="--d:.1s">آماده‌ای اولین سفارش را بگیری؟</h1>
+    <p class="lead a" style="--d:.5s">ساخت فروشگاه چند دقیقه بیشتر طول نمی‌کشد.</p>
+    <div class="btn" style="--d:.9s">
+      ساخت فروشگاه در تلگرام
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+    </div>
+    <p class="handle a" style="--d:1.3s" dir="ltr">@Foroshgrambot</p>
+  </section>
+
+  <div id="bar"><i></i></div>
+</div>
+
+<p id="hint">کلیک یا R: شروع از اول</p>
+
+<script>
+  const stage = document.getElementById('stage');
+  const scenes = [...document.querySelectorAll('.scene')];
+  const fill = document.querySelector('#bar i');
+  const durations = scenes.map(s => +s.dataset.ms);
+  const total = durations.reduce((a, b) => a + b, 0);
+
+  function fit() {
+    const s = Math.min(innerWidth / 1080, innerHeight / 1920);
+    stage.style.setProperty('--s', s);
+  }
+  addEventListener('resize', fit); fit();
+
+  let idx = -1, paused = false, timer = null, startedAt = 0;
+
+  function show(i) {
+    scenes.forEach((s, k) => {
+      if (k === i) { s.classList.remove('active'); void s.offsetWidth; s.classList.add('active'); }
+      else s.classList.remove('active');
+    });
+  }
+
+  function loop() {
+    idx = (idx + 1) % scenes.length;
+    if (idx === 0) startedAt = performance.now();
+    show(idx);
+    timer = setTimeout(loop, durations[idx]);
+  }
+
+  function tick() {
+    if (!paused) {
+      const into = performance.now() - startedAt;
+      fill.style.width = Math.min(100, (into / total) * 100) + '%';
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function start() {
+    clearTimeout(timer); idx = -1; paused = false;
+    startedAt = performance.now();
+    loop();
+  }
+
+  addEventListener('click', start);
+  addEventListener('keydown', e => { if (e.key.toLowerCase() === 'r') start(); });
+
+  document.fonts.ready.then(() => { start(); tick(); });
+</script>
+</body>
+</html>
