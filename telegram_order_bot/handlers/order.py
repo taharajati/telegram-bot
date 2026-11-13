@@ -549,6 +549,7 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
         photo = update.message.photo[-1] if update.message.photo else None
         # Use caption as fallback for receipt_text (user may send photo with caption)
         receipt_text = (update.message.caption or update.message.text or "").strip() or None
+        file_id = None  # رسید متنی (شماره تراکنش) عکس نداره
 
         if photo:
             file_id = photo.file_id
@@ -1426,7 +1427,8 @@ async def order_detail_customer(update: Update, context: ContextTypes.DEFAULT_TY
         stmt = select(Order).where(Order.id == order_id, Order.user_id == update.effective_user.id, Order.shop_id == shop_id)
         order = (await session.execute(stmt)).scalar_one_or_none()
         if order:
-            await session.refresh(order, attribute_names=["items"])
+            # تاریخچه‌ی وضعیت هم توی متن جزئیات نشون داده می‌شه؛ بیرون از session لود نمی‌شه
+            await session.refresh(order, attribute_names=["items", "histories"])
 
     if not order:
         await render_view(query, context, "این سفارش پیدا نشد.",

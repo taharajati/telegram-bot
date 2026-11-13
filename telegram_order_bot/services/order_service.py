@@ -19,6 +19,7 @@ from database.models import (
     Product,
     Shop,
     User,
+    utcnow,
 )
 from services.payment import release_reserved_stock
 from utils.helpers import format_price
@@ -236,6 +237,8 @@ async def attach_card_receipt(
 
         order.payment_receipt_file_id = receipt_file_id
         order.payment_receipt_text = receipt_caption
+        # بدون این، کرون «سفارش رهاشده» رسید رو نمی‌بینه و سفارش پرداخت‌شده رو بعد از ۱۵ دقیقه لغو می‌کنه
+        order.payment_receipt_at = utcnow()
         order.add_status_entry("receipt_uploaded", by="customer", session=session)
 
         await session.commit()

@@ -126,7 +126,7 @@ async def auto_cancel_unpaid_orders() -> int:
     cod_pending_timeout = timedelta(days=30)  # COD سفارش‌های
 
     cancelled = 0
-    now = datetime.now(timezone.utc)
+    now = utcnow()  # naive UTC، هم‌نوع با ستون‌های created_at / payment_receipt_at (aware منهای naive خطا می‌ده)
 
     async with async_session() as session:
         # ── ۱. PENDING_PAYMENT (همه روش‌ها) ──

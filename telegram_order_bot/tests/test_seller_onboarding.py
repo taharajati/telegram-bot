@@ -251,3 +251,48 @@ async def test_first_user_can_start_on_a_fresh_database():
     async with async_session() as session:
         user = await session.get(User, 9001)
     assert user is not None and user.current_shop_id is None
+
+
+# ─── رسید متنی و جزئیات سفارش مشتری (باگ‌هایی که فقط روی سرور واقعی دیده شد) ───
+
+async def test_text_receipt_without_photo_is_accepted(monkeypatch):
+    """مشتری به‌جای عکس، شماره تراکنش می‌فرسته؛ نباید با UnboundLocalError بشکنه."""
+    order_id = await make_paid_order()
+    async with async_session() as session:
+        order = await session.get(Order, order_id)
+        order.status = OrderStatus.PENDING_PAYMENT
+        order.payment_method = "card_to_card"
+        await session.commit()
+        shop_id = order.shop_id
+    notify = AsyncMock()
+    monkeypatch.setattr(order_h, "_notify_seller_receipt", notify)
+    update = message_update("TX-884412", user_id=5001)
+    update.message.caption = None
+    update.message.photo = []
+    context = make_context()
+    context.user_data["card_order_id"] = order_id
+
+    assert await order_h.handle_card_receipt(update, context) == ConversationHandler.END
+
+    notify.assert_awaited_once()
+    assert notify.await_args.args[1:3] == (order_id, shop_id)
+    async with async_session() as session:
+        assert (await session.get(Order, order_id)).payment_receipt_at is not None
+
+
+async def test_customer_order_detail_shows_status_history(monkeypatch):
+    order_id = await make_paid_order()
+    await transition_order(order_id, OrderStatus.CONFIRMED, actor="seller")
+    monkeypatch.setattr(order_h, "get_current_shop_id", AsyncMock(return_value=(await _shop_id_of(order_id))))
+    update = callback_update(f"order:detail:{order_id}", user_id=5001)
+
+    detail = getattr(order_h.order_detail_customer, "__wrapped__", order_h.order_detail_customer)
+    await detail(update, make_context())
+
+    shown = update.callback_query.edit_message_text.await_args.args[0]
+    assert "تاریخچه وضعیت" in shown
+
+
+async def _shop_id_of(order_id):
+    async with async_session() as session:
+        return (await session.get(Order, order_id)).shop_id
