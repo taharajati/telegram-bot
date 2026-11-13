@@ -240,8 +240,10 @@ async def _handle_checkout_saved(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data["order_name"] = user.saved_name
         context.user_data["order_phone"] = user.saved_phone
         context.user_data["order_address"] = user.saved_address
-    # Go straight to payment
-    next_state = await _show_payment_method_selection(update, context)
+    # Go straight to payment (روی آپدیت دکمه، update.message خالیه؛ پیام خود دکمه رو می‌دیم)
+    from types import SimpleNamespace
+    chat = SimpleNamespace(message=query.message, effective_user=update.effective_user, effective_chat=update.effective_chat)
+    next_state = await _show_payment_method_selection(chat, context)
     return next_state if next_state else ASK_PAYMENT_METHOD
 
 

@@ -68,3 +68,9 @@ async def about_platform(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "فروشگرام یه پلتفرم فروشگاه‌سازیه؛ هرکسی می‌تونه فقط تو چند دقیقه، فروشگاه تلگرامی خودشو راه بندازه و شروع به فروش کنه 🚀",
         show_alert=True,
     )
+
+
+async def stale_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """آخرین هندلر دکمه‌ها: دکمه‌ی یک پیام قدیمی (مثلاً مرحله‌ای از ثبت سفارش که تموم شده) که هیچ هندلری نداره.
+    به‌جای اینکه دکمه فقط بچرخه، یه جواب روشن می‌گیره."""
+    await update.callback_query.answer("این صفحه دیگه معتبر نیست. از منو دوباره شروع کن 🙏", show_alert=True)

@@ -873,10 +873,10 @@ async def delete_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if product:
             # Delete associated images from filesystem
             if product.image_url:
-                await delete_image(product.image_url)
+                delete_image(product.image_url)
             for img in product.images:
                 if img.local_url:
-                    await delete_image(img.local_url)
+                    delete_image(img.local_url)
             
             await session.delete(product)
             await session.commit()
@@ -1031,7 +1031,7 @@ async def gallery_delete_photo(update: Update, context: ContextTypes.DEFAULT_TYP
 
         if img:
             if img.local_url:
-                await delete_image(img.local_url)
+                delete_image(img.local_url)
             await session.delete(img)
             await session.commit()
             await query.answer("عکس حذف شد ✅")

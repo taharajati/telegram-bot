@@ -80,3 +80,42 @@ async def get_current_shop(update: Update):
         return None
     async with async_session() as session:
         return await session.get(Shop, shop_id)
+
+
+def install_safe_edits() -> None:
+    """edit_message_text روی پیام عکس‌دار (و edit_message_caption روی پیام متنی) توی تلگرام خطا می‌ده.
+    به‌جای شکستن هر صفحه، پیام قبلی پاک و همون محتوا به‌صورت پیام جدید فرستاده می‌شه."""
+    from telegram import CallbackQuery
+
+    if getattr(CallbackQuery, "_safe_edits_installed", False):
+        return
+    original_text, original_caption = CallbackQuery.edit_message_text, CallbackQuery.edit_message_caption
+
+    async def edit_text(self, text, *args, **kwargs):
+        try:
+            return await original_text(self, text, *args, **kwargs)
+        except BadRequest as error:
+            if "no text in the message" not in str(error).lower() or self.message is None:
+                raise
+            message = self.message
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return await message.get_bot().send_message(
+                chat_id=message.chat_id, text=text,
+                reply_markup=kwargs.get("reply_markup"), parse_mode=kwargs.get("parse_mode"),
+                disable_web_page_preview=kwargs.get("disable_web_page_preview"),
+            )
+
+    async def edit_caption(self, caption=None, *args, **kwargs):
+        try:
+            return await original_caption(self, caption, *args, **kwargs)
+        except BadRequest as error:
+            if "no caption in the message" not in str(error).lower() or self.message is None:
+                raise
+            return await original_text(self, caption or "", reply_markup=kwargs.get("reply_markup"), parse_mode=kwargs.get("parse_mode"))
+
+    CallbackQuery.edit_message_text = edit_text
+    CallbackQuery.edit_message_caption = edit_caption
+    CallbackQuery._safe_edits_installed = True

@@ -40,7 +40,7 @@ from handlers.admin import orders as admin_orders
 from handlers.admin import panel as admin_panel
 from handlers.admin import products as admin_products
 from handlers.admin import shops as admin_shops
-from handlers.common import cancel_conversation, noop_callback, about_platform
+from handlers.common import cancel_conversation, noop_callback, about_platform, stale_callback
 from handlers import conversations as msg
 from handlers import widgets as widgets_h
 from services import widgets as widgets_svc
@@ -53,8 +53,42 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
+_ALERTED: dict[str, float] = {}  # (نوع خطا + متن) → آخرین باری که به ادمین خبر دادیم؛ تا پیام تکراری نیاد
+ALERT_COOLDOWN = 600
+
+
+def _describe_update(update: object) -> str:
+    if isinstance(update, Update):
+        if update.callback_query:
+            return f"دکمه {update.callback_query.data}"
+        if update.effective_message and update.effective_message.text:
+            return f"پیام {update.effective_message.text[:60]}"
+    return "آپدیت نامشخص"
+
+
+async def _alert_admins(context: ContextTypes.DEFAULT_TYPE, update: object, error: BaseException) -> None:
+    """خطای ناشناخته رو همون لحظه برای ادمین می‌فرسته (هر خطای مشابه حداکثر هر ۱۰ دقیقه یک بار)."""
+    import time
+    key = f"{type(error).__name__}:{str(error)[:80]}"
+    if time.monotonic() - _ALERTED.get(key, -ALERT_COOLDOWN) < ALERT_COOLDOWN:
+        return
+    _ALERTED[key] = time.monotonic()
+    user = update.effective_user if isinstance(update, Update) else None
+    text = (
+        f"⚠️ خطای ناشناخته\n"
+        f"📍 {_describe_update(update)}\n"
+        f"👤 {user.id if user else '—'}\n"
+        f"🧨 {type(error).__name__}: {str(error)[:300]}"
+    )
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await context.bot.send_message(admin_id, text)
+        except Exception:
+            pass
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """Global error handler — logs to Sentry + Prometheus."""
+    """Global error handler — logs to Sentry + Prometheus، به ادمین خبر می‌ده و به کاربر راه برگشت می‌ده."""
     error = context.error
 
     # Track in Prometheus
@@ -66,13 +100,18 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     # Sentry will capture this automatically if initialized
 
     if isinstance(error, RetryAfter):
-        user_msg = f"⏳ تعداد درخواست‌ها زیاد شد. لطفاً {error.retry_after} ثانیه صبر کنید."
+        user_msg = f"⏳ تعداد درخواست‌ها زیاد شد. {error.retry_after} ثانیه صبر کن و دوباره بزن."
     else:
-        user_msg = "❌ یه مشکل غیرمنتظره پیش اومد. لطفاً دوباره تلاش کن یا با /start شروع کن."
+        user_msg = "❌ یه مشکل غیرمنتظره پیش اومد و به تیم خبر دادم. برای ادامه از دکمه‌ی پایین برگرد 👇"
+        await _alert_admins(context, update, error)
 
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text(user_msg)
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            await update.effective_message.reply_text(
+                user_msg,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 منو", callback_data="nav:main")]]),
+            )
         except Exception:
             logger.warning("Failed to send error message to user.")
 
@@ -263,6 +302,7 @@ def _register_order_handlers(application: Application):
             CallbackQueryHandler(order.handle_pay_cancel, pattern="^order:pay_cancel:"),
             CallbackQueryHandler(order.start_checkout, pattern="^order:start$"),
         ],
+        allow_reentry=True,
         name="checkout_conversation",
     )
     application.add_handler(checkout_conv)
@@ -356,6 +396,7 @@ def _register_admin_handlers(application: Application):
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="add_product_conversation",
     )
     application.add_handler(add_product_conv)
@@ -366,6 +407,7 @@ def _register_admin_handlers(application: Application):
             admin_products.EDIT_ASK_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_products.save_edit_field)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="edit_product_field_conversation",
     )
     application.add_handler(edit_field_conv)
@@ -376,6 +418,7 @@ def _register_admin_handlers(application: Application):
             admin_products.ASK_PHOTO_CHANGE: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, admin_products.save_change_photo)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="change_photo_conversation",
     )
     application.add_handler(change_photo_conv)
@@ -389,6 +432,7 @@ def _register_admin_handlers(application: Application):
             admin_products.ASK_PHOTO_CHANGE: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, admin_products.gallery_save_photo)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="gallery_add_photo_conversation",
     )
     application.add_handler(gallery_add_conv)
@@ -404,6 +448,7 @@ def _register_admin_handlers(application: Application):
             admin_categories.ASK_CATEGORY_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_categories.save_category)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="add_category_conversation",
     )
     application.add_handler(add_category_conv)
@@ -423,6 +468,7 @@ def _register_admin_handlers(application: Application):
             admin_orders.ASK_TRACKING_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_orders.save_tracking_number)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="tracking_number_conversation",
     )
     application.add_handler(tracking_conv)
@@ -434,6 +480,7 @@ def _register_admin_handlers(application: Application):
             admin_broadcast.ASK_BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast.send_broadcast)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="broadcast_conversation",
     )
     application.add_handler(broadcast_conv)
@@ -445,6 +492,7 @@ def _register_admin_handlers(application: Application):
             admin_broadcast.ASK_BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast.send_broadcast_shop)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
+        allow_reentry=True,
         name="broadcast_shop_conversation",
     )
     application.add_handler(broadcast_shop_conv)
@@ -472,7 +520,8 @@ def _register_admin_handlers(application: Application):
         admin_shops.ASK_SHOP_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_shops.save_shop_desc)],
     },
     fallbacks=[CommandHandler("cancel", cancel_conversation)],
-    name="add_shop_conversation",
+    allow_reentry=True,
+        name="add_shop_conversation",
     )
     application.add_handler(add_shop_conv)
 
@@ -519,6 +568,9 @@ def _register_messaging_handlers(application: Application):
 
 
 def build_application() -> Application:
+    from utils.tg_helpers import install_safe_edits
+    install_safe_edits()
+
     proxy_url = os.getenv("PROXY_URL", "")
     builder = Application.builder().token(config.BOT_TOKEN)
     if proxy_url:
@@ -545,6 +597,9 @@ def build_application() -> Application:
     _register_admin_handlers(application)
     _register_messaging_handlers(application)
     widgets_h.register(application)
+
+    # باید آخرین هندلر باشه: فقط دکمه‌هایی رو می‌گیره که هیچ هندلر دیگه‌ای نگرفته
+    application.add_handler(CallbackQueryHandler(stale_callback))
 
     application.add_error_handler(error_handler)
     return application

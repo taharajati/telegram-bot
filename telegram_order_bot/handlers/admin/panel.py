@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 import config
 from database.db import async_session
 from database.models import OrderItem, Shop, ShopOwner, Order, OrderStatus, Product, Category, User
-from sqlalchemy import func, select
+from sqlalchemy import func, select, literal_column
 from utils.helpers import is_super_admin, format_price, to_persian_digits
 
 
@@ -395,7 +395,7 @@ async def admin_top_products(update: Update, context: ContextTypes.DEFAULT_TYPE)
     async with async_session() as session:
         base = (
             select(
-                func.coalesce(OrderItem.product_id, -1),
+                func.coalesce(OrderItem.product_id, literal_column("-1")),
                 OrderItem.product_name,
                 func.sum(OrderItem.quantity).label("total_sold"),
                 func.sum(OrderItem.quantity * OrderItem.unit_price).label("total_revenue"),
@@ -409,7 +409,7 @@ async def admin_top_products(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
                 Order.created_at >= thirty_days_ago,
             )
-            .group_by(func.coalesce(OrderItem.product_id, -1), OrderItem.product_name)
+            .group_by(func.coalesce(OrderItem.product_id, literal_column("-1")), OrderItem.product_name)
             .order_by(func.sum(OrderItem.quantity).desc())
             .limit(5)
         )
