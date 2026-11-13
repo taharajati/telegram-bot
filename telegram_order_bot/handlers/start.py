@@ -105,12 +105,18 @@ async def _record_shop_visit(user_id: int, shop_id: int) -> None:
 
 async def register_user(tg_user, shop_id: int | None = None) -> None:
     """ثبت‌نام کاربر جدید یا بروزرسانی اطلاعات."""
+    # فروشگاه پیش‌فرض فقط وقتی استفاده می‌شه که واقعاً وجود داشته باشه؛ توی دیتابیس تازه
+    # شاپ شماره‌ی ۱ نیست و کلید خارجی users.current_shop_id کل /start رو می‌شکست.
+    current_shop_id = shop_id
+    if current_shop_id is None and await ensure_shop_exists(config.DEFAULT_SHOP_ID):
+        current_shop_id = config.DEFAULT_SHOP_ID
+
     async with async_session() as session:
         user = await session.get(User, tg_user.id)
         if user is None:
             session.add(User(
                 user_id=tg_user.id,
-                current_shop_id=shop_id or config.DEFAULT_SHOP_ID,
+                current_shop_id=current_shop_id,
                 last_shop_id=shop_id,
                 first_name=tg_user.first_name,
                 last_name=tg_user.last_name,

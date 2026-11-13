@@ -237,3 +237,17 @@ async def test_checkout_stops_early_when_shop_has_no_card(monkeypatch):
 
     assert "اطلاعات پرداخت" in update.callback_query.edit_message_text.await_args.args[0]
     assert notifier.send_to_seller.await_args.args[0] == shop_id
+
+
+# ─── کاربر اول روی دیتابیس تازه ────────────────────────────────
+
+async def test_first_user_can_start_on_a_fresh_database():
+    """روی دیتابیس بدون هیچ فروشگاهی، /start نباید به‌خاطر فروشگاه پیش‌فرض (شماره ۱) بشکنه."""
+    from handlers.start import register_user
+
+    tg_user = SimpleNamespace(id=9001, first_name="سارا", last_name=None, username="sara")
+    await register_user(tg_user)
+
+    async with async_session() as session:
+        user = await session.get(User, 9001)
+    assert user is not None and user.current_shop_id is None
