@@ -24,18 +24,16 @@ CUSTOMER_COMMANDS: list[BotCommand] = [
     BotCommand("cart", "🛒 سبد خرید"),
     BotCommand("my_orders", "📦 سفارش‌های من"),
     BotCommand("support", "💬 پشتیبانی"),
-    BotCommand("cancel", "❌ لغو"),
 ]
 
 SELLER_COMMANDS: list[BotCommand] = [
-    BotCommand("myshop", "پنل مدیریت فروشگاه"),
-    BotCommand("neworders", "سفارش‌های جدید"),
-    BotCommand("my_panel", "تنظیمات فروشنده و پرداخت"),
+    BotCommand("myshop", "🏪 پنل فروشگاه من"),
+    BotCommand("neworders", "🧾 سفارش‌های جدید"),
 ]
 
 ADMIN_COMMANDS: list[BotCommand] = [
-    BotCommand("admin", "پنل مدیریت کل"),
-    BotCommand("orders", "مدیریت سفارش‌ها"),
+    BotCommand("admin", "🛠 پنل مدیریت کل"),
+    BotCommand("orders", "📋 مدیریت سفارش‌ها"),
 ]
 
 

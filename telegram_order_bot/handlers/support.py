@@ -347,9 +347,9 @@ async def admin_support_list(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # For now, show a placeholder - we'd need a way to track support messages
     # Since we don't persist them separately, we can show a note
     text = (
-        "📨 پیام‌های پشتیبانی\\n\\n"
-        "پیام‌های پشتیبانی در حال حاضر در چت ادمین‌ها فوروارد می‌شوند.\\n"
-        "برای پاسخ دادن، روی دکمه <b>💬 پاسخ</b> در پیام فوروارد شده کلیک کنید.\\n\\n"
+        "📨 پیام‌های پشتیبانی\n\n"
+        "پیام‌های پشتیبانی در حال حاضر در چت ادمین‌ها فوروارد می‌شوند.\n"
+        "برای پاسخ دادن، روی دکمه <b>💬 پاسخ</b> در پیام فوروارد شده کلیک کنید.\n\n"
         "📋 لیست پیام‌های اخیر:\n"
         "— (پیام‌ها در تاریخچه چت ادمین‌ها قابل مشاهده‌اند)"
     )

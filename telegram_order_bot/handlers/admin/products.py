@@ -3,6 +3,7 @@
 هر فروشنده فقط به محصولات فروشگاه خودش دسترسی داره.
 """
 import math
+from urllib.parse import quote
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Update
 from telegram.ext import ContextTypes, ConversationHandler
@@ -318,6 +319,7 @@ async def _finish_add_product(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"✅ محصول «{data['name']}» اضافه شد و الان توی فروشگاهت دیده می‌شه.\n\n"
         f"🔗 لینک مستقیم محصول (برای استوری و کانال):\n{link}",
         reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 اشتراک‌گذاری", url=f"https://t.me/share/url?url={quote(link)}&text={quote(data['name'])}")],
             [InlineKeyboardButton("➕ افزودن محصول بعدی", callback_data="admin:products:add")],
             [InlineKeyboardButton("📦 لیست محصولات", callback_data="admin:products:list:0")],
             [InlineKeyboardButton("🔙 پنل مدیریت", callback_data="admin:panel")],
@@ -341,12 +343,35 @@ def product_edit_keyboard(product: Product, bot_username: str = "") -> InlineKey
         ],
         [InlineKeyboardButton("🖼 تغییر عکس اصلی", callback_data=f"admin:products:photo:{product.id}")],
         [InlineKeyboardButton("🖼🖼 گالری (چند عکس)", callback_data=f"admin:products:gallery:{product.id}")],
-        [InlineKeyboardButton(f"تغییر وضعیت ({active_label})", callback_data=f"admin:products:toggle:{product.id}")],
+        [
+            InlineKeyboardButton("⛔ ناموجود شد", callback_data=f"admin:products:soldout:{product.id}"),
+            InlineKeyboardButton(f"{active_label}", callback_data=f"admin:products:toggle:{product.id}"),
+        ],
         [InlineKeyboardButton("📋 لینک محصول", callback_data=f"admin:products:link:{product.id}")],
         [InlineKeyboardButton("🗑 حذف محصول", callback_data=f"admin:products:delete:{product.id}")],
         [InlineKeyboardButton("🔙 بازگشت به لیست", callback_data="admin:products:list:0")],
     ]
     return InlineKeyboardMarkup(rows)
+
+
+@admin_only
+async def product_soldout(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """یک تپ: موجودی قابل‌فروش محصول صفر می‌شه (سفارش‌های در جریان دست‌نخورده می‌مونن)."""
+    query = update.callback_query
+    product_id = int(query.data.split(":")[3])
+    shop_id = context.user_data.get("admin_shop_id") or await _get_shop_id_for_admin(update.effective_user.id)
+    async with async_session() as session:
+        stmt = select(Product).where(Product.id == product_id)
+        if shop_id:
+            stmt = stmt.where(Product.shop_id == shop_id)
+        product = (await session.execute(stmt)).scalar_one_or_none()
+        if not product:
+            await query.answer("محصول پیدا نشد", show_alert=True)
+            return
+        product.stock = product.reserved_stock
+        await session.commit()
+    await query.answer("⛔ ناموجود شد")
+    await render_view(query, context, _product_detail_text(product), product_edit_keyboard(product))
 
 
 def _product_detail_text(product: Product) -> str:
@@ -565,7 +590,10 @@ async def save_edit_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await session.commit()
             if field == 'stock' and old_stock == 0 and value > 0:
                 await _check_and_notify_restock(session, product_id, product.shop_id, context.bot)
-            await update.message.reply_text(f"✅ {FIELD_LABELS[field]} محصول به‌روزرسانی شد")
+            await update.message.reply_text(
+                f"✅ {FIELD_LABELS[field]} به‌روز شد.\n\n{_product_detail_text(product)}",
+                reply_markup=product_edit_keyboard(product),
+            )
         else:
             await update.message.reply_text("محصول پیدا نشد.")
 

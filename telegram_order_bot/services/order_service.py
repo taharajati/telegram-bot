@@ -213,6 +213,13 @@ async def attach_card_receipt(
 
         if order.payment_method != "card_to_card":
             raise ValueError("این سفارش برای پرداخت کارت به کارت نیست")
+        if order.status == OrderStatus.CANCELLED:
+            raise ValueError(
+                "مهلت پرداخت این سفارش تموم شده و لغو شده. نگران نباش، سبدت سر جاشه؛ دوباره ثبتش کن 🙏\n"
+                "اگه پولت رو واریز کردی، رسیدت رو برای فروشنده بفرست تا پیگیری کنه."
+            )
+        if order.status != OrderStatus.PENDING_PAYMENT:
+            raise ValueError("این سفارش دیگه منتظر رسید نیست.")
 
         # ── De-duplication: hash of file_id + caption ──
         receipt_hash = hashlib.sha256(

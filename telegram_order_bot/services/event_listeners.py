@@ -46,17 +46,12 @@ async def on_order_paid(**kw):
     ns = get_notification_service(bot)
     is_first = kw.get("is_first_sale", False)
 
-    if is_first:
-        text = (
-            "🎉 اولین خرید انجام شد!\n\n"
-            "می‌تونی وارد بخش <b>سفارش‌ها</b> بشی و وضعیت ارسال رو مدیریت کنی.\n"
-            "از /myshop استفاده کن."
-        )
-    else:
-        text = (
-            "🛒 سفارش جدید دریافت شد!\n\n"
-            "برای تغییر وضعیت و مدیریت ارسال، به بخش سفارش‌های /myshop برو."
-        )
+    if not is_first:
+        return  # فروشنده همین الان خودش تایید کرده؛ پیام «سفارش جدید» تکراری و بی‌محتواست
+    text = (
+        "🎉 <b>اولین فروشت ثبت شد!</b>\n\n"
+        "از «🧾 سفارش‌ها» بسته رو برای ارسال آماده کن و «ارسال شد» رو بزن."
+    )
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🗂 مشاهده سفارش‌ها", callback_data="admin:orders:pending:0")]
@@ -116,7 +111,15 @@ async def on_seller_message(**kw):
     message_text = kw.get("message_text", "")
     if bot and shop_id:
         ns = get_notification_service(bot)
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from utils.tg_helpers import escape_html
+
+        who = escape_html(kw.get("buyer_name") or "یه مشتری")
+        reply_markup = None
+        if kw.get("conv_id"):
+            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(f"✏️ پاسخ به {kw.get('buyer_name') or 'مشتری'}", callback_data=f"msg:reply:{kw['conv_id']}")]])
         await ns.send_to_seller(
             shop_id,
-            f"💬 پیام جدید از خریدار:\n\n{message_text}\n\nبرای پاسخ از /my_panel استفاده کنید.",
+            f"💬 <b>{who}</b> پیام داد:\n\n{escape_html(message_text)}",
+            reply_markup=reply_markup,
         )

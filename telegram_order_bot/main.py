@@ -97,6 +97,18 @@ async def _post_init(application: Application):
     widgets_svc.init(application.bot)
     logger.info("پایگاه داده آماده شد ✅")
 
+    try:
+        await application.bot.set_my_description(
+            "🛍 فروشگاه‌ساز تلگرامی\n\n"
+            "فروشنده‌ای؟ با ۳ سؤال کوتاه فروشگاهت رو بساز و سفارش بگیر. رایگان.\n"
+            "خریداری؟ لینک فروشگاه رو بزن و سفارشت رو همین‌جا ثبت و پیگیری کن."
+        )
+        await application.bot.set_my_short_description("ساخت فروشگاه تلگرامی در ۳ سؤال — رایگان 🛍")
+        from telegram import MenuButtonCommands
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    except Exception as e:
+        logger.warning("نتونستم پروفایل ربات رو تنظیم کنم: %s", e)
+
     await set_default_menu(application.bot)
     await setup_startup_menus(application.bot)
     try:
@@ -122,10 +134,10 @@ async def _post_init(application: Application):
         await asyncio.sleep(120)
         while True:
             try:
-                await payment_svc.auto_cancel_unpaid_orders()
+                await payment_svc.auto_cancel_unpaid_orders(bot=application.bot)
             except Exception as e:
                 logger.error(f"خطا در auto_cancel_unpaid_orders: {e}")
-            await asyncio.sleep(1800)
+            await asyncio.sleep(120)
 
     asyncio.create_task(cleanup_task())
     logger.info("کرون‌جاب تمیزسازی سفارش‌های پرداخت‌نشده فعال شد ⏰")
@@ -160,7 +172,8 @@ def _register_customer_handlers(application: Application):
     application.add_handler(CommandHandler("searchall", search.search_all_products))
     application.add_handler(CommandHandler("findshop", search.search_shops))
 
-    application.add_handler(CallbackQueryHandler(menu.show_shop, pattern="^menu:shop:"))
+    application.add_handler(CallbackQueryHandler(menu.show_shop, pattern="^menu:shop(:|$)"))
+    application.add_handler(CallbackQueryHandler(menu.show_product_photo, pattern="^prod:img:"))
     application.add_handler(CallbackQueryHandler(help_handler.help_callback, pattern="^help:show$"))
     application.add_handler(CallbackQueryHandler(start.main_menu_callback, pattern="^nav:main$"))
     application.add_handler(CallbackQueryHandler(menu.show_categories, pattern="^cat:list$"))
@@ -220,7 +233,10 @@ def _register_order_handlers(application: Application):
             order.ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, order.ask_name)],
             order.ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, order.ask_phone)],
             order.ASK_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, order.ask_address)],
-            order.ASK_NOTES: [MessageHandler(filters.TEXT & ~filters.COMMAND, order.ask_notes)],
+            order.ASK_NOTES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, order.ask_notes),
+                CallbackQueryHandler(order.skip_notes, pattern="^order:skip_notes$"),
+            ],
             order.ASK_PAYMENT_METHOD: [
                 CallbackQueryHandler(order.ask_payment_method, pattern="^pay:card_to_card$"),
                 CallbackQueryHandler(order.confirm_card_payment, pattern="^order:confirm_card$"),
@@ -265,7 +281,7 @@ def _register_order_handlers(application: Application):
     application.add_handler(CallbackQueryHandler(order.handle_card_receipt_retry, pattern="^pay:receipt_retry:"))
     application.add_handler(CallbackQueryHandler(order.handle_pay_cancel, pattern="^pay:cancel:"))
     application.add_handler(CallbackQueryHandler(order.handle_pay_cancel, pattern="^order:pay_cancel:"))
-    application.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, order.handle_card_receipt_retry_photo), group=2)
+    application.add_handler(MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, order.handle_card_receipt_retry_photo), group=2)
 
     # Customer delivery confirmation
     application.add_handler(CallbackQueryHandler(admin_orders.customer_confirm_delivery, pattern="^customer:confirm_delivery:"))
@@ -279,6 +295,7 @@ def _register_seller_handlers(application: Application):
     seller_panel_conv = seller_panel.get_seller_panel_conversation()
     application.add_handler(seller_panel_conv)
 
+    application.add_handler(CallbackQueryHandler(seller_panel.seller_settings_menu, pattern="^seller:settings$"))
     application.add_handler(CallbackQueryHandler(seller_panel.seller_delete_confirm, pattern="^seller:delete_shop$"))
     application.add_handler(CallbackQueryHandler(seller_panel.seller_delete_final, pattern="^seller:delete_final:"))
     application.add_handler(CallbackQueryHandler(seller_panel.seller_orders_pending, pattern="^seller:orders:pending$"))
@@ -317,6 +334,7 @@ def _register_admin_handlers(application: Application):
     application.add_handler(CallbackQueryHandler(admin_products.list_products, pattern="^admin:products:list:"))
     application.add_handler(CallbackQueryHandler(admin_products.open_product_edit, pattern=r"^admin:products:edit:\d+$"))
     application.add_handler(CallbackQueryHandler(admin_products.toggle_product, pattern="^admin:products:toggle:"))
+    application.add_handler(CallbackQueryHandler(admin_products.product_soldout, pattern=r"^admin:products:soldout:\d+$"))
     application.add_handler(CallbackQueryHandler(admin_products.product_link, pattern=r"^admin:products:link:\d+$"))
     application.add_handler(CallbackQueryHandler(admin_products.delete_product_confirm, pattern=r"^admin:products:delete:\d+$"))
     application.add_handler(CallbackQueryHandler(admin_products.delete_product, pattern="^admin:products:delete:confirm:"))

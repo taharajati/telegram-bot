@@ -117,31 +117,29 @@ async def add_to_cart(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await session.commit()
 
-    await query.answer()
+    parts = query.data.split(":")
+    on_product_screen = bool(getattr(query.message, "photo", None)) or len(parts) > 4
 
-    # Show quick action buttons inline
-    product_name = product.name
-    product_price = product.price
+    if on_product_screen:
+        # صفحه‌ی محصول: فقط یک اعلان کوچیک + به‌روزرسانی دکمه‌ها (۱ تپ، بدون پیام جدید)
+        from handlers.menu import load_product_screen
+        cat_id = int(parts[3]) or None if len(parts) > 3 else None
+        page = int(parts[4]) if len(parts) > 4 else 0
+        await query.answer("✅ به سبد اضافه شد")
+        screen = await load_product_screen(product_id, user_id, cat_id, page)
+        if screen:
+            try:
+                await query.edit_message_reply_markup(reply_markup=screen["keyboard"])
+            except Exception:
+                pass
+        return
+
+    await query.answer()
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛒 مشاهده سبد خرید", callback_data="cart:view")],
+        [InlineKeyboardButton("🛒 مشاهده سبد", callback_data="cart:view"), InlineKeyboardButton("✅ ثبت سفارش", callback_data="order:start")],
         [InlineKeyboardButton("🛍 ادامه خرید", callback_data="cat:list")],
-        [InlineKeyboardButton("✅ ثبت سفارش", callback_data="order:start")],
     ])
-    try:
-        await query.edit_message_text(
-            f"✅ «{product_name}» به سبد خرید اضافه شد!\n"
-            f"💰 قیمت: {format_price(product_price)}\n\n"
-            f"می‌خوای سبدت رو ببینی یا به خرید ادامه بدی؟",
-            reply_markup=keyboard
-        )
-    except Exception:
-        # Message might be a photo/media without text - send new message
-        await query.message.reply_text(
-            f"✅ «{product_name}» به سبد خرید اضافه شد!\n"
-            f"💰 قیمت: {format_price(product_price)}\n\n"
-            f"می‌خوای سبدت رو ببینی یا به خرید ادامه بدی؟",
-            reply_markup=keyboard
-        )
+    await query.message.reply_text(f"✅ «{product.name}» به سبدت اضافه شد.", reply_markup=keyboard)
 
 
 @require_active_subscription

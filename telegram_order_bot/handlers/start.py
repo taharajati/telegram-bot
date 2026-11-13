@@ -7,7 +7,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
 import config
 from database.db import async_session
-from database.models import Shop, User, Product, ProductImage
+from sqlalchemy import select
+from database.models import Category, Shop, User, Product, ProductImage
 from utils.helpers import format_price, is_super_admin
 from utils.tenant import (
     ensure_shop_exists,
@@ -54,7 +55,7 @@ def _shop_menu_text(first_name: str, shop: Shop) -> str:
         parts.append(f"{shop.description}\n\n")
     parts.append(
         "از منوی پایین می‌تونی محصولات رو ببینی، به سبدت اضافه کنی، سفارش ثبت کنی و وضعیت سفارش‌های قبلیت رو پیگیری کنی.\n\n"
-        "سوالی داشتی؟ از دکمه «☎️ پشتیبانی» بپرس."
+        "سوالی داشتی؟ از «💬 پرسش از فروشنده» بپرس."
     )
     return "".join(parts)
 
@@ -62,11 +63,9 @@ def _shop_menu_text(first_name: str, shop: Shop) -> str:
 def _shop_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🛍 مشاهده محصولات", callback_data="cat:list")],
-        [InlineKeyboardButton("🛒 سبد خرید", callback_data="cart:view")],
-        [InlineKeyboardButton("📦 سفارش‌های من", callback_data="order:history")],
-        [InlineKeyboardButton("💬 پیام به فروشنده", callback_data="support:seller")],
-        [InlineKeyboardButton("☎️ پشتیبانی", callback_data="support:open")],
-        [InlineKeyboardButton("🏪 پنل فروشنده", callback_data="seller:panel_back")],
+        [InlineKeyboardButton("🛒 سبد خرید", callback_data="cart:view"), InlineKeyboardButton("📦 سفارش‌های من", callback_data="order:history")],
+        [InlineKeyboardButton("🔍 جستجو", callback_data="search:ask"), InlineKeyboardButton("❤️ علاقه‌مندی‌ها", callback_data="wishlist:view")],
+        [InlineKeyboardButton("💬 پرسش از فروشنده", callback_data="support:seller"), InlineKeyboardButton("🆘 پشتیبانی فروشگرام", callback_data="support:open")],
     ])
 
 
@@ -78,7 +77,7 @@ def _last_shop_keyboard(shop: Shop, bot_username: str = None) -> InlineKeyboardM
             callback_data=f"nav:main",  # will redirect to last_shop's menu
         )],
         [InlineKeyboardButton("🏪 می‌خوام فروشگاه بسازم", callback_data="seller_reg:start")],
-        [InlineKeyboardButton("ℹ️ درباره فروشگرام", callback_data="noop")],
+        [InlineKeyboardButton("ℹ️ درباره فروشگرام", callback_data="about")],
     ])
 
 
@@ -196,70 +195,66 @@ async def open_shop_from_recent(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ─── Shop deeplink handler ──────────────────────────────────────
 
+async def _open_shop_for_link(update: Update, shop_id: int) -> bool:
+    """لینک مستقیم محصول/دسته: فروشگاه باید فعال باشه، کاربر ثبت و روی همون فروشگاه می‌شینه."""
+    async with async_session() as session:
+        shop = await session.get(Shop, shop_id)
+    if not shop or not shop.is_active or shop.status != "active":
+        await update.message.reply_text(
+            "این فروشگاه فعلاً غیرفعاله. کمی بعد دوباره امتحان کن 🙏",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 شروع", callback_data="nav:main")]]),
+        )
+        return False
+    await register_user(update.effective_user, shop_id)
+    await _record_shop_visit(update.effective_user.id, shop_id)
+    return True
+
+
 async def _handle_product_deeplink(update: Update, context: ContextTypes.DEFAULT_TYPE, product_id: int) -> bool:
-    """Handle /start with product_XXX param. Returns True if handled."""
+    """/start product_N — صفحه‌ی خود محصول (عکس + قیمت + افزودن به سبد). True یعنی رسیدگی شد."""
+    from handlers.menu import load_product_screen, send_product_screen
+
     async with async_session() as session:
         product = await session.get(Product, product_id)
-        if not product or not product.is_active:
-            await update.message.reply_text("❌ این محصول دیگه موجود نیست (احتمالاً فروشنده حذفش کرده یا موجودیش تموم شده). برو سراغ بقیه محصولات فروشگاه 👇")
-            return True
-
-        shop = await session.get(Shop, product.shop_id)
-        if not shop or not shop.is_active or shop.status != "active":
-            await update.message.reply_text("❌ این فروشگاه فعلاً غیرفعاله و امکان مشاهده‌ش نیست. لطفاً بعداً دوباره سر بزن.")
-            return True
-
-        shop_name = shop.name
-        await register_user(update.effective_user, product.shop_id)
-        u = await session.get(User, update.effective_user.id)
-        if u:
-            u.current_shop_id = product.shop_id
-            await session.commit()
-
-        # Load all gallery images too
-        imgs = await session.execute(
-            select(ProductImage).where(ProductImage.product_id == product_id).order_by(ProductImage.sort_order)
+    if not product or not product.is_active:
+        await update.message.reply_text(
+            "این محصول دیگه نیست. بقیه‌ی محصولات فروشگاه رو ببین 👇",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛍 مشاهده محصولات", callback_data="cat:list")]]),
         )
-        extra_images = imgs.scalars().all()
+        return True
+    if not await _open_shop_for_link(update, product.shop_id):
+        return True
 
-    stock_line = "✅ موجود" if product.available_stock > 0 else "❌ ناموجود"
-    text = (
-        f"🏷 {product.name}\n\n"
-        f"{product.description or 'فروشنده هنوز توضیحی برای این محصول ننوشته'}\n\n"
-        f"💰 قیمت: {format_price(product.price)}\n"
-        f"📦 وضعیت: {stock_line}\n"
-        f"🛍 فروشگاه: {shop_name}"
-    )
-    rows = []
-    if product.available_stock > 0:
-        rows.append([InlineKeyboardButton("➕ افزودن به سبد خرید", callback_data=f"cart:add:{product.id}")])
-    rows.append([InlineKeyboardButton("🔙 بازگشت به فروشگاه", callback_data="nav:main")])
-    keyboard = InlineKeyboardMarkup(rows)
+    screen = await load_product_screen(product_id, update.effective_user.id, product.category_id, 0)
+    if not screen:
+        return False
+    await send_product_screen(context.bot, update.effective_chat.id, screen)
 
-    # ── Build full image list (main + gallery) ──
-    image_ids = []
-    if product.image_file_id:
-        image_ids.append(product.image_file_id)
-    for img in extra_images:
-        image_ids.append(img.file_id)
-
-    if image_ids:
-        media_group = [
-            InputMediaPhoto(media=image_ids[0], caption=text, parse_mode=None)
-        ]
-        for fid in image_ids[1:10]:
-            media_group.append(InputMediaPhoto(media=fid))
-        await update.message.reply_media_group(media=media_group)
-        # Buttons in a separate message (media groups can't carry reply_markup)
-        await update.message.reply_text("⬇️ گزینه‌های محصول:", reply_markup=keyboard)
-    else:
-        await update.message.reply_text(text, reply_markup=keyboard)
-
-    # اگر فروشنده/ادمین لینک محصول خودش رو زده → بره به پنل
+    # فروشنده‌ای که لینک محصول خودش رو می‌زنه، پنل رو هم می‌بینه
     owner_shop_id = await get_owner_shop_id(update.effective_user.id)
     if (is_super_admin(update.effective_user.id) or owner_shop_id) and product.shop_id == owner_shop_id:
         from handlers.admin.panel import admin_command
         await admin_command(update, context)
+    return True
+
+
+async def _handle_category_deeplink(update: Update, context: ContextTypes.DEFAULT_TYPE, category_id: int) -> bool:
+    """/start category_N — لیست محصولات همون دسته. True یعنی رسیدگی شد."""
+    from handlers.menu import build_products_view
+
+    async with async_session() as session:
+        category = await session.get(Category, category_id)
+    if not category:
+        await update.message.reply_text(
+            "این دسته دیگه نیست.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 شروع", callback_data="nav:main")]]),
+        )
+        return True
+    if not await _open_shop_for_link(update, category.shop_id):
+        return True
+
+    text, keyboard = await build_products_view(category.shop_id, category_id, 0, update.effective_user.id, context.user_data)
+    await update.message.reply_text(text, reply_markup=keyboard)
     return True
 
 

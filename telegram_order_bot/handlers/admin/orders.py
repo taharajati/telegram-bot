@@ -12,44 +12,40 @@ from database.db import async_session
 from database.models import ORDER_STATUS_LABELS, Order, OrderStatus, ALLOWED_TRANSITIONS
 from services import payment as payment_svc
 from services.order_service import transition_order
-from utils.helpers import format_price, to_jalali, notify_shop_owner
+from utils.helpers import format_price, to_jalali, notify_shop_owner, history_line, to_persian_digits
 from utils.order_validator import can_transition, get_allowed_targets
-from utils.tg_helpers import get_current_shop_id, render_view
+from utils.tg_helpers import escape_html, get_current_shop_id, render_view
 from handlers.admin.panel import admin_only, _get_shop_id_for_admin
 
 ORDERS_PER_PAGE = 8
 
 
 def _order_detail_text(order: Order) -> str:
+    pay = {"card_to_card": "💳 کارت به کارت", "online": "💳 آنلاین"}.get(order.payment_method, "🚚 درب منزل")
+    paid = {"paid": "✅ پرداخت شده", "pending": "⏳ منتظر پرداخت", "pending_review": "🔎 رسید رسیده، منتظر تایید تو"}.get(order.payment_status_view, "—")
     lines = [
-        f"🧾 سفارش #{order.tracking_code}",
+        f"🧾 سفارش <code>{order.tracking_code}</code>",
         f"وضعیت: {ORDER_STATUS_LABELS[order.status]}",
-        f"💳 روش پرداخت: {'💳 آنلاین' if order.payment_method == 'online' else '💳 کارت به کارت' if order.payment_method == 'card_to_card' else '🚚 درب منزل'}",
-        f"💲 وضعیت پرداخت: {'✅ پرداخت شده' if order.payment_status_view == 'paid' else '⏳ در انتظار' if order.payment_status_view == 'pending' else '🔄 در انتظار بررسی' if order.payment_status_view == 'pending_review' else '—'}",
-        f"👤 گیرنده: {order.receiver_name}",
-        f"📞 تماس: {order.phone}",
-        f"📍 آدرس: {order.shipping_address}",
-        f"🏪 فروشگاه: #{order.shop_id}",
-        f"🕒 تاریخ ثبت: {to_jalali(order.created_at)}",
+        f"{pay} · {paid}",
         "",
-        "اقلام سفارش:",
+        f"👤 {escape_html(order.receiver_name)} — {to_persian_digits(order.phone)}",
+        f"📍 {escape_html(order.shipping_address)}",
     ]
+    if order.customer_notes:
+        lines.append(f"✏️ {escape_html(order.customer_notes)}")
+    lines += ["", "اقلام:"]
     for item in order.items:
-        lines.append(f"• {item.product_name} × {item.quantity} = {format_price(item.unit_price * item.quantity)}")
-    lines.append(f"\n💰 جمع کل: {format_price(order.total_price)}")
+        lines.append(f"• {escape_html(item.product_name)} × {to_persian_digits(item.quantity)} = {format_price(item.unit_price * item.quantity)}")
+    lines.append(f"\n💰 جمع کل: <b>{format_price(order.total_price)}</b>")
+    lines.append(f"🕒 {to_jalali(order.created_at)}")
 
-    # کد رهگیری
     if order.tracking_number:
-        lines.append(f"\n📮 <b>کد رهگیری پستی:</b> <code>{order.tracking_number}</code>")
+        lines.append(f"\n📮 کد رهگیری پستی: <code>{escape_html(order.tracking_number)}</code>")
 
     history = order.get_status_history()
     if history:
-        lines.append("\n📜 تاریخچه وضعیت:")
-        for h in history:
-            ts = h.changed_at.strftime("%Y-%m-%d %H:%M") if h.changed_at else ""
-            meta = h.get_meta()
-            reason = f" — {meta.get('reason', '')}" if meta.get('reason') else ""
-            lines.append(f"  • {ts} — {h.status} (توسط {h.changed_by}){reason}")
+        lines.append("\n📜 تاریخچه:")
+        lines += [history_line(h) for h in history]
 
     return "\n".join(lines)
 
@@ -58,13 +54,8 @@ def order_detail_keyboard(order: Order, back_target: str, actor: str = "admin") 
     rows = []
     allowed = get_allowed_targets(order, actor)
 
-    # ── paid / confirmed / preparing → (tracking number) → shipped ──
+    # ── paid / confirmed / preparing → shipped (کد رهگیری اختیاریه و نوشتنش خودش ارسال می‌کنه) ──
     if order.status in (OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING):
-        if order.status != OrderStatus.PREPARING:
-            rows.append([InlineKeyboardButton(
-                "📦 در حال آماده‌سازی (اختیاری)",
-                callback_data=f"admin:orders:status:{order.id}:preparing",
-            )])
         if order.tracking_number:
             # Already has tracking → show ship button
             rows.append([InlineKeyboardButton(
@@ -78,11 +69,11 @@ def order_detail_keyboard(order: Order, back_target: str, actor: str = "admin") 
         else:
             # No tracking yet → offer both options
             rows.append([InlineKeyboardButton(
-                "📮 ثبت کد رهگیری (اختیاری)",
+                "📮 ارسال با کد رهگیری",
                 callback_data=f"admin:orders:tracking:{order.id}",
             )])
             rows.append([InlineKeyboardButton(
-                "🚚 ارسال (بدون کد رهگیری)",
+                "🚚 ارسال شد (بدون کد رهگیری)",
                 callback_data=f"admin:orders:status:{order.id}:shipped",
             )])
 
@@ -194,8 +185,8 @@ async def ask_tracking_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             context.user_data["existing_tracking"] = None
 
     await query.edit_message_text(
-        "📮 کد رهگیری پستی رو وارد کن:\n\n"
-        "(مثال: 1234567890)\n\n"
+        "📮 کد رهگیری پستی رو بفرست.\n"
+        "به‌محض فرستادنش سفارش «ارسال شد» می‌شه و مشتری باخبر می‌شه.\n\n"
         "برای انصراف: /cancel",
         parse_mode="HTML",
     )
@@ -219,25 +210,16 @@ async def save_tracking_number(update: Update, context: ContextTypes.DEFAULT_TYP
         order.tracking_number = tracking
         await session.commit()
 
-    # Notify customer
-    try:
-        tracking_text = (
-            f"📮 <b>کد رهگیری سفارش #{order.tracking_code} ثبت شد</b>\n\n"
-            f"کد رهگیری: <code>{tracking}</code>\n\n"
-            f"از طریق سایت پست می‌تونید وضعیت مرسوله رو پیگیری کنید.\n\n"
-            f"وقتی بسته به دستتون رسید، روی دکمه زیر بزنید تا فروشنده مطلع بشه 👇"
-        )
-        confirm_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📦 بسته به دستم رسید ✅", callback_data=f"customer:confirm_delivery:{order.id}")]
-        ])
-        await context.bot.send_message(
-            chat_id=order.user_id,
-            text=tracking_text,
-            parse_mode="HTML",
-            reply_markup=confirm_keyboard,
-        )
-    except Exception:
-        pass
+    # کد رهگیری ثبت شد → سفارش ارسال می‌شه و مشتری یک‌جا باخبر می‌شه
+    shipped_now = False
+    if order.status in (OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING):
+        try:
+            order = await transition_order(order_id, OrderStatus.SHIPPED, actor="admin", bot=context.bot)
+            shipped_now = True
+        except ValueError:
+            pass
+    if shipped_now or order.status == OrderStatus.SHIPPED:
+        await notify_customer_shipped(context.bot, order)
 
     # Show updated order view
     async with async_session() as session:
@@ -246,7 +228,8 @@ async def save_tracking_number(update: Update, context: ContextTypes.DEFAULT_TYP
             await session.refresh(order, attribute_names=["items", "histories"])
         back_keyboard = order_detail_keyboard(order, "admin:orders:pending:0")
         await update.message.reply_text(
-            f"✅ کد رهگیری <code>{tracking}</code> برای سفارش #{order.tracking_code} ثبت شد.",
+            f"✅ سفارش <code>{order.tracking_code}</code> ارسال شد و مشتری باخبر شد.\n📮 کد رهگیری: <code>{escape_html(tracking)}</code>"
+            if shipped_now else f"✅ کد رهگیری <code>{escape_html(tracking)}</code> برای سفارش {order.tracking_code} ثبت شد.",
             parse_mode="HTML",
             reply_markup=back_keyboard,
         )
@@ -370,24 +353,7 @@ async def change_order_status(update: Update, context: ContextTypes.DEFAULT_TYPE
     # ── Notify customer ──
     try:
         if new_status == OrderStatus.SHIPPED:
-            # Shipped notification with delivery confirm button
-            text = (
-                f"📦 <b>سفارش #{tracking_code} ارسال شد!</b>\n\n"
-                f"وضعیت: {status_label}\n"
-            )
-            if order.tracking_number:
-                text += f"📮 کد رهگیری: <code>{order.tracking_number}</code>\n\n"
-            text += "\nوقتی بسته به دستتون رسید، روی دکمه زیر بزنید 👇"
-
-            confirm_keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📦 بسته به دستم رسید ✅", callback_data=f"customer:confirm_delivery:{order.id}")]
-            ])
-            await context.bot.send_message(
-                chat_id=customer_id,
-                text=text,
-                parse_mode="HTML",
-                reply_markup=confirm_keyboard,
-            )
+            await notify_customer_shipped(context.bot, order)
         elif new_status == OrderStatus.DELIVERED:
             await context.bot.send_message(
                 chat_id=customer_id,
@@ -448,6 +414,23 @@ async def customer_confirm_delivery(update: Update, context: ContextTypes.DEFAUL
         f"برای خرید بعدی: /start",
         parse_mode="HTML",
     )
+
+
+async def notify_customer_shipped(bot, order: Order) -> None:
+    """به مشتری خبر می‌ده سفارشش ارسال شد (با کد رهگیری و دکمه‌ی «بسته رسید»)."""
+    text = f"📦 <b>سفارشت ارسال شد!</b>\nکد سفارش: <code>{order.tracking_code}</code>\n"
+    if order.tracking_number:
+        text += f"📮 کد رهگیری پست: <code>{escape_html(order.tracking_number)}</code>\n(با همین کد از سایت پست پیگیری کن)\n"
+    text += "\nوقتی بسته دستت رسید، دکمه‌ی زیر رو بزن 👇"
+    try:
+        await bot.send_message(
+            chat_id=order.user_id, text=text, parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📦 بسته دستم رسید ✅", callback_data=f"customer:confirm_delivery:{order.id}")]
+            ]),
+        )
+    except Exception:
+        pass
 
 
 async def notify_seller_delivered(bot, order: Order) -> None:

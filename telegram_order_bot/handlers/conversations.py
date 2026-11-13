@@ -247,6 +247,8 @@ async def save_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     bot=context.bot,
                     shop_id=conv.shop_id,
                     message_text=text[:200],
+                    conv_id=conv_id,
+                    buyer_name=update.effective_user.first_name or "",
                 )
             )
         elif shop:

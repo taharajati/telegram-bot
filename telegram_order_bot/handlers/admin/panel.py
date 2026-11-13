@@ -227,7 +227,9 @@ async def _seller_dashboard(session, shop_id: int) -> str:
     """Generate seller dashboard text with rich stats."""
 
     # ── Today ──
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # شروع «امروز» به وقت تهران (UTC+3:30)، نه نیمه‌شب UTC که ۰۳:۳۰ صبحه
+    tehran_offset = timedelta(hours=3, minutes=30)
+    today_start = (datetime.utcnow() + tehran_offset).replace(hour=0, minute=0, second=0, microsecond=0) - tehran_offset
     today_count = (await session.execute(
         select(func.count(Order.id)).where(
             Order.shop_id == shop_id,
@@ -238,7 +240,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         select(func.coalesce(func.sum(Order.total_price), 0)).where(
             Order.shop_id == shop_id,
             Order.created_at >= today_start,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
         )
     )).scalar() or 0
 
@@ -254,7 +256,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         select(func.coalesce(func.sum(Order.total_price), 0)).where(
             Order.shop_id == shop_id,
             Order.created_at >= week_start,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
         )
     )).scalar() or 0
 
@@ -270,7 +272,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         select(func.coalesce(func.sum(Order.total_price), 0)).where(
             Order.shop_id == shop_id,
             Order.created_at >= month_start,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
         )
     )).scalar() or 0
 
@@ -284,7 +286,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         .join(Order, OrderItem.order_id == Order.id)
         .where(
             Order.shop_id == shop_id,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
             Order.created_at >= month_start,
         )
         .group_by(OrderItem.product_name)
@@ -304,7 +306,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         .join(Order, OrderItem.order_id == Order.id)
         .where(
             Order.shop_id == shop_id,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
             Order.created_at >= month_start,
         )
         .group_by(OrderItem.product_name)
@@ -336,7 +338,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         select(func.coalesce(func.avg(Order.total_price), 0)).where(
             Order.shop_id == shop_id,
             Order.created_at >= month_start,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
         )
     )).scalar() or 0
 
@@ -345,7 +347,7 @@ async def _seller_dashboard(session, shop_id: int) -> str:
         select(func.count(Order.id)).where(
             Order.shop_id == shop_id,
             Order.created_at >= month_start,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+            Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
         )
     )).scalar() or 0
     conversion = (completed_count / month_count * 100) if month_count > 0 else 0
@@ -404,7 +406,7 @@ async def admin_top_products(update: Update, context: ContextTypes.DEFAULT_TYPE)
             base = base.where(Order.shop_id == shop_id)
         rows = await session.execute(
             base.where(
-                Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+                Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
                 Order.created_at >= thirty_days_ago,
             )
             .group_by(func.coalesce(OrderItem.product_id, -1), OrderItem.product_name)
@@ -452,7 +454,7 @@ async def admin_weekly_sales(update: Update, context: ContextTypes.DEFAULT_TYPE)
             base = base.where(Order.shop_id == shop_id)
         rows = await session.execute(
             base.where(
-                Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+                Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
                 Order.created_at >= seven_days_ago,
             )
             .group_by(func.date(Order.created_at))

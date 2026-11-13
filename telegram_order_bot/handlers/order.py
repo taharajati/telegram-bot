@@ -34,7 +34,7 @@ from database.models import (
 )
 from services import payment as payment_svc
 from services.order_service import create_order_from_cart, attach_card_receipt, cancel_order_and_release_stock, CustomerInfo, transition_order
-from utils.helpers import format_price, generate_tracking_code, notify_shop_owner, to_jalali
+from utils.helpers import format_price, generate_tracking_code, notify_shop_owner, to_jalali, to_persian_digits, history_line, short_price
 from utils.crypto import safe_decrypt
 from handlers.subscription_decorator import require_active_subscription
 from utils.order_validator import can_transition
@@ -42,6 +42,8 @@ from utils.payment_config import get_enabled_payment_methods, get_payment_method
 from utils.tg_helpers import get_current_shop_id, get_current_shop, render_view, escape_html
 
 logger = logging.getLogger(__name__)
+
+_ALL_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 ASK_NAME, ASK_PHONE, ASK_ADDRESS, ASK_NOTES, ASK_PAYMENT_METHOD, CONFIRM, ASK_CARD_RECEIPT, ASK_DISCOUNT = range(8)
 
@@ -220,9 +222,8 @@ async def start_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ASK_NAME  # will be redirected by callback pattern
 
     await render_view(query, context,
-        "برای ثبت سفارش، لطفاً نام و نام خانوادگی گیرنده رو وارد کن:\n\n"
-        "(هر لحظه با /cancel می‌تونی لغو کنی)",
-        None,
+        "📝 ثبت سفارش، قدم ۱ از ۴\n\nاسم و فامیل گیرنده رو بنویس:",
+        InlineKeyboardMarkup([[InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")]]),
     )
     return ASK_NAME
 
@@ -245,11 +246,14 @@ async def _handle_checkout_saved(update: Update, context: ContextTypes.DEFAULT_T
 
 async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
-    if len(name) < 3 or any(c.isdigit() for c in name):
-        await update.message.reply_text("لطفاً نام معتبر وارد کن (فقط حروف، حداقل ۳ کاراکتر):")
+    if len(name) < 2 or len(name) > 80:
+        await update.message.reply_text("اسم رو با حروف بنویس (حداقل ۲ حرف):", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")]]))
         return ASK_NAME
     context.user_data["order_name"] = name
-    await update.message.reply_text("شماره تماس رو وارد کن (مثال: 09123456789):")
+    await update.message.reply_text(
+        "📞 قدم ۲ از ۴\n\nشماره موبایلت رو بنویس (مثلاً ۰۹۱۲۳۴۵۶۷۸۹):",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")]]),
+    )
     return ASK_PHONE
 
 
@@ -258,17 +262,20 @@ async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Convert Persian digits first, then validate
     phone = phone.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
     if not PHONE_PATTERN.match(phone):
-        await update.message.reply_text("شماره وارد شده معتبر نیست. دوباره امتحان کن (مثال: 09123456789):")
+        await update.message.reply_text("شماره درست نیست. مثلاً ۰۹۱۲۳۴۵۶۷۸۹ رو بفرست:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")]]))
         return ASK_PHONE
     context.user_data["order_phone"] = phone
-    await update.message.reply_text("آدرس کامل ارسال رو وارد کن:")
+    await update.message.reply_text(
+        "📍 قدم ۳ از ۴\n\nآدرس کامل رو بنویس (شهر، خیابان، پلاک، کد پستی):",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")]]),
+    )
     return ASK_ADDRESS
 
 
 async def ask_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     address = update.message.text.strip()
     if len(address) < 10:
-        await update.message.reply_text("لطفاً آدرس کامل‌تری وارد کن (خیابان، محله، شهر — حداقل ۱۰ حرف):")
+        await update.message.reply_text("آدرس کامل‌تر بنویس (شهر، خیابان، پلاک — حداقل ۱۰ حرف):", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")]]))
         return ASK_ADDRESS
     context.user_data["order_address"] = address
     # ذخیره آدرس برای استفاده بعدی
@@ -280,9 +287,11 @@ async def ask_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Ask for optional notes (color, size, etc.)
     await update.message.reply_text(
-        "✏️ توضیحات اضافی (اختیاری):\n\n"
-        "اگه نکته خاصی مثل رنگ، سایز، یا هر توضیح دیگه‌ای داری اینجا بنویس.\n"
-        "اگه نمی‌خوای چیزی بنویسی، یه خط بزن «نخواهم»:"
+        "✏️ قدم ۴ از ۴\n\nتوضیح خاصی داری؟ مثلاً سایز یا رنگ. بنویس، یا «ندارم» رو بزن.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⏭ ندارم", callback_data="order:skip_notes")],
+            [InlineKeyboardButton("❌ انصراف", callback_data="order:cancel")],
+        ]),
     )
     return ASK_NOTES
 
@@ -290,10 +299,21 @@ async def ask_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Receive optional order notes, then go to card summary."""
     text = update.message.text.strip()
-    if text and text not in ("نخواهم", "نمیخواهم", "نه", "no", "No"):
-        context.user_data["order_notes"] = text
+    if text and text not in ("نخواهم", "نمیخواهم", "ندارم", "نه", "no", "No", "-"):
+        notes = text
     else:
-        context.user_data["order_notes"] = ""
+        notes = ""
+    return await _finish_notes(update, context, update.message, notes)
+
+
+async def skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دکمه‌ی «ندارم» توی مرحله‌ی توضیحات."""
+    await update.callback_query.answer()
+    return await _finish_notes(update, context, update.callback_query.message, "")
+
+
+async def _finish_notes(update: Update, context: ContextTypes.DEFAULT_TYPE, message, notes: str):
+    context.user_data["order_notes"] = notes
 
     # Only card_to_card is available — skip selection, go straight to summary
     shop_id = context.user_data.get("checkout_shop_id") or await get_current_shop_id(update)
@@ -301,9 +321,11 @@ async def ask_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with async_session() as session:
         shop = await session.get(Shop, shop_id) if shop_id else None
         if not shop or not shop.card_number:
-            await update.message.reply_text("❌ این فروشگاه هنوز اطلاعات کارت بانکی ثبت نکرده.")
+            await message.reply_text("این فروشگاه هنوز اطلاعات پرداختش رو کامل نکرده. کمی بعد دوباره امتحان کن 🙏")
             return ConversationHandler.END
-    return await _start_card_to_card_flow(update, context, shop)
+    from types import SimpleNamespace
+    return await _start_card_to_card_flow(
+        SimpleNamespace(message=message, effective_user=update.effective_user), context, shop)
 
 
 async def _show_payment_method_selection(update_or_query, context) -> int | None:
@@ -399,12 +421,12 @@ async def _start_card_to_card_flow(update_or_query, context, shop):
         total = max(0, total - discount_amount)
 
     lines = [
-        "📋 خلاصه سفارش (پیش‌نویس)\n",
-        *[f"• {it.product.name} × {it.quantity} = {format_price(it.product.price * it.quantity)}" for it in cart_items],
-        f"\n👤 گیرنده: {customer_info.receiver_name}",
-        f"📞 تماس: {customer_info.phone}",
-        f"📍 آدرس: {customer_info.shipping_address}",
-        f"💳 روش پرداخت: 🧾 کارت به کارت",
+        "📋 خلاصه سفارش\n",
+        *[f"• {escape_html(it.product.name)} × {to_persian_digits(it.quantity)} = {format_price(it.product.price * it.quantity)}" for it in cart_items],
+        f"\n👤 گیرنده: {escape_html(customer_info.receiver_name)}",
+        f"📞 تماس: {to_persian_digits(customer_info.phone)}",
+        f"📍 آدرس: {escape_html(customer_info.shipping_address)}",
+        f"🏪 فروشگاه: {escape_html(shop.name)}" + (f" — تماس: {to_persian_digits(shop.phone)}" if shop.phone else ""),
     ]
     if shipping_cost > 0:
         lines.append(f"\n📦 جمع کالاها: {format_price(subtotal)}")
@@ -415,7 +437,7 @@ async def _start_card_to_card_flow(update_or_query, context, shop):
         lines.append("─────────────")
     notes = context.user_data.get("order_notes", "")
     if notes:
-        lines.append(f"✏️ توضیحات: {notes}")
+        lines.append(f"✏️ توضیحات: {escape_html(notes)}")
     lines.append(f"\n💰 مبلغ قابل پرداخت: {format_price(total)}")
 
     rows = [
@@ -496,7 +518,7 @@ async def confirm_card_payment(update: Update, context: ContextTypes.DEFAULT_TYP
             discount_amount=context.user_data.get("discount_amount", 0),
         )
     except ValueError as e:
-        await query.edit_message_text(f"❌ {e}")
+        await query.edit_message_text(f"❌ {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 برگشت به سبد", callback_data="cart:view")]]))
         return ConversationHandler.END
     
     order = result.order
@@ -512,17 +534,14 @@ async def confirm_card_payment(update: Update, context: ContextTypes.DEFAULT_TYP
     holder_display = safe_decrypt(shop.card_holder_name) or ""
     
     text = (
-        f"✅ موجودی رزرو شد!\n"
-        f"⏰ ۱۵ دقیقه فرصت دارید پرداخت کنید.\n\n"
-        f"🧾 پرداخت کارت به کارت\n\n"
-        f"شماره کارت: {card_display}\n"
-        f"به نام: {holder_display or 'صاحب حساب'}\n\n"
-        f"📦 کد پیگیری: {tracking_code}\n"
-        f"💰 مبلغ: {format_price(total_price)}\n\n"
-        f"⚠️ لطفاً کد پیگیری {tracking_code} رو حتماً\n"
-        f"در قسمت «توضیحات» انتقال بنویسید تا فروشنده\n"
-        f"سریع‌تر پرداختتون رو تایید کنه.\n\n"
-        f"بعد از واریز، می‌تونی عکس رسید یا شماره تراکنش رو بفرستی 👇"
+        f"✅ موجودی برات رزرو شد. ⏰ {to_persian_digits(payment_svc.CARD_PAYMENT_MINUTES)} دقیقه وقت داری.\n\n"
+        f"💳 مبلغ رو به این کارت واریز کن (روی عدد بزن تا کپی بشه):\n"
+        f"<code>{card_display}</code>\n"
+        f"به نام: <b>{escape_html(holder_display) or 'صاحب حساب'}</b>\n\n"
+        f"💰 مبلغ: <b>{format_price(total_price)}</b>\n"
+        f"برای کپی: <code>{int(total_price)}</code>\n\n"
+        f"📦 کد پیگیری سفارش: <code>{tracking_code}</code>\n\n"
+        f"بعد از واریز، عکس رسید یا شماره‌ی پیگیری تراکنش رو همین‌جا بفرست 👇"
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("❌ انصراف", callback_data=f"order:pay_cancel:{order.id}")]
@@ -555,11 +574,10 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
             file_id = photo.file_id
         elif receipt_text:
             # Text receipt — validate it looks like a transaction number
-            if len(receipt_text) < 4 or len(receipt_text) > 100:
+            if len(receipt_text) < 4 or len(receipt_text) > 100 or not any(c.isdigit() for c in receipt_text.translate(_ALL_DIGITS)):
                 await update.message.reply_text(
-                    "❌ شماره تراکنش معتبر نیست.\n"
-                    "می‌تونی عکس رسید بفرستی یا شماره تراکنش (حداقل ۴ رقم) رو بنویسی 👇",
-                    parse_mode="HTML"
+                    "این شبیه شماره‌ی پیگیری نیست.\n"
+                    "عکس رسید رو بفرست یا شماره‌ی پیگیری تراکنش (حداقل ۴ رقم) رو بنویس 👇"
                 )
                 return ASK_CARD_RECEIPT
 
@@ -581,7 +599,7 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
         except ValueError as e:
             error_msg = str(e)
-            await update.message.reply_text(f"❌ {error_msg}", parse_mode="HTML")
+            await update.message.reply_text(error_msg, reply_markup=_NAV_KB)
             # If duplicate receipt, let user try again
             if "قبلاً" in error_msg:
                 return ASK_CARD_RECEIPT
@@ -708,7 +726,7 @@ async def _show_order_summary(update_or_query, context) -> int:
         lines.append("─────────────")
     notes = context.user_data.get("order_notes", "")
     if notes:
-        lines.append(f"✏️ توضیحات: {notes}")
+        lines.append(f"✏️ توضیحات: {escape_html(notes)}")
     lines.append(f"\n💰 مبلغ قابل پرداخت: {format_price(total)}")
 
     rows = [
@@ -757,7 +775,7 @@ async def _validate_and_apply_discount(
         # Calculate discount
         subtotal, shipping_cost, total = await _calculate_order_total(session, user_id, shop_id)
         if total < (dc.min_order_amount or 0):
-            return f"❌ حداقل مبلغ سفارش برای این کد {format_price(dc.min_order_amount)} تومان است.", 0
+            return f"حداقل مبلغ سفارش برای این کد {format_price(dc.min_order_amount)} هست.", 0
 
         if dc.discount_type == "percent":
             amount = int(total * dc.discount_value / 100)
@@ -811,7 +829,7 @@ async def receive_discount(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Return to summary with discount applied
     await update.message.reply_text(
-        f"✅ کد تخفیف {code.upper().strip()} با موفقیت اعمال شد! {format_price(amount)} تومان از مبلغت کم شد 🎉",
+        f"✅ کد تخفیف {code.upper().strip()} اعمال شد! {format_price(amount)} از مبلغت کم شد 🎉",
         parse_mode="HTML",
     )
 
@@ -867,7 +885,7 @@ async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
             discount_amount=context.user_data.get("discount_amount", 0),
         )
     except ValueError as e:
-        await query.edit_message_text(f"❌ {e}")
+        await query.edit_message_text(f"❌ {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 برگشت به سبد", callback_data="cart:view")]]))
         return ConversationHandler.END
 
     order = result.order
@@ -925,44 +943,31 @@ async def cancel_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─── Seller Approval: Card-to-Card Receipt ────────────────
 
 async def _notify_seller_receipt(context, order_id: int, shop_id: int, tracking: str, total: float, file_id: str | None = None, receipt_text: str | None = None):
-    """Send receipt (photo or text) to shop owner with approve/reject buttons."""
-    # Get order items and customer info for shipping breakdown
+    """رسید (عکس یا شماره‌ی پیگیری) رو با اقلام سفارش و دکمه‌های تایید/رد برای فروشنده می‌فرسته."""
     async with async_session() as session:
         order = await session.get(Order, order_id)
-        shop = await session.get(Shop, shop_id)
-        shipping_cost = shop.shipping_cost or 0.0 if shop else 0.0
-        result = await session.execute(
-            select(OrderItem).where(OrderItem.order_id == order_id)
-        )
-        order_items = result.scalars().all()
-        subtotal = sum(item.unit_price * item.quantity for item in order_items) if order_items else 0
+        order_items = (await session.execute(select(OrderItem).where(OrderItem.order_id == order_id))).scalars().all()
 
-    msg = (
-        f"🧾 رسید پرداخت جدید\n\n"
-        f"سفارش: #{tracking}\n"
-    )
-    # Show breakdown if shipping cost applies
-    if total != subtotal:
-        msg += (
-            f"جمع کالاها: {format_price(subtotal)}\n"
-            f"هزینه ارسال: {format_price(total - subtotal)}\n"
-            "─────────────\n"
-        )
-    msg += f"مبلغ قابل پرداخت: {format_price(total)}\n"
-
+    lines = [f"🧾 <b>رسید پرداخت جدید</b> — سفارش <code>{tracking}</code>", ""]
+    for item in order_items[:8]:
+        lines.append(f"• {escape_html(item.product_name)} × {to_persian_digits(item.quantity)}")
+    if len(order_items) > 8:
+        lines.append(f"• … و {to_persian_digits(len(order_items) - 8)} قلم دیگه")
+    subtotal = sum(item.unit_price * item.quantity for item in order_items)
+    if order_items and total != subtotal:
+        lines.append(f"🚚 هزینه ارسال: {format_price(total - subtotal)}")
+    lines += ["", f"💰 مبلغ: <b>{format_price(total)}</b>"]
     if receipt_text:
-        msg += f"🧾 شماره تراکنش: {receipt_text}\n"
-
-    # ── Customer info ──
-    msg += (
-        f"\n👤 {order.receiver_name or '—'}"
-        f"\n📞 {order.phone or '—'}"
-        f"\n📍 {order.shipping_address or '—'}"
-    )
+        lines.append(f"🔢 شماره‌ی پیگیری تراکنش: <code>{escape_html(receipt_text)}</code>")
+    lines += [
+        "",
+        f"👤 {escape_html(order.receiver_name or '—')} — {to_persian_digits(order.phone or '—')}",
+        f"📍 {escape_html((order.shipping_address or '—')[:200])}",
+    ]
     if order.customer_notes:
-        msg += f"\n✏️ توضیحات: {order.customer_notes}"
-
-    msg += "\n\nلطفاً پس از تطبیق مبلغ و رسید، تایید یا رد کنید:"
+        lines.append(f"✏️ {escape_html(order.customer_notes[:150])}")
+    lines += ["", "مبلغ رو با رسید چک کن و تایید یا رد کن 👇"]
+    msg = "\n".join(lines)[:1000]  # کپشن عکس تا ۱۰۲۴ کاراکتر مجازه
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -971,12 +976,13 @@ async def _notify_seller_receipt(context, order_id: int, shop_id: int, tracking:
         ]
     ])
 
-    # Send to shop owner via NotificationService
     ns = get_notification_service(context.bot)
     if file_id:
         await ns.send_photo_to_seller(shop_id, file_id, msg, reply_markup=keyboard)
-    elif receipt_text:
+    else:
         await ns.send_to_seller(shop_id, msg, reply_markup=keyboard)
+
+
 async def seller_approve_card_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """فروشنده دکمه «تایید پرداخت» رو زده."""
     query = update.callback_query
@@ -1070,7 +1076,7 @@ async def seller_submit_reject_reason(update: Update, context: ContextTypes.DEFA
                 order.user_id,
                 text=(
                     "❌ رسید پرداخت شما توسط فروشنده تایید نشد.\n\n"
-                    f"📌 دلیل فروشنده: {reason}\n\n"
+                    f"📌 دلیل فروشنده: {escape_html(reason)}\n\n"
                     "می‌تونی یکی از این گزینه‌ها رو انتخاب کنی:\n"
                     "🔁 آپلود رسید جدید — رسید دیگه‌ای بفرست\n"
                     "🚩 فکر می‌کنم اشتباه شده — درخواست به ادمین ارسال می‌شه\n"
@@ -1398,11 +1404,7 @@ def _order_detail_text_customer(order: Order) -> str:
     history = order.get_status_history()
     if history:
         lines.append("\n📜 تاریخچه وضعیت:")
-        for h in history:
-            ts = h.changed_at.strftime("%Y-%m-%d %H:%M") if h.changed_at else ""
-            meta = h.get_meta()
-            reason = f" — {meta.get('reason', '')}" if meta.get('reason') else ""
-            lines.append(f"  • {ts} — {h.status} (توسط {h.changed_by}){reason}")
+        lines += [history_line(h) for h in history]
 
     # Progress bar
     lines.append(_order_detail_progress_bar(order))
@@ -1439,6 +1441,8 @@ async def order_detail_customer(update: Update, context: ContextTypes.DEFAULT_TY
     rows = []
     if order.status not in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
         rows.append([InlineKeyboardButton("🔄 خرید دوباره", callback_data=f"order:reorder:{order.id}")])
+    if order.status == OrderStatus.PENDING_PAYMENT:
+        rows.insert(0, [InlineKeyboardButton("📤 ارسال رسید پرداخت", callback_data=f"pay:receipt_retry:{order.id}")])
     if config.WIDGETS_ENABLED and order.status not in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
         rows.append([InlineKeyboardButton("📍 رهگیری زنده", callback_data=f"order:track:{order.id}")])
     rows.append([InlineKeyboardButton("💬 پیام به فروشنده", callback_data=f"msg:open_conv:{order.id}")])
@@ -1520,7 +1524,7 @@ async def _order_history_keyboard(orders) -> InlineKeyboardMarkup:
         status_label = ORDER_STATUS_LABELS.get(o.status, o.status)
         rows.append([
             InlineKeyboardButton(
-                f"#{o.tracking_code} — {status_label} — {format_price(o.total_price)}",
+                f"{status_label} · {o.tracking_code} · {short_price(o.total_price)}",
                 callback_data=f"order:detail:{o.id}"
             )
         ])

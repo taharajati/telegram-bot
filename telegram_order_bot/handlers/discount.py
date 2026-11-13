@@ -17,6 +17,7 @@ from telegram.ext import (
 
 from database.db import async_session
 from database.models import DiscountCode
+from utils.helpers import format_price
 from utils.tg_helpers import get_current_shop_id, render_view
 
 ASK_CODE_TYPE, ASK_VALUE, ASK_CODE, ASK_MIN, ASK_USES = range(5)
@@ -165,13 +166,13 @@ async def _ask_uses_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await session.commit()
 
     type_label = "درصدی" if disc_type == "percent" else "مبلغی"
-    value_label = f"{disc_value}٪" if disc_type == "percent" else f"{disc_value:,} تومان"
+    value_label = f"{disc_value}٪" if disc_type == "percent" else format_price(disc_value)
     await update.message.reply_text(
         f"✅ کد تخفیف ساخته شد!\n\n"
         f"🎯 کد: {code}\n"
         f"📊 نوع: {type_label}\n"
         f"💰 مقدار: {value_label}\n"
-        f"📋 حداقل سفارش: {min_amount:,} تومان\n"
+        f"📋 حداقل سفارش: {format_price(min_amount)}\n"
         f"🔢 حداکثر استفاده: {'نامحدود' if max_uses == 0 else max_uses}\n\n"
         f"مشتری‌ها می‌تونن در هنگام پرداخت این کد رو وارد کنن.",
         parse_mode="HTML",

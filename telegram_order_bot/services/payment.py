@@ -3,6 +3,8 @@ Payment service — stock management, card-to-card receipt flow, COD.
 card_to_card + COD remain (Zarinpal removed).
 """
 import logging
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import text, select
@@ -109,7 +111,10 @@ async def cancel_order_with_refund(order_id: int, by: str = "system") -> bool:
     return True
 
 
-async def auto_cancel_unpaid_orders() -> int:
+CARD_PAYMENT_MINUTES = 30  # مهلت واریز بعد از ثبت سفارش (مشتری باید برنامه‌ی بانک رو باز کنه و کارت رو کپی کنه)
+
+
+async def auto_cancel_unpaid_orders(bot=None) -> int:
     """Cron job: cancel orders stuck beyond timeout.
 
     برای هر سفارش با `FOR UPDATE NOWAIT` قفل می‌گیره تا با transition_order
@@ -121,11 +126,12 @@ async def auto_cancel_unpaid_orders() -> int:
     - COD (PENDING): ۳۰ روز — فروشنده تایید نکرده
     - COD (CONFIRMED منتظر ارسال): ۳۰ روز
     """
-    card_timeout_no_receipt = timedelta(minutes=15)
+    card_timeout_no_receipt = timedelta(minutes=CARD_PAYMENT_MINUTES)
     card_timeout_after_receipt = timedelta(hours=48)
     cod_pending_timeout = timedelta(days=30)  # COD سفارش‌های
 
     cancelled = 0
+    notified: list[tuple[int, str]] = []  # (user_id, tracking_code) سفارش‌هایی که بدون رسید لغو شدن
     now = utcnow()  # naive UTC، هم‌نوع با ستون‌های created_at / payment_receipt_at (aware منهای naive خطا می‌ده)
 
     async with async_session() as session:
@@ -144,6 +150,7 @@ async def auto_cancel_unpaid_orders() -> int:
                 else:
                     if now - order.created_at > card_timeout_no_receipt:
                         await _cancel_and_release_in_session(session, order, by="auto_timeout_card_no_receipt")
+                        notified.append((order.user_id, order.tracking_code))
                         cancelled += 1
             elif order.payment_method == "cod":
                 # COD در PENDING_PAYMENT (نادر) — کلاً timeout نداره ولی احتیاطاً
@@ -167,6 +174,17 @@ async def auto_cancel_unpaid_orders() -> int:
         await session.commit()
 
     logger.info(f"auto_cancel_unpaid_orders: {cancelled} سفارش لغو شد")
+    if bot is not None:
+        for user_id, tracking_code in notified:
+            try:
+                await bot.send_message(
+                    user_id,
+                    f"⏰ مهلت پرداخت سفارش {tracking_code} تموم شد و سفارش لغو شد.\n"
+                    "نگران نباش، سبدت سر جاشه. هر وقت آماده بودی دوباره ثبتش کن 🙏",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 سبد خرید", callback_data="cart:view")]]),
+                )
+            except Exception:
+                logger.info("could not notify user %s about the expired order", user_id)
     return cancelled
 
 
@@ -267,10 +285,16 @@ async def retry_card_receipt(order_id: int, file_id: str | None = None, receipt_
                 await session.refresh(order, attribute_names=["items"])
                 for item in order.items:
                     if item.product_id:
-                        await session.execute(
-                            text("UPDATE products SET reserved_stock = reserved_stock + :qty WHERE id = :pid"),
+                        reserved = await session.execute(
+                            text("UPDATE products SET reserved_stock = reserved_stock + :qty "
+                                 "WHERE id = :pid AND stock - reserved_stock >= :qty"),
                             {"qty": item.quantity, "pid": item.product_id},
                         )
+                        if reserved.rowcount == 0:
+                            # موجودی بین لغو و تلاش دوباره جای دیگه‌ای رفته؛ سفارش رو زنده نمی‌کنیم
+                            await session.rollback()
+                            logger.warning(f"retry_card_receipt: موجودی سفارش {order_id} دیگه کافی نیست")
+                            return False
             else:
                 logger.warning(f"retry_card_receipt: سفارش {order_id} در وضعیت {order.status} قابل تغییر نیست")
                 return False

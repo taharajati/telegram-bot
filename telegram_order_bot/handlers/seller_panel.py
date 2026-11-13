@@ -15,9 +15,9 @@ from telegram.ext import (
 
 from database.db import async_session
 from database.models import Admin, Shop, ShopOwner
-from utils.helpers import format_price, is_super_admin, to_jalali
+from utils.helpers import format_price, is_super_admin, to_jalali, to_persian_digits
 from utils.crypto import safe_encrypt, safe_decrypt
-from utils.tg_helpers import get_current_shop_id, render_view
+from utils.tg_helpers import escape_html, get_current_shop_id, render_view
 import config
 from config import WEBSITE_URL
 
@@ -55,54 +55,68 @@ async def _build_seller_panel(user_id: int, bot_username: str = "") -> tuple[str
 
     # Card status (decrypt for display)
     card_decrypted = safe_decrypt(shop.card_number) or ""
-    holder_decrypted = safe_decrypt(shop.card_holder_name) or ""
-    card_display = f"✅ ...{card_decrypted[-4:]}" if card_decrypted else "❌ ثبت نشده"
-    holder_display = f"✅ {holder_decrypted}" if holder_decrypted else "❌ ثبت نشده"
-    shipping_display = format_price(shop.shipping_cost) if shop.shipping_cost else "🆓 رایگان"
-
+    card_line = f"💳 کارت: ...{card_decrypted[-4:]}" if card_decrypted else "⚠️ کارت ثبت نشده (مشتری نمی‌تونه پرداخت کنه)"
     link = f"https://t.me/{bot_username}?start=shop_{shop.id}" if bot_username else ""
 
-    # Subscription status
-    from services.subscription import get_subscription_display
-    sub_text = await get_subscription_display(owner.shop_id, session)
+    # سفارش‌هایی که منتظر اقدام فروشنده‌ان: رسید رسیده یا پرداخت تایید شده ولی هنوز ارسال نشده
+    from database.models import Order, OrderStatus
+    from sqlalchemy import func, or_, and_
+    async with async_session() as session:
+        pending = (await session.execute(
+            select(func.count(Order.id)).where(
+                Order.shop_id == shop.id,
+                or_(
+                    Order.status.in_([OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.PREPARING]),
+                    and_(Order.status == OrderStatus.PENDING_PAYMENT, Order.payment_receipt_at.is_not(None)),
+                ),
+            )
+        )).scalar_one()
+    badge = f" ({to_persian_digits(pending)})" if pending else ""
 
-    text = (
-        f"🏪 {shop.name}\n"
-        f"{shop.description[:80] + '...' if shop.description and len(shop.description) > 80 else (shop.description or '')}\n\n"
-        f"💳 کارت: {card_display} | 👤 صاحب: {holder_display}\n"
-        f"🚚 ارسال: {shipping_display}\n"
-        f"💳 اشتراک: {sub_text}\n\n"
-    )
+    lines = [f"🏪 <b>{escape_html(shop.name)}</b>", ""]
+    lines.append(f"🧾 {to_persian_digits(pending)} سفارش منتظر اقدام تو" if pending else "🧾 سفارش منتظر اقدامی نداری")
+    lines.append(card_line)
+    if not config.FREE_MODE:
+        from services.subscription import get_subscription_display
+        async with async_session() as session:
+            lines.append(f"🎫 اشتراک: {await get_subscription_display(shop.id, session)}")
     if link:
-        text += f"🔗 لینک فروشگاه:\n{link}\n\n"
-    text += "👇 از دکمه‌های زیر مدیریت کن:"
+        lines += ["", f"🔗 لینک فروشگاهت:\n{link}"]
+    text = "\n".join(lines)
 
     buttons = [
-        # ── محصولات و دسته‌بندی‌ها ──
-        [InlineKeyboardButton("🗂 دسته‌بندی‌ها", callback_data="admin:categories")],
-        [InlineKeyboardButton("📦 محصولات", callback_data="admin:products:list:0")],
-        [InlineKeyboardButton("➕ محصول جدید", callback_data="admin:products:add")],
-        # ── سفارش‌ها ──
-        [InlineKeyboardButton("🧾 سفارش‌های جدید", callback_data="admin:orders:pending:0")],
-        [InlineKeyboardButton("📜 تاریخچه سفارش‌ها", callback_data="admin:orders:history:0")],
-        # ── آمار و مالی ──
-        [InlineKeyboardButton("📊 آمار فروش", callback_data="seller:stats")],
-        *([[InlineKeyboardButton("📈 داشبورد زنده", callback_data="seller:live")]] if config.WIDGETS_ENABLED else []),
-        [InlineKeyboardButton("💰 کدهای تخفیف", callback_data="discount:list")],
-        # ── پیام‌ها ──
-        [InlineKeyboardButton("💬 پیام‌های مشتریان", callback_data="seller:inbox")],
-        # ── تنظیمات ──
-        [InlineKeyboardButton("🧾 تنظیمات پرداخت", callback_data="seller:payment_settings")],
-        *([] if config.FREE_MODE else [[InlineKeyboardButton("💳 اشتراک فروشگاه", callback_data="seller:subscription:show")]]),
-        [InlineKeyboardButton("🏪 لینک فروشگاه", callback_data="seller:show_link")],
-        [InlineKeyboardButton("📷 عکس کاور", callback_data="seller:set_banner")],
-        [InlineKeyboardButton("⚙️ تنظیمات سایت", callback_data="seller:site_settings")],
-        [InlineKeyboardButton("👤 اطلاعات حساب", callback_data="seller:account_info")],
-        # ── خطرناک ──
-        [InlineKeyboardButton("🗑 حذف فروشگاه", callback_data="seller:delete_shop")],
+        [InlineKeyboardButton(f"🧾 سفارش‌ها{badge}", callback_data="admin:orders:pending:0"),
+         InlineKeyboardButton("💬 پیام‌ها", callback_data="seller:inbox")],
+        [InlineKeyboardButton("➕ محصول جدید", callback_data="admin:products:add"),
+         InlineKeyboardButton("📦 محصولات", callback_data="admin:products:list:0")],
+        [*([InlineKeyboardButton("📈 داشبورد زنده", callback_data="seller:live")] if config.WIDGETS_ENABLED else []),
+         InlineKeyboardButton("📊 آمار فروش", callback_data="seller:stats")],
+        [InlineKeyboardButton("🔗 لینک فروشگاه", callback_data="seller:show_link"),
+         InlineKeyboardButton("💰 کد تخفیف", callback_data="discount:list")],
+        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="seller:settings")],
     ]
-
     return text, InlineKeyboardMarkup(buttons)
+
+
+async def seller_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تنظیمات کم‌استفاده‌تر یک‌جا، تا صفحه‌ی اصلی پنل شلوغ نشه."""
+    query = update.callback_query
+    await query.answer()
+    rows = [
+        [InlineKeyboardButton("🧾 تنظیمات پرداخت و ارسال", callback_data="seller:payment_settings")],
+        [InlineKeyboardButton("🗂 دسته‌بندی‌ها", callback_data="admin:categories"),
+         InlineKeyboardButton("📷 عکس کاور", callback_data="seller:set_banner")],
+        [InlineKeyboardButton("📜 تاریخچه سفارش‌ها", callback_data="admin:orders:history:0")],
+        [InlineKeyboardButton("⚙️ تنظیمات سایت", callback_data="seller:site_settings"),
+         InlineKeyboardButton("👤 اطلاعات حساب", callback_data="seller:account_info")],
+    ]
+    if not config.FREE_MODE:
+        rows.insert(1, [InlineKeyboardButton("💳 اشتراک فروشگاه", callback_data="seller:subscription:show")])
+    rows += [
+        [InlineKeyboardButton("🗑 حذف فروشگاه", callback_data="seller:delete_shop")],
+        [InlineKeyboardButton("🔙 پنل فروشگاه", callback_data="seller:panel_back")],
+    ]
+    await render_view(query, context, "⚙️ تنظیمات فروشگاه", InlineKeyboardMarkup(rows))
 
 
 async def seller_panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -412,10 +426,13 @@ async def show_shop_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "وقتی مشتری روش کلیک می‌کنه، مستقیم منوی همین فروشگاه میاد:"
     )
 
+    from urllib.parse import quote
+    share = f"https://t.me/share/url?url={quote(deep_link)}&text={quote('فروشگاه ' + shop_name)}"
     buttons = [
+        [InlineKeyboardButton("📤 اشتراک‌گذاری", url=share)],
         [InlineKeyboardButton("📋 بازگشت به پنل", callback_data="seller:panel_back")],
     ]
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="HTML")
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="HTML", disable_web_page_preview=True)
     return ConversationHandler.END
 
 
@@ -596,7 +613,7 @@ async def save_shipping_cost(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if cost == 0:
         display = "رایگان 🆓"
     else:
-        display = f"{cost:,} تومان"
+        display = format_price(cost)
 
     await update.message.reply_text(
         f"✅ هزینه ارسال روی {display} تنظیم شد.",

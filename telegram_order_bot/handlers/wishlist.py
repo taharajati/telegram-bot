@@ -46,6 +46,18 @@ async def toggle_wishlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await session.commit()
             await query.answer("⭐ به علاقه‌مندی‌ها اضافه شد", show_alert=False)
 
+    # از صفحه‌ی محصول: فقط دکمه‌ها درجا عوض می‌شن (پیام تأیید جدا نمی‌فرستیم)
+    parts = query.data.split(":")
+    if len(parts) >= 5 and getattr(query.message, "photo", None):
+        from handlers.menu import load_product_screen
+        screen = await load_product_screen(product_id, user_id, int(parts[3]) or None, int(parts[4]))
+        if screen:
+            try:
+                await query.edit_message_reply_markup(reply_markup=screen["keyboard"])
+            except Exception:
+                pass
+        return
+
     # Send confirmation message after session is closed
     if product_name:
         if item:

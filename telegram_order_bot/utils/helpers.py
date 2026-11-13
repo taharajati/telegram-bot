@@ -21,6 +21,33 @@ def format_price(amount: float) -> str:
     return f"{to_persian_digits(s)} {config.CURRENCY_LABEL}"
 
 
+def short_price(amount: float) -> str:
+    """قیمت کوتاه برای روی دکمه‌ها: ۲ میلیون، ۴۵۰ هزار، ۹۹۰ تومان."""
+    amount = int(round(amount))
+    if amount >= 1_000_000:
+        value = amount / 1_000_000
+        text = f"{value:.1f}".rstrip("0").rstrip(".").replace(".", "٫")
+        return f"{to_persian_digits(text)} میلیون"
+    if amount >= 1000:
+        return f"{to_persian_digits(round(amount / 1000))} هزار"
+    return f"{to_persian_digits(amount)} تومان"
+
+
+_EXTRA_HISTORY_LABELS = {
+    "receipt_uploaded": "🧾 رسید ثبت شد",
+    "receipt_retry_uploaded": "🔄 رسید جدید ثبت شد",
+}
+
+
+def history_line(entry) -> str:
+    """یک خط تاریخچه‌ی وضعیت سفارش: تاریخ شمسی + برچسب فارسی (نه «paid توسط admin»)."""
+    from database.models import ORDER_STATUS_LABELS
+    label = _EXTRA_HISTORY_LABELS.get(entry.status) or ORDER_STATUS_LABELS.get(entry.status, entry.status)
+    when = to_jalali(entry.changed_at) if entry.changed_at else ""
+    reason = entry.get_meta().get("reason", "")
+    return f"  • {when} — {label}" + (f" ({reason})" if reason else "")
+
+
 def generate_tracking_code() -> str:
     now = datetime.utcnow()
     date_part = now.strftime("%y%m%d")
@@ -30,9 +57,9 @@ def generate_tracking_code() -> str:
 
 def to_jalali(dt: datetime) -> str:
     try:
-        return jdatetime.datetime.fromgregorian(datetime=dt).strftime("%Y/%m/%d %H:%M")
+        return to_persian_digits(jdatetime.datetime.fromgregorian(datetime=dt).strftime("%Y/%m/%d %H:%M"))
     except Exception:
-        return dt.strftime("%Y-%m-%d %H:%M")
+        return to_persian_digits(dt.strftime("%Y-%m-%d %H:%M"))
 
 
 def is_super_admin(user_id: int) -> bool:
