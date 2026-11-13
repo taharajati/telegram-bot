@@ -20,6 +20,7 @@ from utils.crypto import safe_encrypt, safe_decrypt
 from utils.tg_helpers import escape_html, get_current_shop_id, render_view
 import config
 from config import WEBSITE_URL
+from services.widgets import available as widgets_available
 
 from sqlalchemy import select
 
@@ -89,7 +90,7 @@ async def _build_seller_panel(user_id: int, bot_username: str = "") -> tuple[str
          InlineKeyboardButton("💬 پیام‌ها", callback_data="seller:inbox")],
         [InlineKeyboardButton("➕ محصول جدید", callback_data="admin:products:add"),
          InlineKeyboardButton("📦 محصولات", callback_data="admin:products:list:0")],
-        [*([InlineKeyboardButton("📈 داشبورد زنده", callback_data="seller:live")] if config.WIDGETS_ENABLED else []),
+        [*([InlineKeyboardButton("📈 داشبورد زنده", callback_data="seller:live")] if widgets_available() else []),
          InlineKeyboardButton("📊 آمار فروش", callback_data="seller:stats")],
         [InlineKeyboardButton("🔗 لینک فروشگاه", callback_data="seller:show_link"),
          InlineKeyboardButton("💰 کد تخفیف", callback_data="discount:list")],

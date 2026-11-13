@@ -590,3 +590,92 @@ def test_short_price_formats_for_buttons():
     assert short_price(1500000) == "۱٫۵ میلیون"
     assert short_price(450000) == "۴۵۰ هزار"
     assert short_price(900) == "۹۰۰ تومان"
+
+
+# ─── لیست و کارت محصول برای فروشنده ───
+
+async def _seller_with_products():
+    await register(make_context())
+    shop = await get_shop()
+    async with async_session() as session:
+        cat = Category(name="تیشرت", shop_id=shop.id)
+        session.add(cat)
+        await session.flush()
+        session.add_all([
+            Product(name="موجود", price=2000000, stock=10, category_id=cat.id, shop_id=shop.id),
+            Product(name="ناموجود", price=450000, stock=0, category_id=cat.id, shop_id=shop.id),
+            Product(name="مخفی", price=1000, stock=4, is_active=False, category_id=cat.id, shop_id=shop.id),
+        ])
+        await session.commit()
+        ids = {p.name: p.id for p in (await session.execute(select(Product))).scalars()}
+    return shop.id, ids
+
+
+async def test_seller_product_list_shows_status_counts_and_filters():
+    from handlers.admin import products as products_h
+
+    _, ids = await _seller_with_products()
+    context = make_context()
+
+    update = callback_update("admin:products:list:0")
+    await getattr(products_h.list_products, "__wrapped__", products_h.list_products)(update, context)
+    shown = update.callback_query.edit_message_text.await_args
+    assert "۳ محصول" in shown.args[0] and "۱ موجود" in shown.args[0] and "۱ ناموجود" in shown.args[0] and "۱ مخفی" in shown.args[0]
+    labels = [b.text for row in shown.kwargs["reply_markup"].inline_keyboard for b in row]
+    assert any(t.startswith("🟢") and "۲ میلیون" in t for t in labels)
+    assert any(t.startswith("⛔") for t in labels) and any(t.startswith("🙈") for t in labels)
+
+    cycle = getattr(products_h.cycle_products_filter, "__wrapped__", products_h.cycle_products_filter)
+    update = callback_update("admin:products:filter")
+    await cycle(update, context)  # all -> in
+    shown = update.callback_query.edit_message_text.await_args
+    rows = [b.text for row in shown.kwargs["reply_markup"].inline_keyboard for b in row if b.callback_data.startswith("admin:products:edit:")]
+    assert len(rows) == 1 and rows[0].startswith("🟢") and "فیلتر: موجود" in shown.args[0]
+
+
+async def test_seller_stock_stepper_respects_reserved_stock():
+    from handlers.admin import products as products_h
+
+    _, ids = await _seller_with_products()
+    product_id = ids["موجود"]
+    async with async_session() as session:
+        product = await session.get(Product, product_id)
+        product.stock, product.reserved_stock = 3, 3
+        await session.commit()
+    step = getattr(products_h.product_stock_step, "__wrapped__", products_h.product_stock_step)
+
+    down = callback_update(f"admin:products:stk:{product_id}:-1")
+    await step(down, make_context())
+    async with async_session() as session:
+        assert (await session.get(Product, product_id)).stock == 3  # زیر رزرو نمی‌ره
+    assert "رزرو" in down.callback_query.answer.await_args.args[0]
+
+    up = callback_update(f"admin:products:stk:{product_id}:1")
+    up.callback_query.edit_message_text = AsyncMock()
+    await step(up, make_context())
+    async with async_session() as session:
+        assert (await session.get(Product, product_id)).stock == 4
+    card = up.callback_query.edit_message_text.await_args
+    assert "<b>۴</b>" in card.args[0] and card.kwargs["parse_mode"] == "HTML"
+
+
+async def test_product_card_has_photo_status_and_quick_actions():
+    from handlers.admin import products as products_h
+
+    _, ids = await _seller_with_products()
+    async with async_session() as session:
+        product = await session.get(Product, ids["موجود"])
+        product.image_file_id = "AgAC-main"
+        await session.commit()
+    context = make_context()
+    update = callback_update(f"admin:products:edit:{ids['موجود']}")
+    update.callback_query.message.photo = []
+    await getattr(products_h.open_product_edit, "__wrapped__", products_h.open_product_edit)(update, context)
+
+    sent = context.bot.send_photo.await_args.kwargs
+    assert sent["photo"] == "AgAC-main" and "🟢" in sent["caption"] and "۲,۰۰۰,۰۰۰" in sent["caption"]
+    data = [b.callback_data for row in sent["reply_markup"].inline_keyboard for b in row]
+    for expected in (f"admin:products:stk:{ids['موجود']}:1", f"admin:products:stk:{ids['موجود']}:-1",
+                     f"admin:products:soldout:{ids['موجود']}", f"admin:products:toggle:{ids['موجود']}",
+                     f"admin:products:preview:{ids['موجود']}"):
+        assert expected in data

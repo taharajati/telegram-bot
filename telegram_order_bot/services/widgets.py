@@ -11,6 +11,7 @@ python-telegram-bot هنوز متدهای ویجت رو نداره، پس مست
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 import logging
 import zlib
@@ -29,6 +30,23 @@ from utils.helpers import format_price
 logger = logging.getLogger(__name__)
 
 WIDGET_DIR = Path(__file__).resolve().parent.parent / "widgets"
+
+# تلگرام ممکنه ویجت رو برای ربات ببنده (INPUT_MEDIA_WIDGET_NOT_ALLOWED)؛ اون موقع دکمه‌های ویجتی
+# پنهان می‌شن تا کاربر فقط خطا نبینه، و بعد از BLOCK_SECONDS دوباره امتحان می‌شه.
+BLOCK_SECONDS = 1800
+_blocked_until = 0.0
+
+
+def available() -> bool:
+    """آیا الان باید دکمه‌های ویجتی نشون داده بشن؟"""
+    return config.WIDGETS_ENABLED and time.monotonic() >= _blocked_until
+
+
+def _note_failure(error: Exception) -> None:
+    global _blocked_until
+    if "WIDGET_NOT_ALLOWED" in str(error).upper():
+        _blocked_until = time.monotonic() + BLOCK_SECONDS
+        logger.warning("Telegram refused widgets for this bot; hiding widget buttons for %s s", BLOCK_SECONDS)
 
 # محدودیت‌های تلگرام
 MAX_HTML_BYTES = 32768
@@ -51,6 +69,10 @@ def compressed_size(html: str) -> int:
 
 ORDER_TRACKER_HTML = load_widget_html("order_tracker")
 SELLER_DASHBOARD_HTML = load_widget_html("seller_dashboard")
+SELLER_INVENTORY_HTML = load_widget_html("seller_inventory")
+
+INVENTORY_PAGE_SIZE = 6
+INVENTORY_PREFIX = "v:"  # v:<action>:<id|page>:<page> — action: + - t(مخفی/نمایش) g(صفحه)
 
 
 async def _call(bot, method: str, **params):
@@ -119,7 +141,7 @@ async def _load_order_state(order_id: int) -> tuple[Order | None, str | None]:
 
 async def send_order_tracker(bot, order_id: int, chat_id: int) -> bool:
     """ویجت رهگیری رو می‌فرسته و پیامش رو برای به‌روزرسانی‌های بعدی ثبت می‌کنه."""
-    if not config.WIDGETS_ENABLED:
+    if not available():
         return False
     order, state = await _load_order_state(order_id)
     if not order:
@@ -134,6 +156,7 @@ async def send_order_tracker(bot, order_id: int, chat_id: int) -> bool:
             caption=f"📍 رهگیری زنده سفارش #{order.tracking_code}",
         )
     except TelegramError as e:
+        _note_failure(e)
         logger.warning("sendWidget (order tracker) failed for order %s: %s", order_id, e)
         return False
 
@@ -152,7 +175,7 @@ async def send_order_tracker(bot, order_id: int, chat_id: int) -> bool:
 
 async def sync_order_tracker(bot, order_id: int) -> bool:
     """state ویجت رهگیری سفارش رو با وضعیت فعلی یکی می‌کنه (اگه ویجتی فرستاده شده باشه)."""
-    if not config.WIDGETS_ENABLED:
+    if not available():
         return False
     async with async_session() as session:
         row = (await session.execute(select(OrderWidget).where(OrderWidget.order_id == order_id))).scalar_one_or_none()
@@ -215,7 +238,7 @@ for _attr in (Order.status, Order.tracking_number, Order.payment_receipt_at):
 @event.listens_for(Session, "after_commit")
 def _sync_after_commit(session: Session) -> None:
     order_ids = session.info.pop(_DIRTY_KEY, None)
-    if not order_ids or _bot is None or not config.WIDGETS_ENABLED:
+    if not order_ids or _bot is None or not available():
         return
     try:
         loop = asyncio.get_running_loop()
@@ -306,7 +329,7 @@ async def seller_dashboard_state(shop_id: int) -> str:
 
 
 async def send_seller_dashboard(bot, shop_id: int, chat_id: int) -> bool:
-    if not config.WIDGETS_ENABLED:
+    if not available():
         return False
     state = await seller_dashboard_state(shop_id)
     try:
@@ -319,9 +342,112 @@ async def send_seller_dashboard(bot, shop_id: int, chat_id: int) -> bool:
             caption="📊 داشبورد زنده فروشگاه",
         )
     except TelegramError as e:
+        _note_failure(e)
         logger.warning("sendWidget (seller dashboard) failed for shop %s: %s", shop_id, e)
         return False
     return True
+
+
+# ════════════════════════════════════════════════════════════════
+# موجودی سریع فروشنده: افزایش/کاهش موجودی و مخفی‌کردن محصول توی یک پیام
+# ════════════════════════════════════════════════════════════════
+
+def _short_name(name: str, limit: int = 15) -> str:
+    name = (name or "").strip()
+    return name if len(name) <= limit else name[: limit - 1].rstrip() + "…"
+
+
+async def inventory_state(shop_id: int, page: int = 0) -> str:
+    """state ویجت موجودی: یک صفحه‌ی ۶تایی از محصولات (سقف state ۱۰۲۴ بایته)."""
+    from database.models import Product
+
+    async with async_session() as session:
+        shop = await session.get(Shop, shop_id)
+        total = (await session.execute(select(func.count(Product.id)).where(Product.shop_id == shop_id))).scalar_one()
+        pages = max(1, -(-total // INVENTORY_PAGE_SIZE))
+        page = max(0, min(page, pages - 1))
+        products = (await session.execute(
+            select(Product).where(Product.shop_id == shop_id)
+            .order_by(Product.id.desc()).offset(page * INVENTORY_PAGE_SIZE).limit(INVENTORY_PAGE_SIZE)
+        )).scalars().all()
+
+    return _dump_state({
+        "s": _short_name(shop.name if shop else "", 24),
+        "g": page,
+        "m": pages,
+        "t": int(total),
+        # [id, اسم کوتاه, موجودی, رزرو, قیمت (هزار تومان), فعال]
+        "p": [[p.id, _short_name(p.name), int(p.stock), int(p.reserved_stock), int(p.price // 1000), 1 if p.is_active else 0] for p in products],
+    })
+
+
+async def send_seller_inventory(bot, shop_id: int, chat_id: int) -> bool:
+    if not available():
+        return False
+    state = await inventory_state(shop_id, 0)
+    try:
+        await _call(bot, "sendWidget", chat_id=chat_id, html=SELLER_INVENTORY_HTML, chat_data=state,
+                    allow_queries=True, caption="📊 موجودی سریع: با + و − موجودی رو عوض کن، با 👁 محصول رو مخفی کن")
+    except TelegramError as e:
+        _note_failure(e)
+        logger.warning("sendWidget (seller inventory) failed for shop %s: %s", shop_id, e)
+        return False
+    return True
+
+
+async def _apply_inventory_action(bot, shop_id: int, action: str, product_id: int) -> None:
+    """یک تغییر روی محصول؛ موجودی هیچ‌وقت زیر تعداد رزروشده یا صفر نمی‌ره."""
+    from database.models import Product
+
+    async with async_session() as session:
+        product = (await session.execute(
+            select(Product).where(Product.id == product_id, Product.shop_id == shop_id).with_for_update()
+        )).scalar_one_or_none()
+        if not product:
+            return
+        was_sold_out = product.available_stock <= 0
+        if action == "+":
+            product.stock += 1
+        elif action == "-":
+            product.stock = max(int(product.reserved_stock), product.stock - 1, 0)
+        elif action == "t":
+            product.is_active = not product.is_active
+        await session.commit()
+        restocked = was_sold_out and product.available_stock > 0
+    if restocked:
+        from handlers.admin.products import _check_and_notify_restock
+        async with async_session() as session:
+            await _check_and_notify_restock(session, product_id, shop_id, bot)
+
+
+async def _answer_inventory_query(bot, user_id: int, chat_id: int | None, message_id: int | None, data: str) -> str | None:
+    parts = data.split(":")
+    if len(parts) != 4:
+        return None
+    action = parts[1]
+    try:
+        target, page = int(parts[2]), int(parts[3])
+    except ValueError:
+        return None
+    async with async_session() as session:
+        owner = (await session.execute(select(ShopOwner).where(ShopOwner.user_id == user_id).limit(1))).scalar_one_or_none()
+    if not owner:
+        return None  # from رو تلگرام تأیید می‌کنه؛ فقط صاحب فروشگاه اجازه‌ی تغییر داره
+
+    if action == "g":
+        page = target
+    elif action in ("+", "-", "t"):
+        await _apply_inventory_action(bot, owner.shop_id, action, target)
+    else:
+        return None
+
+    state = await inventory_state(owner.shop_id, page)
+    if chat_id is not None and message_id is not None:
+        try:  # state رو نگه می‌داریم تا اگه ویجت دوباره ساخته شد، قدیمی نباشه
+            await _call(bot, "editMessageWidgetData", chat_id=chat_id, message_id=message_id, chat_data=state)
+        except TelegramError:
+            pass
+    return state
 
 
 # ════════════════════════════════════════════════════════════════
@@ -377,6 +503,8 @@ async def handle_widget_query(bot, widget_query: dict) -> None:
             answer = await _answer_order_query(bot, user_id, chat_id, widget_query.get("message_id"), data)
         elif data == Q_SELLER_REFRESH:
             answer = await _answer_seller_query(user_id)
+        elif data.startswith(INVENTORY_PREFIX):
+            answer = await _answer_inventory_query(bot, user_id, chat_id, widget_query.get("message_id"), data)
     except Exception:
         logger.exception("Widget query %r failed", data)
     try:

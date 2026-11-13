@@ -15,10 +15,13 @@ from sqlalchemy.orm import selectinload
 from database.db import async_session
 from database.models import CartItem, Category, OrderItem, Product, ProductImage
 from handlers.admin.panel import admin_only, _get_shop_id_for_admin
+from utils.helpers import short_price, to_persian_digits
+from utils.tg_helpers import escape_html
 from utils.helpers import format_price, to_jalali
 from utils.tg_helpers import render_view
 from utils.image_storage import download_and_store_image, download_and_store_multiple, delete_image
 from services.restock import _check_and_notify_restock
+from services.widgets import available as widgets_available
 
 ASK_NAME, ASK_DESC, ASK_PRICE, ASK_CATEGORY, ASK_STOCK, ASK_PHOTO = range(6)
 
@@ -48,21 +51,87 @@ FIELD_LABELS = {
 }
 
 
-def products_list_keyboard(page_items, page, total_pages) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton(f"✏️ {p.name} — {format_price(p.price)}", callback_data=f"admin:products:edit:{p.id}")]
-        for p in page_items
-    ]
-    nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton("◀️", callback_data=f"admin:products:list:{page - 1}"))
-    if page < total_pages - 1:
-        nav.append(InlineKeyboardButton("▶️", callback_data=f"admin:products:list:{page + 1}"))
-    if nav:
-        rows.append(nav)
-    rows.append([InlineKeyboardButton("➕ افزودن محصول جدید", callback_data="admin:products:add")])
-    rows.append([InlineKeyboardButton("📤 افزودن با فوروارد", callback_data="admin:products:add_forward")])
-    rows.append([InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel")])
+FILTERS = ("all", "in", "out", "hidden")
+FILTER_LABELS = {"all": "همه", "in": "موجود", "out": "ناموجود", "hidden": "مخفی"}
+
+
+def product_status(product: Product) -> tuple[str, str]:
+    """(ایموجی، برچسب) وضعیت محصول برای فروشنده."""
+    if not product.is_active:
+        return "🙈", "مخفی (مشتری نمی‌بینه)"
+    if product.available_stock <= 0:
+        return "⛔", "ناموجود"
+    if product.available_stock <= 3:
+        return "⚡", "کم‌موجود"
+    return "🟢", "فعال و موجود"
+
+
+def _product_row_label(p: Product) -> str:
+    emoji, _ = product_status(p)
+    name = p.name if len(p.name) <= 22 else p.name[:21].rstrip() + "…"
+    return f"{emoji} {name} · {short_price(p.price)} · {to_persian_digits(p.available_stock)} عدد"
+
+
+def _matches_filter(p: Product, flt: str) -> bool:
+    if flt == "in":
+        return p.is_active and p.available_stock > 0
+    if flt == "out":
+        return p.is_active and p.available_stock <= 0
+    if flt == "hidden":
+        return not p.is_active
+    return True
+
+
+FILTERS = ("all", "in", "out", "hidden")
+FILTER_LABELS = {"all": "همه", "in": "موجود", "out": "ناموجود", "hidden": "مخفی"}
+
+
+def product_status(product: Product) -> tuple[str, str]:
+    """(ایموجی، برچسب) وضعیت محصول برای فروشنده."""
+    if not product.is_active:
+        return "🙈", "مخفی (مشتری نمی‌بینه)"
+    if product.available_stock <= 0:
+        return "⛔", "ناموجود"
+    if product.available_stock <= 3:
+        return "⚡", "کم‌موجود"
+    return "🟢", "فعال و موجود"
+
+
+def _product_row_label(p: Product) -> str:
+    emoji, _ = product_status(p)
+    name = p.name if len(p.name) <= 22 else p.name[:21].rstrip() + "…"
+    return f"{emoji} {name} · {short_price(p.price)} · {to_persian_digits(p.available_stock)} عدد"
+
+
+def _matches_filter(p: Product, flt: str) -> bool:
+    if flt == "in":
+        return p.is_active and p.available_stock > 0
+    if flt == "out":
+        return p.is_active and p.available_stock <= 0
+    if flt == "hidden":
+        return not p.is_active
+    return True
+
+
+def products_list_keyboard(page_items, page, total_pages, flt: str = "all") -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(_product_row_label(p), callback_data=f"admin:products:edit:{p.id}")] for p in page_items]
+    if total_pages > 1:
+        pager = []
+        if page > 0:
+            pager.append(InlineKeyboardButton("◀️", callback_data=f"admin:products:list:{page - 1}"))
+        pager.append(InlineKeyboardButton(f"{to_persian_digits(page + 1)} از {to_persian_digits(total_pages)}", callback_data="noop"))
+        if page < total_pages - 1:
+            pager.append(InlineKeyboardButton("▶️", callback_data=f"admin:products:list:{page + 1}"))
+        rows.append(pager)
+    tools = [InlineKeyboardButton(f"🔎 {FILTER_LABELS[flt]}", callback_data="admin:products:filter")]
+    if widgets_available():
+        tools.append(InlineKeyboardButton("📊 موجودی سریع", callback_data="seller:inv"))
+    rows.append(tools)
+    rows.append([
+        InlineKeyboardButton("➕ محصول جدید", callback_data="admin:products:add"),
+        InlineKeyboardButton("📤 با فوروارد", callback_data="admin:products:add_forward"),
+    ])
+    rows.append([InlineKeyboardButton("🔙 پنل فروشگاه", callback_data="admin:panel")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -71,24 +140,47 @@ async def _render_products_list(query, context, page: int, shop_id: int | None):
         stmt = select(Product).order_by(Product.id.desc())
         if shop_id:
             stmt = stmt.where(Product.shop_id == shop_id)
-        result = await session.execute(stmt)
-        products = result.scalars().all()
+        products = (await session.execute(stmt)).scalars().all()
 
     if not products:
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ افزودن محصول جدید", callback_data="admin:products:add")],
+            [InlineKeyboardButton("➕ افزودن اولین محصول", callback_data="admin:products:add")],
             [InlineKeyboardButton("📤 افزودن با فوروارد", callback_data="admin:products:add_forward")],
-            [InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel")],
+            [InlineKeyboardButton("🔙 پنل فروشگاه", callback_data="admin:panel")],
         ])
-        await render_view(query, context, "هنوز هیچ محصولی ثبت نکردی. با دکمه پایین اولین محصولتو اضافه کن 👇", keyboard)
+        await render_view(query, context, "هنوز محصولی نداری. اولین محصولت رو اضافه کن 👇", keyboard)
         return
 
-    total_pages = max(1, math.ceil(len(products) / PRODUCTS_PER_PAGE))
-    page = max(0, min(page, total_pages - 1))
-    page_items = products[page * PRODUCTS_PER_PAGE : (page + 1) * PRODUCTS_PER_PAGE]
+    flt = context.user_data.get("products_filter", "all")
+    in_stock = sum(1 for p in products if _matches_filter(p, "in"))
+    out = sum(1 for p in products if _matches_filter(p, "out"))
+    hidden = sum(1 for p in products if _matches_filter(p, "hidden"))
+    shown = [p for p in products if _matches_filter(p, flt)]
 
-    text = f"📦 محصولات (صفحه {page + 1} از {total_pages}) — برای ویرایش روی هرکدوم بزن:"
-    await render_view(query, context, text, products_list_keyboard(page_items, page, total_pages))
+    total_pages = max(1, math.ceil(len(shown) / PRODUCTS_PER_PAGE))
+    page = max(0, min(page, total_pages - 1))
+    page_items = shown[page * PRODUCTS_PER_PAGE:(page + 1) * PRODUCTS_PER_PAGE]
+
+    text = (
+        f"📦 محصولات فروشگاه\n"
+        f"{to_persian_digits(len(products))} محصول · ✅ {to_persian_digits(in_stock)} موجود · "
+        f"⛔ {to_persian_digits(out)} ناموجود · 🙈 {to_persian_digits(hidden)} مخفی"
+    )
+    if flt != "all":
+        text += f"\nفیلتر: {FILTER_LABELS[flt]} ({to_persian_digits(len(shown))} مورد)"
+    text += "\n\nروی هر محصول بزن تا ویرایشش کنی 👇" if shown else "\n\nمحصولی با این فیلتر نیست."
+    await render_view(query, context, text, products_list_keyboard(page_items, page, total_pages, flt))
+
+
+@admin_only
+async def cycle_products_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """فیلتر لیست محصولات: همه ← موجود ← ناموجود ← مخفی."""
+    query = update.callback_query
+    await query.answer()
+    current = context.user_data.get("products_filter", "all")
+    context.user_data["products_filter"] = FILTERS[(FILTERS.index(current) + 1) % len(FILTERS)]
+    shop_id = context.user_data.get("admin_shop_id") or await _get_shop_id_for_admin(update.effective_user.id)
+    await _render_products_list(query, context, 0, shop_id)
 
 
 @admin_only
@@ -331,27 +423,175 @@ async def _finish_add_product(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 def product_edit_keyboard(product: Product, bot_username: str = "") -> InlineKeyboardMarkup:
-    active_label = "🟢 فعال" if product.is_active else "🔴 غیرفعال"
+    visible = product.is_active
     rows = [
         [
-            InlineKeyboardButton("✏️ نام", callback_data=f"admin:products:field:{product.id}:name"),
-            InlineKeyboardButton("✏️ قیمت", callback_data=f"admin:products:field:{product.id}:price"),
+            InlineKeyboardButton("➖", callback_data=f"admin:products:stk:{product.id}:-1"),
+            InlineKeyboardButton(f"📦 {to_persian_digits(product.stock)} عدد ✏️", callback_data=f"admin:products:field:{product.id}:stock"),
+            InlineKeyboardButton("➕", callback_data=f"admin:products:stk:{product.id}:1"),
         ],
         [
-            InlineKeyboardButton("✏️ توضیحات", callback_data=f"admin:products:field:{product.id}:description"),
-            InlineKeyboardButton("✏️ موجودی", callback_data=f"admin:products:field:{product.id}:stock"),
+            InlineKeyboardButton("✏️ قیمت", callback_data=f"admin:products:field:{product.id}:price"),
+            InlineKeyboardButton("✏️ نام", callback_data=f"admin:products:field:{product.id}:name"),
+            InlineKeyboardButton("📝 توضیحات", callback_data=f"admin:products:field:{product.id}:description"),
         ],
-        [InlineKeyboardButton("🖼 تغییر عکس اصلی", callback_data=f"admin:products:photo:{product.id}")],
-        [InlineKeyboardButton("🖼🖼 گالری (چند عکس)", callback_data=f"admin:products:gallery:{product.id}")],
         [
             InlineKeyboardButton("⛔ ناموجود شد", callback_data=f"admin:products:soldout:{product.id}"),
-            InlineKeyboardButton(f"{active_label}", callback_data=f"admin:products:toggle:{product.id}"),
+            InlineKeyboardButton("🙈 مخفی کن" if visible else "👁 نمایش بده", callback_data=f"admin:products:toggle:{product.id}"),
         ],
-        [InlineKeyboardButton("📋 لینک محصول", callback_data=f"admin:products:link:{product.id}")],
-        [InlineKeyboardButton("🗑 حذف محصول", callback_data=f"admin:products:delete:{product.id}")],
-        [InlineKeyboardButton("🔙 بازگشت به لیست", callback_data="admin:products:list:0")],
+        [
+            InlineKeyboardButton("🖼 عکس اصلی", callback_data=f"admin:products:photo:{product.id}"),
+            InlineKeyboardButton("🖼 گالری", callback_data=f"admin:products:gallery:{product.id}"),
+        ],
+        [
+            InlineKeyboardButton("🔗 لینک و اشتراک", callback_data=f"admin:products:link:{product.id}"),
+            InlineKeyboardButton("👁 دید مشتری", callback_data=f"admin:products:preview:{product.id}"),
+        ],
+        [
+            InlineKeyboardButton("🔙 لیست", callback_data="admin:products:list:0"),
+            InlineKeyboardButton("🗑 حذف", callback_data=f"admin:products:delete:{product.id}"),
+        ],
     ]
     return InlineKeyboardMarkup(rows)
+
+
+def product_card_text(product: Product, category_name: str = "") -> str:
+    emoji, label = product_status(product)
+    stock = f"📦 موجودی: <b>{to_persian_digits(product.stock)}</b> عدد"
+    if product.reserved_stock:
+        stock += f" (رزرو: {to_persian_digits(product.reserved_stock)} · قابل‌فروش: {to_persian_digits(product.available_stock)})"
+    lines = [
+        f"<b>{escape_html(product.name)}</b>",
+        "",
+        f"💰 قیمت: <b>{format_price(product.price)}</b>",
+        stock,
+        f"{emoji} وضعیت: {label}",
+    ]
+    if category_name:
+        lines.append(f"🗂 دسته: {escape_html(category_name)}")
+    if product.description:
+        text = product.description.strip()
+        lines += ["", escape_html(text if len(text) <= 300 else text[:299].rstrip() + "…")]
+    return "\n".join(lines)[:1000]
+
+
+async def _load_card(product_id: int, shop_id: int | None):
+    """محصول + نام دسته + اولین عکس؛ اگه محصول (یا دسترسی) نبود None."""
+    from handlers.menu import product_photo_sources
+
+    async with async_session() as session:
+        stmt = select(Product).where(Product.id == product_id)
+        if shop_id:
+            stmt = stmt.where(Product.shop_id == shop_id)
+        product = (await session.execute(stmt)).scalar_one_or_none()
+        if not product:
+            return None
+        category = await session.get(Category, product.category_id)
+    photos = product_photo_sources(product, [])
+    return product, (category.name if category else ""), (photos[0] if photos else None)
+
+
+async def show_product_card(query, context, product_id: int, shop_id: int | None, fresh: bool = False):
+    """کارت محصول: fresh=True از لیست میاد (پیام جدید با عکس)، وگرنه همون پیام درجا به‌روز می‌شه."""
+    from telegram.error import BadRequest
+
+    loaded = await _load_card(product_id, shop_id)
+    if not loaded:
+        await render_view(query, context, "این محصول پیدا نشد یا به فروشگاه تو تعلق نداره.",
+                          InlineKeyboardMarkup([[InlineKeyboardButton("🔙 لیست محصولات", callback_data="admin:products:list:0")]]))
+        return
+    product, category_name, photo = loaded
+    text, keyboard = product_card_text(product, category_name), product_edit_keyboard(product)
+
+    if fresh:
+        if photo:
+            try:
+                await render_view(query, context, text, keyboard, photo=photo, parse_mode="HTML")
+                return
+            except Exception:
+                pass
+        await render_view(query, context, text, keyboard, parse_mode="HTML")
+        return
+    try:
+        if getattr(query.message, "photo", None):
+            await query.edit_message_caption(caption=text, reply_markup=keyboard, parse_mode="HTML")
+        else:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
+    except BadRequest as e:
+        if "not modified" not in str(e).lower():
+            await render_view(query, context, text, keyboard, parse_mode="HTML")
+
+
+async def send_product_card(bot, chat_id: int, product: Product):
+    """کارت محصول رو به‌صورت پیام جدید می‌فرسته (بعد از ویرایش با تایپ)."""
+    from handlers.menu import product_photo_sources
+
+    async with async_session() as session:
+        category = await session.get(Category, product.category_id)
+    text, keyboard = product_card_text(product, category.name if category else ""), product_edit_keyboard(product)
+    photos = product_photo_sources(product, [])
+    if photos:
+        try:
+            await bot.send_photo(chat_id=chat_id, photo=photos[0], caption=text, parse_mode="HTML", reply_markup=keyboard)
+            return
+        except Exception:
+            pass
+    await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=keyboard)
+
+
+@admin_only
+async def product_stock_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """admin:products:stk:<id>:<±1> — موجودی با یک تپ کم/زیاد می‌شه (زیر تعداد رزروشده نمی‌ره)."""
+    query = update.callback_query
+    parts = query.data.split(":")
+    product_id, delta = int(parts[3]), int(parts[4])
+    shop_id = context.user_data.get("admin_shop_id") or await _get_shop_id_for_admin(update.effective_user.id)
+
+    restocked = False
+    async with async_session() as session:
+        stmt = select(Product).where(Product.id == product_id).with_for_update()
+        if shop_id:
+            stmt = stmt.where(Product.shop_id == shop_id)
+        product = (await session.execute(stmt)).scalar_one_or_none()
+        if not product:
+            await query.answer("محصول پیدا نشد", show_alert=True)
+            return
+        floor = max(int(product.reserved_stock), 0)
+        new_stock = max(floor, product.stock + delta)
+        if new_stock == product.stock:
+            await query.answer("کمتر از تعداد رزروشده‌ی سفارش‌ها نمی‌شه" if floor else "موجودی صفر شده", show_alert=False)
+            return
+        restocked = product.available_stock <= 0 and (new_stock - product.reserved_stock) > 0
+        product.stock = new_stock
+        await session.commit()
+    if restocked:
+        async with async_session() as session:
+            await _check_and_notify_restock(session, product_id, shop_id or product.shop_id, context.bot)
+    await query.answer()
+    await show_product_card(query, context, product_id, shop_id)
+
+
+@admin_only
+async def product_preview(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دید مشتری: همون عکس و کپشنی که مشتری می‌بینه، به‌صورت پیام جدا و بدون دکمه."""
+    from handlers.menu import load_product_screen
+
+    query = update.callback_query
+    product_id = int(query.data.split(":")[3])
+    screen = await load_product_screen(product_id, update.effective_user.id)
+    if not screen:
+        await query.answer("محصول پیدا نشد", show_alert=True)
+        return
+    await query.answer()
+    chat_id = query.message.chat_id
+    note = "👁 این چیزیه که مشتری می‌بینه:"
+    if screen["photos"]:
+        try:
+            await context.bot.send_photo(chat_id=chat_id, photo=screen["photos"][0], caption=f"{note}\n\n{screen['caption']}"[:1000], parse_mode="HTML")
+            return
+        except Exception:
+            pass
+    await context.bot.send_message(chat_id=chat_id, text=f"{note}\n\n{screen['caption']}", parse_mode="HTML")
 
 
 @admin_only
@@ -371,7 +611,7 @@ async def product_soldout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product.stock = product.reserved_stock
         await session.commit()
     await query.answer("⛔ ناموجود شد")
-    await render_view(query, context, _product_detail_text(product), product_edit_keyboard(product))
+    await show_product_card(query, context, product_id, shop_id)
 
 
 def _product_detail_text(product: Product) -> str:
@@ -392,19 +632,7 @@ async def open_product_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     product_id = int(query.data.split(":")[3])
     shop_id = context.user_data.get("admin_shop_id") or await _get_shop_id_for_admin(update.effective_user.id)
-
-    async with async_session() as session:
-        stmt = select(Product).where(Product.id == product_id)
-        if shop_id:
-            stmt = stmt.where(Product.shop_id == shop_id)
-        product = (await session.execute(stmt)).scalar_one_or_none()
-
-    if not product:
-        await render_view(query, context, "این محصول پیدا نشد یا به شما تعلق نداره.",
-                           InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="admin:products:list:0")]]))
-        return
-
-    await render_view(query, context, _product_detail_text(product), product_edit_keyboard(product))
+    await show_product_card(query, context, product_id, shop_id, fresh=True)
 
 
 @admin_only
@@ -422,8 +650,8 @@ async def toggle_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
             product.is_active = not product.is_active
             await session.commit()
 
-    await query.answer()
-    await open_product_edit(update, context)
+    await query.answer("🙈 مخفی شد" if product and not product.is_active else "👁 دوباره نمایش داده می‌شه")
+    await show_product_card(query, context, product_id, shop_id)
 
 
 @admin_only
@@ -590,10 +818,8 @@ async def save_edit_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await session.commit()
             if field == 'stock' and old_stock == 0 and value > 0:
                 await _check_and_notify_restock(session, product_id, product.shop_id, context.bot)
-            await update.message.reply_text(
-                f"✅ {FIELD_LABELS[field]} به‌روز شد.\n\n{_product_detail_text(product)}",
-                reply_markup=product_edit_keyboard(product),
-            )
+            await update.message.reply_text(f"✅ {FIELD_LABELS[field]} به‌روز شد.")
+            await send_product_card(context.bot, update.effective_chat.id, product)
         else:
             await update.message.reply_text("محصول پیدا نشد.")
 

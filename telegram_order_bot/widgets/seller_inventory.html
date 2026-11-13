@@ -1,0 +1,62 @@
+<style>
+body{margin:0;direction:rtl;color:var(--tg-theme-text-color,#000)}
+.w{padding:12px 12px max(12px,env(safe-area-inset-bottom))}
+.h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.h b{font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.m{color:var(--tg-theme-hint-color,#888);font-size:12px;white-space:nowrap}
+.r{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--tg-theme-secondary-bg-color,#eee)}
+.r.off .n{opacity:.45}
+.n{flex:1;min-width:0}
+.n b{display:block;font-size:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.n span{font-size:12px;color:var(--tg-theme-hint-color,#888)}
+.c{min-width:30px;text-align:center;font-size:18px;font-weight:700}
+.c.z{color:var(--tg-theme-destructive-text-color,#e53935)}
+button{font:inherit;border:0;border-radius:50%;width:38px;height:38px;font-size:22px;line-height:1;background:var(--tg-theme-secondary-bg-color,#eee);color:var(--tg-theme-text-color,#000)}
+button.eye{width:34px;height:34px;font-size:16px;border-radius:10px}
+button.pg{border-radius:10px;width:auto;padding:0 18px;font-size:15px;background:var(--tg-theme-button-color,#39f);color:var(--tg-theme-button-text-color,#fff)}
+.f{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:10px;font-size:13px;color:var(--tg-theme-hint-color,#888)}
+.e{padding:26px 0;text-align:center;color:var(--tg-theme-hint-color,#888)}
+</style>
+<div class="w">
+<div class="h"><b id="s"></b><span class="m" id="t"></span></div>
+<div id="l"></div>
+<div class="f" id="f"></div>
+</div>
+<script>
+const W=window.TelegramWidget,$=i=>document.getElementById(i);
+const fa=n=>Number(n||0).toLocaleString('fa-IR');
+const pr=k=>k>=1000?fa(Math.round(k/100)/10)+' میلیون':fa(k)+' هزار';
+let o=null,busy=false;
+function btn(txt,cls,fn){const b=document.createElement('button');b.textContent=txt;if(cls)b.className=cls;b.addEventListener('click',fn);return b}
+function act(a,id){
+  if(busy||!o)return;busy=true;
+  W.request('v:'+a+':'+id+':'+o.g).then(r=>{busy=false;if(r.result)draw(r.result);W.HapticFeedback.impactOccurred('light')},
+  ()=>{busy=false;W.HapticFeedback.notificationOccurred('error')});
+}
+function draw(j){
+  try{o=JSON.parse(j==null?W.chatData:j)}catch(e){}
+  if(!o)return;
+  $('s').textContent=o.s||'';$('t').textContent=fa(o.t)+' محصول';
+  const l=$('l');l.textContent='';
+  if(!o.p||!o.p.length){const e=document.createElement('div');e.className='e';e.textContent='هنوز محصولی نداری';l.appendChild(e)}
+  (o.p||[]).forEach(p=>{
+    const [id,name,stock,res,k,on]=p,r=document.createElement('div');r.className='r'+(on?'':' off');
+    const n=document.createElement('div');n.className='n';
+    const nb=document.createElement('b');nb.textContent=name;
+    const ns=document.createElement('span');ns.textContent=pr(k)+(res?' · رزرو '+fa(res):'')+(on?'':' · مخفی');
+    n.appendChild(nb);n.appendChild(ns);
+    const c=document.createElement('div');c.className='c'+(stock-res<=0?' z':'');c.textContent=fa(stock);
+    r.appendChild(n);r.appendChild(btn('−','',()=>act('-',id)));r.appendChild(c);r.appendChild(btn('+','',()=>act('+',id)));
+    r.appendChild(btn(on?'👁':'🙈','eye',()=>act('t',id)));
+    l.appendChild(r);
+  });
+  const f=$('f');f.textContent='';
+  if(o.m>1){
+    f.appendChild(btn('▶','pg',()=>act('g',o.g>0?o.g-1:o.m-1)));
+    const s=document.createElement('span');s.textContent=fa(o.g+1)+' از '+fa(o.m);f.appendChild(s);
+    f.appendChild(btn('◀','pg',()=>act('g',o.g<o.m-1?o.g+1:0)));
+  }
+}
+W.onEvent('chatDataChanged',()=>draw());
+draw();if(W.ready)W.ready();
+</script>

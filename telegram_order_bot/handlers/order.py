@@ -33,6 +33,7 @@ from database.models import (
     User,
 )
 from services import payment as payment_svc
+from services.widgets import available as widgets_available
 from services.order_service import create_order_from_cart, attach_card_receipt, cancel_order_and_release_stock, CustomerInfo, transition_order
 from utils.helpers import format_price, generate_tracking_code, notify_shop_owner, to_jalali, to_persian_digits, history_line, short_price
 from utils.crypto import safe_decrypt
@@ -621,7 +622,7 @@ async def handle_card_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE
             [InlineKeyboardButton("📦 سفارش‌های من", callback_data="order:history")],
             [InlineKeyboardButton("🛍 منوی اصلی", callback_data="nav:main")],
         ]
-        if config.WIDGETS_ENABLED and not config.WIDGET_AUTO_SEND:
+        if widgets_available() and not config.WIDGET_AUTO_SEND:
             receipt_rows.insert(0, [InlineKeyboardButton("📍 رهگیری زنده سفارش", callback_data=f"order:track:{order_id}")])
 
         if file_id:
@@ -1443,7 +1444,7 @@ async def order_detail_customer(update: Update, context: ContextTypes.DEFAULT_TY
         rows.append([InlineKeyboardButton("🔄 خرید دوباره", callback_data=f"order:reorder:{order.id}")])
     if order.status == OrderStatus.PENDING_PAYMENT:
         rows.insert(0, [InlineKeyboardButton("📤 ارسال رسید پرداخت", callback_data=f"pay:receipt_retry:{order.id}")])
-    if config.WIDGETS_ENABLED and order.status not in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
+    if widgets_available() and order.status not in (OrderStatus.CANCELLED, OrderStatus.REFUNDED):
         rows.append([InlineKeyboardButton("📍 رهگیری زنده", callback_data=f"order:track:{order.id}")])
     rows.append([InlineKeyboardButton("💬 پیام به فروشنده", callback_data=f"msg:open_conv:{order.id}")])
     rows.append([InlineKeyboardButton("🔙 بازگشت", callback_data="order:history")])

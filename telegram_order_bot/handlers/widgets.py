@@ -12,7 +12,7 @@ from utils.tenant import get_owner_shop_id
 
 logger = logging.getLogger(__name__)
 
-_UNSUPPORTED = "ویجت باز نشد. تلگرامت رو به آخرین نسخه به‌روز کن و دوباره امتحان کن."
+_UNSUPPORTED = "این قابلیت فعلاً در تلگرام در دسترس نیست (یا تلگرامت قدیمیه). کمی بعد دوباره امتحان کن."
 
 
 async def widget_query_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -55,8 +55,22 @@ async def seller_live_dashboard(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer(_UNSUPPORTED, show_alert=True)
 
 
+async def seller_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """seller:inv — ویجت موجودی سریع (+ و − و مخفی‌کردن) رو برای فروشنده می‌فرسته."""
+    query = update.callback_query
+    shop_id = await get_owner_shop_id(update.effective_user.id)
+    if not shop_id:
+        await query.answer("فروشگاهی برای این حساب پیدا نشد.", show_alert=True)
+        return
+    if await widgets.send_seller_inventory(context.bot, shop_id, query.message.chat_id):
+        await query.answer()
+    else:
+        await query.answer(_UNSUPPORTED, show_alert=True)
+
+
 def register(application: Application) -> None:
     # گروه جدا: TypeHandler همه‌ی آپدیت‌ها رو می‌بینه و نباید جلوی هندلرهای دیگه رو بگیره
     application.add_handler(TypeHandler(Update, widget_query_router), group=-1)
     application.add_handler(CallbackQueryHandler(order_track, pattern=r"^order:track:\d+$"))
     application.add_handler(CallbackQueryHandler(seller_live_dashboard, pattern="^seller:live$"))
+    application.add_handler(CallbackQueryHandler(seller_inventory, pattern="^seller:inv$"))

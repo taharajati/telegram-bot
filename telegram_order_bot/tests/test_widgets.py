@@ -70,13 +70,13 @@ async def make_order(status=OrderStatus.PENDING_PAYMENT, **extra) -> int:
 
 # ─── کد ویجت ───────────────────────────────────────────────────
 
-@pytest.mark.parametrize("html", [widgets.ORDER_TRACKER_HTML, widgets.SELLER_DASHBOARD_HTML])
+@pytest.mark.parametrize("html", [widgets.ORDER_TRACKER_HTML, widgets.SELLER_DASHBOARD_HTML, widgets.SELLER_INVENTORY_HTML])
 def test_widget_html_fits_telegram_limits(html):
     assert len(html.encode("utf-8")) <= widgets.MAX_HTML_BYTES
     assert widgets.compressed_size(html) <= widgets.MAX_HTML_COMPRESSED
 
 
-@pytest.mark.parametrize("html", [widgets.ORDER_TRACKER_HTML, widgets.SELLER_DASHBOARD_HTML])
+@pytest.mark.parametrize("html", [widgets.ORDER_TRACKER_HTML, widgets.SELLER_DASHBOARD_HTML, widgets.SELLER_INVENTORY_HTML])
 def test_widget_html_avoids_features_telegram_strips(html):
     # پروفایل ۱ ویجت: بدون شبکه، بدون فرم، بدون منابع خارجی
     for forbidden in ("fetch(", "XMLHttpRequest", "<input", "<form", "<iframe", "src=", "@import", "text-shadow", "vh;"):
@@ -247,3 +247,102 @@ async def test_seller_dashboard_counts_sales_and_pending_work(bot):
 
     await widgets.handle_widget_query(bot, widget_query(widgets.Q_SELLER_REFRESH, user_id=SELLER_ID))
     assert json.loads(calls(bot, "answerWidgetQuery")[0]["data"])["t"] == 450000
+
+
+# ─── ویجت موجودی سریع فروشنده ───
+
+async def _inventory_shop(count=14):
+    from database.models import Category, Product
+
+    async with async_session() as session:
+        shop = Shop(name="فروشگاه با یک اسم نسبتاً طولانی برای تست", status="active", is_active=True)
+        session.add(shop)
+        await session.flush()
+        session.add(ShopOwner(user_id=SELLER_ID, shop_id=shop.id))
+        cat = Category(name="تیشرت", shop_id=shop.id)
+        session.add(cat)
+        await session.flush()
+        for i in range(count):
+            session.add(Product(name=f"تیشرت خیلی خیلی طولانی شماره {i}", price=2000000, stock=5, category_id=cat.id, shop_id=shop.id))
+        await session.commit()
+        return shop.id
+
+
+async def test_inventory_state_fits_the_state_limit_and_pages():
+    shop_id = await _inventory_shop(14)
+    first = json.loads(await widgets.inventory_state(shop_id, 0))
+    assert first["t"] == 14 and first["m"] == 3 and len(first["p"]) == widgets.INVENTORY_PAGE_SIZE
+    for page in range(3):
+        state = await widgets.inventory_state(shop_id, page)
+        assert len(state.encode("utf-8")) <= widgets.MAX_STATE_BYTES
+    assert json.loads(await widgets.inventory_state(shop_id, 99))["g"] == 2  # صفحه‌ی بیرون از بازه به آخر می‌چسبه
+
+
+async def test_inventory_widget_changes_stock_and_visibility_for_the_owner(bot):
+    from database.models import Product
+
+    await _inventory_shop(2)
+    async with async_session() as session:
+        pid = (await session.execute(Product.__table__.select().order_by(Product.id))).first().id
+
+    def query(action):
+        return {"id": "q", "data": f"v:{action}:{pid}:0", "message_id": 5,
+                "from": {"id": SELLER_ID}, "chat": {"id": SELLER_ID, "type": "private"}}
+
+    await widgets.handle_widget_query(bot, query("+"))
+    answer = json.loads(calls(bot, "answerWidgetQuery")[-1]["data"])
+    assert [p for p in answer["p"] if p[0] == pid][0][2] == 6
+    await widgets.handle_widget_query(bot, query("-"))
+    await widgets.handle_widget_query(bot, query("t"))
+    async with async_session() as session:
+        row = (await session.execute(Product.__table__.select().where(Product.id == pid))).first()
+    assert row.stock == 5 and not row.is_active
+    assert calls(bot, "editMessageWidgetData")  # state ذخیره می‌شه تا ویجت دوباره‌ساخته‌شده کهنه نباشه
+
+
+async def test_inventory_widget_ignores_other_users_and_respects_reserved(bot):
+    from database.models import Product
+
+    await _inventory_shop(1)
+    async with async_session() as session:
+        pid = (await session.execute(Product.__table__.select())).first().id
+        await session.execute(Product.__table__.update().where(Product.id == pid).values(stock=5, reserved_stock=5))
+        await session.commit()
+
+    stranger = {"id": "q", "data": f"v:+:{pid}:0", "message_id": 5, "from": {"id": 424242}, "chat": {"id": 424242, "type": "private"}}
+    await widgets.handle_widget_query(bot, stranger)
+    assert "data" not in calls(bot, "answerWidgetQuery")[-1]
+
+    down = {"id": "q2", "data": f"v:-:{pid}:0", "message_id": 5, "from": {"id": SELLER_ID}, "chat": {"id": SELLER_ID, "type": "private"}}
+    await widgets.handle_widget_query(bot, down)
+    async with async_session() as session:
+        row = (await session.execute(Product.__table__.select().where(Product.id == pid))).first()
+    assert row.stock == 5  # زیر تعداد رزروشده نمی‌ره
+
+
+# ─── تلگرام ویجت رو رد می‌کنه: دکمه‌ها پنهان می‌شن و بعد دوباره امتحان می‌شه ───
+
+async def test_widget_buttons_hide_when_telegram_refuses_widgets(bot, monkeypatch):
+    monkeypatch.setattr(widgets, "_blocked_until", 0.0)  # بعد از تست خودکار به حالت اول برمی‌گرده
+    shop_id = await _inventory_shop(1)
+    assert widgets.available()
+    bot.do_api_request = AsyncMock(side_effect=BadRequest("INPUT_MEDIA_WIDGET_NOT_ALLOWED"))
+
+    assert not await widgets.send_seller_inventory(bot, shop_id, SELLER_ID)
+
+    assert not widgets.available()
+    bot.do_api_request.reset_mock()
+    assert not await widgets.send_seller_inventory(bot, shop_id, SELLER_ID)
+    bot.do_api_request.assert_not_awaited()  # تا پایان مهلت دوباره درخواست نمی‌ره
+
+    monkeypatch.setattr(widgets, "_blocked_until", 0.0)
+    assert widgets.available()
+
+
+async def test_other_widget_errors_do_not_hide_the_buttons(bot, monkeypatch):
+    monkeypatch.setattr(widgets, "_blocked_until", 0.0)
+    shop_id = await _inventory_shop(1)
+    bot.do_api_request = AsyncMock(side_effect=BadRequest("chat not found"))
+
+    assert not await widgets.send_seller_inventory(bot, shop_id, SELLER_ID)
+    assert widgets.available()
