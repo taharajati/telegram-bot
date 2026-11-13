@@ -4,9 +4,11 @@
 """
 import math
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Update
 from telegram.ext import ContextTypes, ConversationHandler
 from sqlalchemy import delete, select, update as sa_update
+
+import config
 from sqlalchemy.orm import selectinload
 
 from database.db import async_session
@@ -659,9 +661,23 @@ async def gallery_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not images:
         text = f"🖼 گالری «{product.name}» خالی است."
     else:
-        text = f"🖼 گالری «{product.name}» ({len(images)} عکس):\n\n"
-        for i, img in enumerate(images, 1):
-            text += f"{i}. {img.local_url or 'فقط file_id'}\n"
+        text = (
+            f"🖼 گالری «{product.name}»: {len(images)} عکس اضافه‌ی دیگه (غیر از عکس اصلی).\n"
+            "پیش‌نمایش‌شون بالاست؛ برای حذف، شماره‌ی عکس رو بزن 👇"
+        )
+        # پیش‌نمایش خود عکس‌ها (به‌جای نمایش مسیر فایل)
+        previews = []
+        for img in images[:10]:
+            if img.file_id and img.file_id.startswith(("AgA", "BAAC")):
+                previews.append(InputMediaPhoto(media=img.file_id))
+            elif img.local_url:
+                previews.append(InputMediaPhoto(
+                    media=img.local_url if img.local_url.startswith("http") else config.WEBSITE_URL + img.local_url))
+        if previews:
+            try:
+                await context.bot.send_media_group(chat_id=query.message.chat_id, media=previews)
+            except Exception:
+                pass
 
     rows = []
     if images:

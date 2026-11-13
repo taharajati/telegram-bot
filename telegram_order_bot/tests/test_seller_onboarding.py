@@ -296,3 +296,32 @@ async def test_customer_order_detail_shows_status_history(monkeypatch):
 async def _shop_id_of(order_id):
     async with async_session() as session:
         return (await session.get(Order, order_id)).shop_id
+
+
+# ─── گالری عکس‌های وب‌محور (محصولاتی که عکسشون از سایت یا ایمپورت اومده) ───
+
+async def test_gallery_shows_previews_not_file_paths(monkeypatch):
+    from database.models import ProductImage
+
+    await register(make_context())
+    shop = await get_shop()
+    async with async_session() as session:
+        cat = Category(name="تیشرت", shop_id=shop.id)
+        session.add(cat)
+        await session.flush()
+        product = Product(name="تیشرت تست", price=2000000, stock=3, category_id=cat.id, shop_id=shop.id)
+        session.add(product)
+        await session.flush()
+        session.add(ProductImage(product_id=product.id, file_id="web_x.jpg", local_url="/api/product-image-file/x.jpg", sort_order=1))
+        await session.commit()
+        product_id = product.id
+    monkeypatch.setattr(config, "WEBSITE_URL", "http://example.test")
+    update = callback_update(f"admin:products:gallery:{product_id}")
+    context = make_context()
+
+    await products_h.gallery_list(update, context)
+
+    shown = update.callback_query.edit_message_text.await_args.args[0]
+    assert "/api/product-image-file" not in shown
+    album = context.bot.send_media_group.await_args.kwargs["media"]
+    assert [m.media for m in album] == ["http://example.test/api/product-image-file/x.jpg"]

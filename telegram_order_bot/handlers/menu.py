@@ -199,9 +199,11 @@ async def show_product_detail(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             image_urls.append(config.WEBSITE_URL + product.image_url)
     for img in extra_images:
-        # Skip relative web paths (not real Telegram file_ids)
         if img.file_id and img.file_id.startswith(('AgA', 'BAAC', 'http')):
             image_ids.append(img.file_id)
+        elif img.local_url:
+            # عکس‌هایی که از سایت یا ایمپورت اضافه شدن file_id تلگرام ندارن؛ از آدرس وب فرستاده می‌شن
+            image_urls.append(img.local_url if img.local_url.startswith('http') else config.WEBSITE_URL + img.local_url)
 
     chat_id = query.message.chat_id
 
